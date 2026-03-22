@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { RatingStars } from "@/components/recipes/rating-stars";
 import { RecipeCard } from "@/components/recipes/recipe-card";
@@ -18,7 +18,7 @@ const libraryFilters = [
   { id: "sobremesas", label: "Sobremesas" },
 ];
 
-export default function LibraryPage() {
+export default function LibraryContent() {
   const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("todas");
@@ -113,8 +113,7 @@ export default function LibraryPage() {
   }
 
   return (
-    <Suspense fallback={<div className="pt-5">Carregando...</div>}>
-      <section className="space-y-5 pb-2">
+    <section className="space-y-5 pb-2">
       <header className="relative overflow-hidden rounded-[2rem] shadow-[0_20px_45px_-25px_rgba(42,30,23,0.55)]">
         <div
           className="absolute inset-0 bg-cover bg-center"
@@ -240,6 +239,5 @@ export default function LibraryPage() {
       ) : null}
 
     </section>
-    </Suspense>
   );
 }
