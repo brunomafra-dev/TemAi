@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f5f1e8;
+  --surface: #fffcf7;
+  --surface-muted: #f2e9d9;
+  --foreground: #2a1e17;
+  --muted-foreground: #736459;
+  --primary: #c9a86a;
+  --primary-foreground: #fffdf8;
+  --accent: #ede2cd;
+  --border: #e5d7bf;
+  --ring: #c9a86a;
+  --radius: 1rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-nunito);
+  --font-display: var(--font-lora);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 6px);
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-nunito), sans-serif;
+  background-image: radial-gradient(
+      circle at 20% 0%,
+      #fbf5e9 0,
+      rgba(251, 245, 233, 0) 42%
+    ),
+    radial-gradient(circle at 80% 100%, #e9dcc4 0, rgba(233, 220, 196, 0) 36%);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-lora), serif;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c9a86a;
+  border-radius: 999px;
+}

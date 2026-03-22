@@ -1,0 +1,121 @@
+insert into public.recipes_br
+  (slug, title, description, category, ingredients, steps, prep_minutes, servings, image_url, source_name, source_url)
+values
+  (
+    'file-mignon-ao-molho-com-risoto',
+    'File mignon ao molho com risoto',
+    'Prato principal elegante com carne macia e risoto cremoso.',
+    'principais',
+    array['500g de file mignon', '2 colheres de manteiga', '1 cebola', '1 xicara de arroz arboreo', '1/2 xicara de vinho branco', '4 xicaras de caldo de legumes', 'sal e pimenta'],
+    array['Tempere o file mignon com sal e pimenta.', 'Sele a carne em frigideira quente com manteiga e reserve.', 'Refogue cebola, adicione arroz arboreo e vinho.', 'Acrescente caldo aos poucos ate o risoto ficar cremoso.', 'Finalize ajustando sal e sirva com o file.'],
+    45,
+    2,
+    'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80',
+    'TemAi Curadoria',
+    null
+  ),
+  (
+    'carbonara-classica',
+    'Spaghetti carbonara classica',
+    'Massa cremosa com queijo e pancetta para refeicoes especiais.',
+    'massas',
+    array['300g de spaghetti', '150g de pancetta', '3 gemas', '1 ovo', '1 xicara de queijo ralado', 'pimenta-do-reino'],
+    array['Cozinhe o spaghetti em agua com sal.', 'Doure a pancetta em fogo medio.', 'Misture gemas, ovo e queijo em uma tigela.', 'Escorra a massa e misture com pancetta e creme de ovos fora do fogo.', 'Finalize com pimenta e sirva imediatamente.'],
+    25,
+    2,
+    'https://images.unsplash.com/photo-1612874742237-6526221588e3?auto=format&fit=crop&w=1200&q=80',
+    'TemAi Curadoria',
+    null
+  ),
+  (
+    'nhoque-ao-sugo',
+    'Nhoque ao sugo',
+    'Massa macia com molho de tomate caseiro.',
+    'massas',
+    array['500g de nhoque', '2 xicaras de molho de tomate', '1 colher de azeite', 'manjericao', 'queijo ralado'],
+    array['Aqueça o molho de tomate com azeite.', 'Cozinhe o nhoque ate boiar.', 'Misture a massa ao molho.', 'Finalize com manjericao e queijo ralado.'],
+    20,
+    3,
+    'https://images.unsplash.com/photo-1621996346565-e3dbc353d2e5?auto=format&fit=crop&w=1200&q=80',
+    'TemAi Curadoria',
+    null
+  ),
+  (
+    'salada-mediterranea',
+    'Salada mediterranea',
+    'Receita veggie leve com legumes frescos e azeite.',
+    'veggie',
+    array['alface', 'tomate', 'pepino', 'azeitona', 'queijo branco', 'azeite', 'limao', 'sal'],
+    array['Lave e corte os vegetais.', 'Misture tudo em uma tigela grande.', 'Tempere com azeite, limao e sal.', 'Sirva gelada.'],
+    15,
+    2,
+    'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1200&q=80',
+    'TemAi Curadoria',
+    null
+  ),
+  (
+    'legumes-assados-com-ervas',
+    'Legumes assados com ervas',
+    'Opcao veggie pratica para o dia a dia.',
+    'veggie',
+    array['abobrinha', 'cenoura', 'berinjela', 'azeite', 'alecrim', 'sal', 'pimenta'],
+    array['Corte os legumes em tiras.', 'Tempere com azeite, sal, pimenta e ervas.', 'Asse em forno medio por 35 minutos.', 'Sirva quente.'],
+    40,
+    3,
+    'https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=1200&q=80',
+    'TemAi Curadoria',
+    null
+  ),
+  (
+    'mini-hamburguer-caseiro',
+    'Mini hamburguer caseiro',
+    'Receita divertida para o publico infantil.',
+    'kids',
+    array['500g de carne moida', 'sal', 'pao mini', 'queijo', 'alface', 'tomate'],
+    array['Modele mini hamburgueres e tempere.', 'Grelhe ate dourar dos dois lados.', 'Monte no pao com queijo e salada.', 'Sirva com acompanhamento.'],
+    30,
+    4,
+    'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=80',
+    'TemAi Curadoria',
+    null
+  ),
+  (
+    'panqueca-de-banana-kids',
+    'Panqueca de banana para kids',
+    'Lanche rapido e adocicado sem complicacao.',
+    'kids',
+    array['1 banana', '1 ovo', '3 colheres de aveia', 'canela'],
+    array['Amasse a banana e misture com ovo e aveia.', 'Cozinhe em frigideira antiaderente dos dois lados.', 'Finalize com canela.'],
+    12,
+    1,
+    'https://images.unsplash.com/photo-1528207776546-365bb710ee93?auto=format&fit=crop&w=1200&q=80',
+    'TemAi Curadoria',
+    null
+  ),
+  (
+    'pudim-de-leite',
+    'Pudim de leite condensado',
+    'Sobremesa classica brasileira cremosa.',
+    'sobremesas',
+    array['1 lata de leite condensado', '2 medidas de leite', '3 ovos', '1 xicara de acucar'],
+    array['Derreta acucar para a calda e coloque na forma.', 'Bata leite condensado, leite e ovos.', 'Despeje na forma e asse em banho maria.', 'Leve a geladeira antes de desenformar.'],
+    70,
+    8,
+    'https://images.unsplash.com/photo-1551024601-bec78aea704b?auto=format&fit=crop&w=1200&q=80',
+    'TemAi Curadoria',
+    null
+  ),
+  (
+    'mousse-de-maracuja',
+    'Mousse de maracuja',
+    'Sobremesa facil e refrescante.',
+    'sobremesas',
+    array['1 lata de leite condensado', '1 lata de creme de leite', 'suco concentrado de maracuja'],
+    array['Bata todos os ingredientes no liquidificador.', 'Distribua em potes.', 'Leve para gelar por 2 horas.'],
+    10,
+    6,
+    'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=1200&q=80',
+    'TemAi Curadoria',
+    null
+  )
+on conflict (slug) do nothing;
