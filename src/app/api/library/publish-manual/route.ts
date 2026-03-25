@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { slugify } from "@/lib/utils";
-import { upsertImportedRecipeToSupabase } from "@/features/recipes/supabase-library";
+import {
+  refreshAuthorBadgesInSupabase,
+  upsertImportedRecipeToSupabase,
+} from "@/features/recipes/supabase-library";
+import type { LibraryCategory } from "@/features/recipes/types";
 
 interface PublishManualPayload {
   title?: string;
@@ -10,15 +14,41 @@ interface PublishManualPayload {
   prepMinutes?: number;
   servings?: number;
   imageUrl?: string | null;
+  category?: LibraryCategory;
+  authorName?: string;
 }
 
-function inferCategory(title: string, ingredients: string[]): "principais" | "veggie" | "massas" | "kids" | "sobremesas" {
-  const text = `${title} ${ingredients.join(" ")}`.toLowerCase();
-  if (/(bolo|mousse|pudim|sobremesa|chocolate|brigadeiro|torta doce|doce|cookie|brownie|pave)/.test(text)) return "sobremesas";
-  if (/(massa|macarrao|spaghetti|penne|lasanha|nhoque|ravioli|fettuccine|talharim)/.test(text)) return "massas";
-  if (/(vegetar|vegano|salada|abobrinha|berinjela|cenoura|brocolis|grao de bico|tofu)/.test(text)) return "veggie";
-  if (/(kids|infantil|lancheira|papinha|panqueca|nugget|hamburguinho)/.test(text)) return "kids";
-  return "principais";
+const allowedCategories = new Set<LibraryCategory>([
+  "principais",
+  "veggie",
+  "massas",
+  "kids",
+  "sobremesas",
+  "bebidas",
+  "lanches",
+]);
+
+function normalizeAuthorHandle(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40) || "usuario_temai";
+}
+
+function isPremiumAllowed(authorHandle: string): boolean {
+  const mode = (process.env.COMMUNITY_PUBLISH_MODE || "open").trim().toLowerCase();
+  if (mode !== "premium") return true;
+
+  const allowed = (process.env.COMMUNITY_PREMIUM_AUTHORS || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => normalizeAuthorHandle(item));
+
+  return allowed.includes(authorHandle);
 }
 
 export async function POST(request: Request) {
@@ -29,6 +59,19 @@ export async function POST(request: Request) {
     const description = payload.description?.trim() || "";
     const ingredients = Array.isArray(payload.ingredients) ? payload.ingredients.map((i) => i.trim()).filter(Boolean) : [];
     const steps = Array.isArray(payload.steps) ? payload.steps.map((s) => s.trim()).filter(Boolean) : [];
+    const category = payload.category && allowedCategories.has(payload.category) ? payload.category : "principais";
+    const authorName = payload.authorName?.trim() || "Usuario TemAi";
+    const authorHandle = normalizeAuthorHandle(authorName);
+
+    if (!isPremiumAllowed(authorHandle)) {
+      return NextResponse.json(
+        {
+          message:
+            "Publicacao na biblioteca disponivel apenas para premium no momento.",
+        },
+        { status: 403 },
+      );
+    }
 
     if (!title || ingredients.length === 0 || steps.length === 0) {
       return NextResponse.json({ message: "Dados insuficientes para publicar receita." }, { status: 400 });
@@ -41,15 +84,21 @@ export async function POST(request: Request) {
       slug,
       title,
       description: description || "Receita autoral publicada no TemAi.",
-      category: inferCategory(title, ingredients),
+      category,
       ingredients,
       steps,
       prepMinutes: Math.max(5, Math.min(240, Number(payload.prepMinutes) || 20)),
       servings: Math.max(1, Math.min(20, Number(payload.servings) || 2)),
       imageUrl: payload.imageUrl || undefined,
-      sourceName: "Comunidade TemAi",
-      sourceUrl: `temai://manual/${slug}`,
+      sourceName: `@${authorHandle}`,
+      sourceUrl: `temai://community/${slug}`,
     });
+
+    try {
+      await refreshAuthorBadgesInSupabase(authorHandle);
+    } catch {
+      // non-blocking: recipe publish should succeed even if badge refresh fails
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {
@@ -59,4 +108,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

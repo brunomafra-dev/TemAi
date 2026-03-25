@@ -4,6 +4,8 @@ export interface UserProfile {
   firstName: string;
   lastName: string;
   photoDataUrl: string;
+  selectedBadge: string;
+  unlockedBadges: string[];
 }
 
 const PROFILE_STORAGE_KEY = "temai_user_profile";
@@ -12,6 +14,8 @@ const defaultProfile: UserProfile = {
   firstName: "Bruno",
   lastName: "Mafra",
   photoDataUrl: "",
+  selectedBadge: "estagiario",
+  unlockedBadges: ["estagiario"],
 };
 
 export function getUserProfile(): UserProfile {
@@ -30,6 +34,12 @@ export function getUserProfile(): UserProfile {
       firstName: parsed.firstName?.trim() || defaultProfile.firstName,
       lastName: parsed.lastName?.trim() || defaultProfile.lastName,
       photoDataUrl: parsed.photoDataUrl?.trim() || "",
+      selectedBadge:
+        parsed.selectedBadge?.trim() || defaultProfile.selectedBadge,
+      unlockedBadges:
+        Array.isArray(parsed.unlockedBadges) && parsed.unlockedBadges.length > 0
+          ? parsed.unlockedBadges.filter((item): item is string => typeof item === "string")
+          : defaultProfile.unlockedBadges,
     };
   } catch {
     return defaultProfile;
@@ -42,4 +52,5 @@ export function saveUserProfile(profile: UserProfile): void {
   }
 
   window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+  window.dispatchEvent(new CustomEvent("temai:profile-updated"));
 }

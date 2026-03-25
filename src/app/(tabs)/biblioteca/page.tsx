@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { RatingStars } from "@/components/recipes/rating-stars";
 import { RecipeCard } from "@/components/recipes/recipe-card";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,13 +16,44 @@ const libraryFilters = [
   { id: "massas", label: "Massas" },
   { id: "kids", label: "Kids" },
   { id: "sobremesas", label: "Sobremesas" },
+  { id: "bebidas", label: "Bebidas" },
+  { id: "lanches", label: "Lanches" },
 ];
 
+function sanitizePage(value: string | null): number {
+  const parsed = Number(value || "1");
+  if (!Number.isFinite(parsed)) return 1;
+  return Math.max(1, Math.floor(parsed));
+}
+
+function createSeed(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID().slice(0, 8)
+    : `${Date.now()}`;
+}
+
 export default function LibraryPage() {
+  return (
+    <Suspense fallback={<div className="pt-5">Carregando...</div>}>
+      <LibraryPageContent />
+    </Suspense>
+  );
+}
+
+function LibraryPageContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const [search, setSearch] = useState("");
-  const [selectedFilter, setSelectedFilter] = useState("todas");
-  const [page, setPage] = useState(1);
+
+  const allowedFilters = useMemo(() => new Set(libraryFilters.map((item) => item.id)), []);
+
+  const [search, setSearch] = useState(() => searchParams.get("q")?.trim() || "");
+  const [selectedFilter, setSelectedFilter] = useState(() => {
+    const fromUrl = searchParams.get("category")?.trim() || "todas";
+    return allowedFilters.has(fromUrl) ? fromUrl : "todas";
+  });
+  const [page, setPage] = useState(() => sanitizePage(searchParams.get("page")));
+  const [seed, setSeed] = useState(() => searchParams.get("seed")?.trim() || createSeed());
+
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [ratings, setRatings] = useState<Record<string, number>>({});
@@ -30,16 +61,21 @@ export default function LibraryPage() {
   const [totalItems, setTotalItems] = useState(0);
 
   useEffect(() => {
-    const fromUrl = searchParams.get("category")?.trim();
-    const allowed = new Set(libraryFilters.map((item) => item.id));
-    if (fromUrl && allowed.has(fromUrl)) {
-      setSelectedFilter(fromUrl);
-    }
-  }, [searchParams]);
+    const params = new URLSearchParams(searchParams.toString());
 
-  useEffect(() => {
-    setPage(1);
-  }, [search, selectedFilter]);
+    if (search.trim()) params.set("q", search.trim());
+    else params.delete("q");
+
+    params.set("category", selectedFilter);
+    params.set("page", String(page));
+    params.set("seed", seed);
+
+    const nextQuery = params.toString();
+    const currentQuery = searchParams.toString();
+    if (nextQuery !== currentQuery) {
+      router.replace(`/biblioteca?${nextQuery}`, { scroll: false });
+    }
+  }, [router, search, selectedFilter, page, seed, searchParams]);
 
   useEffect(() => {
     let isMounted = true;
@@ -48,17 +84,15 @@ export default function LibraryPage() {
 
       try {
         const response = await fetch(
-          `/api/library/search?q=${encodeURIComponent(search)}&category=${encodeURIComponent(selectedFilter)}&page=${page}&pageSize=12`,
+          `/api/library/search?q=${encodeURIComponent(search)}&category=${encodeURIComponent(selectedFilter)}&page=${page}&pageSize=12&seed=${encodeURIComponent(seed)}`,
         );
-        if (!response.ok) {
-          throw new Error("Falha ao carregar receitas.");
-        }
+        if (!response.ok) throw new Error("Falha ao carregar receitas.");
 
         const data = (await response.json()) as {
           recipes: Recipe[];
-          source: string;
           pagination?: { totalPages?: number; total?: number; page?: number };
         };
+
         if (isMounted) {
           setRecipes(data.recipes);
           setTotalPages(Math.max(1, data.pagination?.totalPages || 1));
@@ -66,10 +100,7 @@ export default function LibraryPage() {
           if (data.pagination?.page && data.pagination.page !== page) {
             setPage(data.pagination.page);
           }
-          const ratingMap = Object.fromEntries(
-            data.recipes.map((recipe) => [recipe.id, getUserRecipeRating(recipe.id)]),
-          );
-          setRatings(ratingMap);
+          setRatings(Object.fromEntries(data.recipes.map((recipe) => [recipe.id, getUserRecipeRating(recipe.id)])));
         }
       } catch {
         if (isMounted) {
@@ -78,9 +109,7 @@ export default function LibraryPage() {
           setTotalItems(0);
         }
       } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        if (isMounted) setIsLoading(false);
       }
     }, 350);
 
@@ -88,20 +117,14 @@ export default function LibraryPage() {
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [search, selectedFilter, page]);
+  }, [search, selectedFilter, page, seed]);
 
   function buildVisiblePages(): number[] {
-    if (totalPages <= 7) {
-      return Array.from({ length: totalPages }, (_, index) => index + 1);
-    }
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
 
-    const pages = new Set<number>();
-    pages.add(1);
-    pages.add(totalPages);
+    const pages = new Set<number>([1, totalPages]);
     for (let i = page - 1; i <= page + 1; i += 1) {
-      if (i > 1 && i < totalPages) {
-        pages.add(i);
-      }
+      if (i > 1 && i < totalPages) pages.add(i);
     }
 
     return [...pages].sort((a, b) => a - b);
@@ -112,9 +135,18 @@ export default function LibraryPage() {
     setRatings((current) => ({ ...current, [recipeId]: rating }));
   }
 
+  function buildRecipeHref(recipeId: string): string {
+    const params = new URLSearchParams();
+    params.set("origin", "library");
+    if (search.trim()) params.set("q", search.trim());
+    params.set("category", selectedFilter);
+    params.set("page", String(page));
+    params.set("seed", seed);
+    return `/receita/${recipeId}?${params.toString()}`;
+  }
+
   return (
-    <Suspense fallback={<div className="pt-5">Carregando...</div>}>
-      <section className="space-y-5 pb-2">
+    <section className="space-y-5 pb-2">
       <header className="relative overflow-hidden rounded-[2rem] shadow-[0_20px_45px_-25px_rgba(42,30,23,0.55)]">
         <div
           className="absolute inset-0 bg-cover bg-center"
@@ -134,7 +166,11 @@ export default function LibraryPage() {
             <Input
               placeholder="Buscar por nome ou ingrediente..."
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+                setSeed(createSeed());
+              }}
               className="h-10 border-0 bg-transparent text-[#2A1E17] placeholder:text-[#9F988D]"
             />
           </div>
@@ -145,7 +181,11 @@ export default function LibraryPage() {
         {libraryFilters.map((filter) => (
           <button
             key={filter.id}
-            onClick={() => setSelectedFilter(filter.id)}
+            onClick={() => {
+              setSelectedFilter(filter.id);
+              setPage(1);
+              setSeed(createSeed());
+            }}
             className={
               selectedFilter === filter.id
                 ? "rounded-full border border-[#C9A86A] bg-[#F6EFDF] px-4 py-2 text-xs font-semibold text-[#7D6139]"
@@ -166,9 +206,7 @@ export default function LibraryPage() {
       ) : recipes.length === 0 ? (
         <Card className="border-[#E5D7C1] bg-[#FFFCF7] shadow-[0_20px_35px_-25px_rgba(42,30,23,0.7)]">
           <CardContent className="pt-5">
-            <p className="text-sm text-[#7A6D60]">
-              Nenhuma receita encontrada para a busca atual.
-            </p>
+            <p className="text-sm text-[#7A6D60]">Nenhuma receita encontrada para a busca atual.</p>
           </CardContent>
         </Card>
       ) : (
@@ -177,7 +215,7 @@ export default function LibraryPage() {
             <div key={recipe.id} className="space-y-2">
               <RecipeCard
                 recipe={recipe}
-                href={`/receita/${recipe.id}?origin=library`}
+                href={buildRecipeHref(recipe.id)}
                 footerLabel={`Fonte: ${recipe.sourceLabel}`}
               />
               <div className="rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] px-3 py-2">
@@ -238,8 +276,6 @@ export default function LibraryPage() {
           </div>
         </div>
       ) : null}
-
     </section>
-    </Suspense>
   );
 }

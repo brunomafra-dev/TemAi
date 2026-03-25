@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { getUserProfile } from "@/features/profile/storage";
 import {
   getMyRecipes,
   removeMyRecipe,
   upsertMyRecipe,
 } from "@/features/recipes/local-storage";
-import type { Recipe } from "@/features/recipes/types";
+import type { LibraryCategory, Recipe } from "@/features/recipes/types";
 import { parseIngredientsText } from "@/features/recipes/helpers";
 import { slugify } from "@/lib/utils";
 
@@ -22,14 +23,28 @@ function mapSteps(value: string): string[] {
     .filter(Boolean);
 }
 
+const categoryOptions: Array<{ id: LibraryCategory; label: string }> = [
+  { id: "principais", label: "Principais" },
+  { id: "veggie", label: "Veggie" },
+  { id: "massas", label: "Massas" },
+  { id: "kids", label: "Kids" },
+  { id: "sobremesas", label: "Sobremesas" },
+  { id: "bebidas", label: "Bebidas" },
+  { id: "lanches", label: "Lanches" },
+];
+
 export default function MyRecipesPage() {
   const [recipes, setRecipes] = useState<Recipe[]>(() => getMyRecipes());
   const [isAdding, setIsAdding] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [category, setCategory] = useState<LibraryCategory>("principais");
   const [ingredientsText, setIngredientsText] = useState("");
   const [stepsText, setStepsText] = useState("");
+  const [publishingById, setPublishingById] = useState<Record<string, boolean>>({});
+  const [publishedById, setPublishedById] = useState<Record<string, boolean>>({});
+  const [publishErrorById, setPublishErrorById] = useState<Record<string, string>>({});
 
   const hasFormData = useMemo(
     () => title.trim().length > 0 && ingredientsText.trim().length > 0 && stepsText.trim().length > 0,
@@ -39,6 +54,7 @@ export default function MyRecipesPage() {
   function clearForm() {
     setTitle("");
     setDescription("");
+    setCategory("principais");
     setIngredientsText("");
     setStepsText("");
     setImageUrl("");
@@ -53,6 +69,7 @@ export default function MyRecipesPage() {
       id: `manual-${slugify(title)}-${Date.now()}`,
       title: title.trim(),
       description: description.trim() || "Receita criada por voce no TemAi.",
+      category,
       ingredients: parseIngredientsText(ingredientsText),
       steps: mapSteps(stepsText),
       prepMinutes: 20,
@@ -70,6 +87,49 @@ export default function MyRecipesPage() {
 
   function handleDeleteRecipe(recipeId: string) {
     setRecipes(removeMyRecipe(recipeId));
+  }
+
+  async function handlePublishRecipe(recipe: Recipe) {
+    if (publishingById[recipe.id]) return;
+
+    const profile = getUserProfile();
+    const authorName = `${profile.firstName} ${profile.lastName}`.trim() || "Usuario TemAi";
+
+    setPublishErrorById((current) => ({ ...current, [recipe.id]: "" }));
+    setPublishingById((current) => ({ ...current, [recipe.id]: true }));
+
+    try {
+      const response = await fetch("/api/library/publish-manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: recipe.title,
+          description: recipe.description,
+          ingredients: recipe.ingredients,
+          steps: recipe.steps,
+          prepMinutes: recipe.prepMinutes,
+          servings: recipe.servings,
+          imageUrl: recipe.imageUrl || null,
+          category: recipe.category || "principais",
+          authorName,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = (await response.json()) as { message?: string };
+        throw new Error(data.message || "Falha ao publicar receita.");
+      }
+
+      setPublishedById((current) => ({ ...current, [recipe.id]: true }));
+    } catch (error) {
+      setPublishErrorById((current) => ({
+        ...current,
+        [recipe.id]:
+          error instanceof Error ? error.message : "Falha ao publicar receita.",
+      }));
+    } finally {
+      setPublishingById((current) => ({ ...current, [recipe.id]: false }));
+    }
   }
 
   return (
@@ -103,6 +163,22 @@ export default function MyRecipesPage() {
               onChange={(event) => setDescription(event.target.value)}
               className="min-h-[70px]"
             />
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Categoria
+              </p>
+              <select
+                value={category}
+                onChange={(event) => setCategory(event.target.value as LibraryCategory)}
+                className="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none"
+              >
+                {categoryOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <Textarea
               placeholder="Ingredientes separados por virgula"
               value={ingredientsText}
@@ -140,6 +216,22 @@ export default function MyRecipesPage() {
           recipes.map((recipe) => (
             <div key={recipe.id} className="space-y-2">
               <RecipeCard recipe={recipe} href={`/receita/${recipe.id}?origin=saved`} />
+              <Button
+                variant={publishedById[recipe.id] ? "secondary" : "default"}
+                size="sm"
+                className="w-full"
+                onClick={() => handlePublishRecipe(recipe)}
+                disabled={Boolean(publishingById[recipe.id]) || Boolean(publishedById[recipe.id])}
+              >
+                {publishedById[recipe.id]
+                  ? "Publicada na biblioteca"
+                  : publishingById[recipe.id]
+                    ? "Publicando..."
+                    : "Publicar na biblioteca"}
+              </Button>
+              {publishErrorById[recipe.id] ? (
+                <p className="text-xs text-red-700">{publishErrorById[recipe.id]}</p>
+              ) : null}
               <Button variant="outline" size="sm" className="w-full" onClick={() => handleDeleteRecipe(recipe.id)}>
                 Remover da lista
               </Button>

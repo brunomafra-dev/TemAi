@@ -1,10 +1,11 @@
-import { slugify } from "@/lib/utils";
+﻿import { slugify } from "@/lib/utils";
+import type { LibraryCategory } from "@/features/recipes/types";
 
 export interface ImportedRecipeDraft {
   slug: string;
   title: string;
   description: string;
-  category: "principais" | "veggie" | "massas" | "kids" | "sobremesas";
+  category: LibraryCategory;
   ingredients: string[];
   steps: string[];
   prepMinutes: number;
@@ -30,54 +31,50 @@ interface RecipeJsonLd {
 
 function decodeHtmlEntities(value: string): string {
   let decoded = value;
+  const named: Record<string, string> = {
+    "&aacute;": "\u00E1",
+    "&agrave;": "\u00E0",
+    "&acirc;": "\u00E2",
+    "&atilde;": "\u00E3",
+    "&eacute;": "\u00E9",
+    "&ecirc;": "\u00EA",
+    "&iacute;": "\u00ED",
+    "&oacute;": "\u00F3",
+    "&ocirc;": "\u00F4",
+    "&otilde;": "\u00F5",
+    "&uacute;": "\u00FA",
+    "&ccedil;": "\u00E7",
+    "&Aacute;": "\u00C1",
+    "&Agrave;": "\u00C0",
+    "&Acirc;": "\u00C2",
+    "&Atilde;": "\u00C3",
+    "&Eacute;": "\u00C9",
+    "&Ecirc;": "\u00CA",
+    "&Iacute;": "\u00CD",
+    "&Oacute;": "\u00D3",
+    "&Ocirc;": "\u00D4",
+    "&Otilde;": "\u00D5",
+    "&Uacute;": "\u00DA",
+    "&Ccedil;": "\u00C7"
+  };
+
   for (let i = 0; i < 3; i += 1) {
     const next = decoded
       .replace(/&amp;/gi, "&")
       .replace(/&nbsp;/gi, " ")
-      .replace(/&deg;/gi, "°")
-      .replace(/&ordm;/gi, "º")
-      .replace(/&ordf;/gi, "ª")
+      .replace(/&deg;/gi, "\u00B0")
+      .replace(/&ordm;/gi, "\u00BA")
+      .replace(/&ordf;/gi, "\u00AA")
       .replace(/&frac12;/gi, "1/2")
       .replace(/&frac14;/gi, "1/4")
       .replace(/&frac34;/gi, "3/4")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
-    .replace(/&#x([\da-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
-    .replace(
-      /&([a-z]+);/gi,
-      (entity) =>
-        (
-          {
-            "&aacute;": "á",
-            "&agrave;": "à",
-            "&acirc;": "â",
-            "&atilde;": "ã",
-            "&eacute;": "é",
-            "&ecirc;": "ê",
-            "&iacute;": "í",
-            "&oacute;": "ó",
-            "&ocirc;": "ô",
-            "&otilde;": "õ",
-            "&uacute;": "ú",
-            "&ccedil;": "ç",
-            "&Aacute;": "Á",
-            "&Agrave;": "À",
-            "&Acirc;": "Â",
-            "&Atilde;": "Ã",
-            "&Eacute;": "É",
-            "&Ecirc;": "Ê",
-            "&Iacute;": "Í",
-            "&Oacute;": "Ó",
-            "&Ocirc;": "Ô",
-            "&Otilde;": "Õ",
-            "&Uacute;": "Ú",
-            "&Ccedil;": "Ç",
-          } as Record<string, string>
-        )[entity] || entity,
-    )
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;|&apos;/gi, "'")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+      .replace(/&#x([\da-f]+);/gi, (_, code) => String.fromCodePoint(Number.parseInt(code, 16)))
+      .replace(/&([a-z]+);/gi, (entity) => named[entity] || entity)
       .replace(/\s+/g, " ")
       .trim();
 
@@ -138,6 +135,8 @@ function extractInstructions(instructions: RecipeJsonLd["recipeInstructions"]): 
 
 function inferCategory(title: string, ingredients: string[]): ImportedRecipeDraft["category"] {
   const text = `${title} ${ingredients.join(" ")}`.toLowerCase();
+  if (/(suco|smoothie|vitamina|drink|coquetel|caipirinha|cha|cafe|refrigerante|limonada)/.test(text)) return "bebidas";
+  if (/(lanche|sanduiche|sanduíche|hamburguer|hambúrguer|wrap|tostex|toast|hot dog|cachorro-quente|esfirra)/.test(text)) return "lanches";
   if (/(bolo|mousse|pudim|sobremesa|chocolate|brigadeiro|torta doce)/.test(text)) return "sobremesas";
   if (/(massa|macarrao|spaghetti|penne|lasanha|nhoque|ravioli)/.test(text)) return "massas";
   if (/(vegetar|vegano|salada|abobrinha|berinjela|cenoura|brocolis)/.test(text)) return "veggie";
@@ -299,3 +298,6 @@ export async function collectTudoGostosoRecipeUrls(targetCount: number): Promise
 
   return recipeUrls.slice(0, targetCount);
 }
+
+
+

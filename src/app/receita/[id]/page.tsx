@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchFullRecipe } from "@/features/recipes/api-client";
 import { LIBRARY_RECIPES } from "@/features/recipes/library-recipes";
+import { addShoppingItemsFromRecipe } from "@/features/recipes/shopping-storage";
 import {
   getMyRecipes,
   isRecipeSaved,
@@ -47,6 +48,9 @@ export default function RecipeDetailsPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isSaved, setIsSaved] = useState(false);
   const [userRating, setUserRating] = useState(0);
+  const [isShoppingOpen, setIsShoppingOpen] = useState(false);
+  const [ownedIngredients, setOwnedIngredients] = useState<Record<string, boolean>>({});
+  const [shoppingMessage, setShoppingMessage] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -160,6 +164,31 @@ export default function RecipeDetailsPage() {
     setUserRating(rating);
   }
 
+  function openShoppingSelector() {
+    if (!recipe) return;
+    setOwnedIngredients(
+      Object.fromEntries(recipe.ingredients.map((ingredient) => [ingredient, false])),
+    );
+    setShoppingMessage("");
+    setIsShoppingOpen(true);
+  }
+
+  function confirmShoppingList() {
+    if (!recipe) return;
+    const missing = recipe.ingredients.filter((ingredient) => !ownedIngredients[ingredient]);
+    if (missing.length === 0) {
+      setShoppingMessage("Perfeito! Voce ja tem todos os ingredientes.");
+      return;
+    }
+
+    addShoppingItemsFromRecipe({
+      recipeId: recipe.id,
+      recipeTitle: recipe.title,
+      ingredientNames: missing,
+    });
+    setShoppingMessage(`${missing.length} item(ns) enviado(s) para sua lista de compras.`);
+  }
+
   return (
     <div className="mx-auto min-h-screen w-full max-w-md px-4 pb-12 pt-5">
       <div className="mb-4">
@@ -228,6 +257,52 @@ export default function RecipeDetailsPage() {
                   Ver Minhas receitas
                 </Link>
               </div>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={openShoppingSelector}
+              >
+                Adicionar a lista de compras
+              </Button>
+              {isShoppingOpen ? (
+                <div className="space-y-3 rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] p-3">
+                  <p className="text-sm font-semibold text-[#5D5248]">
+                    Marque os ingredientes que voce ja tem em casa:
+                  </p>
+                  <div className="space-y-2">
+                    {recipe.ingredients.map((ingredient) => (
+                      <label key={`own-${ingredient}`} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(ownedIngredients[ingredient])}
+                          onChange={(event) =>
+                            setOwnedIngredients((current) => ({
+                              ...current,
+                              [ingredient]: event.target.checked,
+                            }))
+                          }
+                        />
+                        <span>{ingredient}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button className="flex-1" onClick={confirmShoppingList}>
+                      Enviar faltantes
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      className="flex-1"
+                      onClick={() => setIsShoppingOpen(false)}
+                    >
+                      Fechar
+                    </Button>
+                  </div>
+                  {shoppingMessage ? (
+                    <p className="text-xs font-semibold text-[#6A5E52]">{shoppingMessage}</p>
+                  ) : null}
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 

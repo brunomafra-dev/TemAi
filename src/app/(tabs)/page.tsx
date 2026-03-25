@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { RatingStars } from "@/components/recipes/rating-stars";
+import { BADGE_CATALOG } from "@/features/profile/badges";
 import { getUserProfile } from "@/features/profile/storage";
 import { LIBRARY_RECIPES } from "@/features/recipes/library-recipes";
+import { getPendingShoppingCount } from "@/features/recipes/shopping-storage";
 import type { Recipe } from "@/features/recipes/types";
 import { cn, normalizeText } from "@/lib/utils";
 
@@ -37,7 +39,7 @@ const categories = [
     id: "kids",
     label: "Kids",
     image:
-      "https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=500&q=80",
+      "https://gastronomiacarioca.zonasul.com.br/wp-content/uploads/2020/10/comida_crianca_zonasul.jpg",
   },
   {
     id: "sobremesas",
@@ -45,16 +47,22 @@ const categories = [
     image:
       "https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?auto=format&fit=crop&w=500&q=80",
   },
+  {
+    id: "lanches",
+    label: "Lanches",
+    image:
+      "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=500&q=80",
+  },
+  {
+    id: "bebidas",
+    label: "Bebidas",
+    image:
+      "https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=500&q=80",
+  },
 ];
 
-const popularCategories = ["principais", "veggie", "massas", "kids", "sobremesas"] as const;
-const featuredPopular = [
-  { slug: "tg-07caf2fde425-picanha-ao-forno-com-sal-grosso", title: "Picanha ao Forno com Sal Grosso" },
-  { slug: "ext-86692078a806-risoto-pratico-de-shimeji", title: "Risoto pratico de shimeji" },
-  { slug: "ext-88d9624726a7-massa-rustica-de-espinafre-na-manteiga-de-salvia", title: "Massa Rustica de espinafre na manteiga de Salvia" },
-  { slug: "ext-2a87b91d385e-miniaboboras-recheadas-com-carne-seca", title: "Mini aboboras recheadas com carne seca" },
-  { slug: "ext-f46c80c5f661-sorvete-de-frutas-amarelas", title: "Sorvete de Frutas Amarelas" },
-] as const;
+const popularCategories = ["principais", "veggie", "massas", "kids", "sobremesas", "lanches", "bebidas"] as const;
+const POPULAR_CACHE_KEY = "temai:home:popular:v1";
 
 const libraryMetaById: Record<
   string,
@@ -118,36 +126,51 @@ const libraryMetaById: Record<
 
 export default function HomePage() {
   const router = useRouter();
-  const [profile] = useState(() => getUserProfile());
+  const [profile, setProfile] = useState(() => getUserProfile());
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("principais");
   const [isGeneratorMenuOpen, setIsGeneratorMenuOpen] = useState(false);
+  const [pendingShoppingCount, setPendingShoppingCount] = useState(0);
   const [popularApiRecipes, setPopularApiRecipes] = useState<
     Array<{ recipe: Recipe; rating: number; category: string }>
   >([]);
+  const currentBadgeLabel =
+    BADGE_CATALOG.find((badge) => badge.slug === profile.selectedBadge)?.label || "🌱 Estagiario";
 
   useEffect(() => {
     let isMounted = true;
 
+    const cached = typeof window !== "undefined" ? window.sessionStorage.getItem(POPULAR_CACHE_KEY) : null;
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached) as Array<{ recipe: Recipe; rating: number; category: string }>;
+        setPopularApiRecipes(parsed);
+      } catch {
+        // ignore invalid cache
+      }
+    }
+
     async function loadPopular() {
       try {
-        const responses = await Promise.all(
-          featuredPopular.map(async (featured, index) => {
-            const preferredResponse = await fetch(`/api/library/meal/${featured.slug}`);
-            if (!preferredResponse.ok) return null;
-            const preferredData = (await preferredResponse.json()) as { recipe?: Recipe };
-            const recipe = preferredData.recipe;
-            if (!recipe) return null;
-            return {
-              recipe,
-              rating: Math.max(4.2, 4.9 - index * 0.08),
-              category: recipe.category || "principais",
-            };
-          }),
-        );
-        const filtered = responses.filter(Boolean) as Array<{ recipe: Recipe; rating: number; category: string }>;
+        const response = await fetch("/api/library/popular?limit=7", { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error("Falha ao carregar populares.");
+        }
+        const data = (await response.json()) as {
+          recipes?: Array<{ recipe: Recipe; rating: number }>;
+        };
+        const filtered = (data.recipes || [])
+          .filter((entry) => Boolean(entry.recipe?.id))
+          .map((entry) => ({
+            recipe: entry.recipe,
+            rating: entry.rating,
+            category: entry.recipe.category || "principais",
+          }));
         if (isMounted) {
           setPopularApiRecipes(filtered);
+          if (typeof window !== "undefined") {
+            window.sessionStorage.setItem(POPULAR_CACHE_KEY, JSON.stringify(filtered));
+          }
         }
       } catch {
         if (isMounted) {
@@ -160,6 +183,41 @@ export default function HomePage() {
     return () => {
       isMounted = false;
     };
+  }, []);
+
+  useEffect(() => {
+    function syncProfile() {
+      setProfile(getUserProfile());
+    }
+
+    window.addEventListener("temai:profile-updated", syncProfile as EventListener);
+    window.addEventListener("storage", syncProfile);
+    return () => {
+      window.removeEventListener("temai:profile-updated", syncProfile as EventListener);
+      window.removeEventListener("storage", syncProfile);
+    };
+  }, []);
+
+  useEffect(() => {
+    function syncPendingCount() {
+      setPendingShoppingCount(getPendingShoppingCount());
+    }
+
+    syncPendingCount();
+    window.addEventListener("temai:shopping-list-changed", syncPendingCount as EventListener);
+    window.addEventListener("storage", syncPendingCount);
+    return () => {
+      window.removeEventListener("temai:shopping-list-changed", syncPendingCount as EventListener);
+      window.removeEventListener("storage", syncPendingCount);
+    };
+  }, []);
+
+  useEffect(() => {
+    const imageUrls = [heroImage, ctaImage, ...categories.map((category) => category.image)];
+    imageUrls.forEach((url) => {
+      const img = new Image();
+      img.src = url;
+    });
   }, []);
 
   function openGeneratorMenu() {
@@ -223,14 +281,7 @@ export default function HomePage() {
       );
     });
 
-    const orderedFeatured = featuredPopular
-      .map((featured) =>
-        filteredApi.find((item) => item.recipe.id === featured.slug),
-      )
-      .filter(
-        (item): item is { recipe: Recipe; rating: number; category: string } =>
-          Boolean(item?.recipe),
-      )
+    const orderedFeatured = filteredApi
       .map((entry) => ({
         recipe: entry.recipe,
         rating: entry.rating,
@@ -270,23 +321,41 @@ export default function HomePage() {
               )}
               <div>
                 <p className="font-display text-2xl leading-none">Ola, {profile.firstName} 👋</p>
-                <p className="mt-1 text-sm text-[#E9DCC6]">{profile.lastName}</p>
+                <p className="mt-1 text-xs font-semibold text-[#E9DCC6]">{currentBadgeLabel}</p>
               </div>
             </div>
-            <button
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-[#F5F1E8] transition hover:bg-white/25"
-              aria-label="Notificacoes"
-            >
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor">
-                <path
-                  d="M6.5 10.5c0-3.2 2.3-5.8 5.5-5.8s5.5 2.6 5.5 5.8v3.3l1.5 2.2H5l1.5-2.2v-3.3Z"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path d="M9.8 17.8c.4 1.2 1.3 1.8 2.2 1.8s1.8-.6 2.2-1.8" strokeWidth="1.8" />
-              </svg>
-            </button>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/perfil?section=notifications"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-[#F5F1E8] transition hover:bg-white/25"
+                aria-label="Notificacoes"
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor">
+                  <path
+                    d="M6.5 10.5c0-3.2 2.3-5.8 5.5-5.8s5.5 2.6 5.5 5.8v3.3l1.5 2.2H5l1.5-2.2v-3.3Z"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path d="M9.8 17.8c.4 1.2 1.3 1.8 2.2 1.8s1.8-.6 2.2-1.8" strokeWidth="1.8" />
+                </svg>
+              </Link>
+              <Link
+                href="/perfil?section=shopping"
+                className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-[#F5F1E8] transition hover:bg-white/25"
+                aria-label="Lista de compras"
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor">
+                  <path d="M7 8h10l-1 10H8L7 8Z" strokeWidth="1.8" />
+                  <path d="M9 8V6a3 3 0 0 1 6 0v2" strokeWidth="1.8" />
+                </svg>
+                {pendingShoppingCount > 0 ? (
+                  <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-[#C9A86A] px-1.5 text-center text-[10px] font-bold text-[#2A1E17]">
+                    {Math.min(99, pendingShoppingCount)}
+                  </span>
+                ) : null}
+              </Link>
+            </div>
           </div>
 
           <div className="relative">

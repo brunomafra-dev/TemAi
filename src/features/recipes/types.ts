@@ -1,4 +1,12 @@
 export type InputMode = "text" | "audio" | "photo";
+export type LibraryCategory =
+  | "principais"
+  | "veggie"
+  | "massas"
+  | "kids"
+  | "sobremesas"
+  | "bebidas"
+  | "lanches";
 
 export type RecipeOrigin = "ai" | "library" | "manual";
 
@@ -14,7 +22,7 @@ export interface Recipe {
   id: string;
   title: string;
   description: string;
-  category?: string;
+  category?: LibraryCategory;
   ingredients: string[];
   steps: string[];
   prepMinutes: number;
