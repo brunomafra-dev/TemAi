@@ -1,14 +1,20 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { BADGE_CATALOG, inferUnlockedBadgesByRecipes } from "@/features/profile/badges";
 import { getNotificationPrefs, saveNotificationPrefs } from "@/features/profile/notifications-storage";
-import { getUserProfile, saveUserProfile, type UserProfile } from "@/features/profile/storage";
+import {
+  getUserProfile,
+  saveUserProfile,
+  saveUserProfileToCloud,
+  syncUserProfileFromCloud,
+  type UserProfile,
+} from "@/features/profile/storage";
 import { getMyRecipes, getSavedRecipeRefs } from "@/features/recipes/local-storage";
 import {
   clearCheckedShoppingItems,
@@ -24,8 +30,9 @@ const sections = [
   { id: "shopping", label: "Lista de Compras" },
   { id: "author", label: "Receitas Autorais" },
   { id: "saved", label: "Receitas Salvas" },
-  { id: "notifications", label: "Notificacoes" },
-  { id: "privacy", label: "Politica de dados e privacidade" },
+  { id: "notifications", label: "Notificações" },
+  { id: "support", label: "Suporte / Fale conosco" },
+  { id: "privacy", label: "Política de dados e privacidade" },
   { id: "terms", label: "Termos de Uso" },
   { id: "logout", label: "Sair da conta" },
   { id: "delete", label: "Excluir conta" },
@@ -62,6 +69,7 @@ function ProfilePageContent() {
   const [selectedRecipeFilter, setSelectedRecipeFilter] = useState<string>("all");
   const [notificationPrefs, setNotificationPrefs] = useState(() => getNotificationPrefs());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [cloudMessage, setCloudMessage] = useState("");
 
   const myRecipes = useMemo(() => getMyRecipes(), []);
   const savedRefs = useMemo(() => getSavedRecipeRefs(), []);
@@ -118,6 +126,25 @@ function ProfilePageContent() {
     return Array.from(byName.values());
   }, [filteredShoppingItems]);
 
+  useEffect(() => {
+    let isMounted = true;
+    syncUserProfileFromCloud()
+      .then((remote) => {
+        if (!isMounted || !remote) return;
+        setProfile(remote);
+        setWorkingProfile(remote);
+        setCloudMessage("Perfil sincronizado com sua conta.");
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setCloudMessage("Perfil local ativo. Faca login para sincronizar entre dispositivos.");
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   function changeSection(nextSection: SectionId | null) {
     if (!nextSection) {
       router.replace("/perfil", { scroll: false });
@@ -131,14 +158,15 @@ function ProfilePageContent() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      if (typeof reader.result === "string") {
-        setWorkingProfile((current) => ({ ...current, photoDataUrl: reader.result as string }));
+      const result = reader.result;
+      if (typeof result === "string") {
+        setWorkingProfile((current) => ({ ...current, photoDataUrl: result }));
       }
     };
     reader.readAsDataURL(file);
   }
 
-  function saveProfileChanges() {
+  async function saveProfileChanges() {
     const selected = unlockedBadges.includes(workingProfile.selectedBadge)
       ? workingProfile.selectedBadge
       : unlockedBadges[0] || "estagiario";
@@ -147,6 +175,12 @@ function ProfilePageContent() {
     saveUserProfile(next);
     setProfile(next);
     setWorkingProfile(next);
+    const synced = await saveUserProfileToCloud(next);
+    setCloudMessage(
+      synced
+        ? "Perfil salvo e sincronizado com sucesso."
+        : "Perfil salvo localmente. Login necessario para sincronizar.",
+    );
   }
 
   function toggleNotification(key: keyof typeof notificationPrefs) {
@@ -203,6 +237,9 @@ function ProfilePageContent() {
 
       <Card className="border-[#E5D7BF] bg-[#FFFCF7]">
         <CardContent className="space-y-2 pt-4">
+          {cloudMessage ? (
+            <p className="rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-xs text-[#6A5E52]">{cloudMessage}</p>
+          ) : null}
           {sections.map((section) => (
             <button
               key={section.id}
@@ -235,86 +272,16 @@ function ProfilePageContent() {
       </Card>
 
       {activeSection === "edit" ? (
-        <Card className="border-[#E5D7BF] bg-[#FFFCF7]">
-          <CardContent className="space-y-4 pt-5">
-            <p className="text-sm font-semibold text-[#5D5248]">Editar Perfil</p>
-
-            <div className="rounded-2xl border border-[#E8DBC8] bg-[#FAF4EA] p-3">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#7A6D60]">Preview</p>
-              <div className="flex items-center gap-3">
-                {workingProfile.photoDataUrl ? (
-                  <img
-                    src={workingProfile.photoDataUrl}
-                    alt="Preview do perfil"
-                    className="h-14 w-14 rounded-full border border-[#DCC9AE] object-cover"
-                  />
-                ) : (
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[#DCC9AE] bg-white text-lg font-semibold text-[#7A6D60]">
-                    {(workingProfile.firstName || "C").slice(0, 1).toUpperCase()}
-                  </div>
-                )}
-                <div>
-                  <p className="text-sm font-semibold text-[#4F4338]">
-                    {workingProfile.firstName || "Chef"} {workingProfile.lastName}
-                  </p>
-                  <p
-                    className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
-                      getBadgeBySlug(workingProfile.selectedBadge || selectedBadgeSlug).colorClass
-                    }`}
-                  >
-                    {getBadgeBySlug(workingProfile.selectedBadge || selectedBadgeSlug).label}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <label className="block rounded-xl border border-[#E8DBC8] bg-[#FAF4EA] px-3 py-2 text-xs text-[#6B6055]">
-              Foto de perfil
-              <input type="file" accept="image/*" className="mt-2 block w-full" onChange={handlePhotoUpload} />
-            </label>
-
-            <Input
-              placeholder="Nome"
-              value={workingProfile.firstName}
-              onChange={(e) => setWorkingProfile((c) => ({ ...c, firstName: e.target.value }))}
-            />
-            <Input
-              placeholder="Sobrenome"
-              value={workingProfile.lastName}
-              onChange={(e) => setWorkingProfile((c) => ({ ...c, lastName: e.target.value }))}
-            />
-
-            <div className="space-y-2 rounded-2xl border border-[#E8DBC8] bg-[#FAF4EA] p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#7A6D60]">Insignia</p>
-              <div className="grid gap-2">
-                {unlockedBadges.map((badgeSlug) => {
-                  const badge = getBadgeBySlug(badgeSlug);
-                  const isActive = (workingProfile.selectedBadge || selectedBadgeSlug) === badge.slug;
-                  return (
-                    <button
-                      key={badge.slug}
-                      onClick={() => setWorkingProfile((current) => ({ ...current, selectedBadge: badge.slug }))}
-                      className={
-                        isActive
-                          ? "rounded-xl border border-[#C66A3D] bg-[#F8E8E1] px-3 py-2 text-left"
-                          : "rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-left"
-                      }
-                    >
-                      <p className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${badge.colorClass}`}>
-                        {badge.label}
-                      </p>
-                      <p className="mt-1 text-xs text-[#6A5E52]">{badge.description}</p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <Button className="w-full" onClick={saveProfileChanges}>
-              Salvar alteracoes
-            </Button>
-          </CardContent>
-        </Card>
+        <Card className="border-[#E5D7BF] bg-[#FFFCF7]"><CardContent className="space-y-4 pt-5">
+          <p className="text-sm font-semibold text-[#5D5248]">Editar Perfil</p>
+          <label className="block rounded-xl border border-[#E8DBC8] bg-[#FAF4EA] px-3 py-2 text-xs text-[#6B6055]">
+            Foto de perfil
+            <input type="file" accept="image/*" className="mt-2 block w-full" onChange={handlePhotoUpload} />
+          </label>
+          <Input placeholder="Nome" value={workingProfile.firstName} onChange={(e) => setWorkingProfile((c) => ({ ...c, firstName: e.target.value }))} />
+          <Input placeholder="Sobrenome" value={workingProfile.lastName} onChange={(e) => setWorkingProfile((c) => ({ ...c, lastName: e.target.value }))} />
+          <Button className="w-full" onClick={() => void saveProfileChanges()}>Salvar alteracoes</Button>
+        </CardContent></Card>
       ) : null}
 
       {activeSection === "shopping" ? (
@@ -377,12 +344,16 @@ function ProfilePageContent() {
         </CardContent></Card>
       ) : null}
 
+      {activeSection === "support" ? (
+        <Card className="border-[#E5D7BF] bg-[#FFFCF7]"><CardContent className="space-y-2 pt-5 text-sm text-[#6A5E52]"><p className="font-semibold text-[#5D5248]">Suporte / Fale conosco</p><p>Em breve: canal oficial de suporte dentro do app.</p></CardContent></Card>
+      ) : null}
+
       {activeSection === "privacy" ? (
-        <Card className="border-[#E5D7BF] bg-[#FFFCF7]"><CardContent className="space-y-2 pt-5 text-sm text-[#6A5E52]"><p className="font-semibold text-[#5D5248]">Politica de dados e privacidade</p><p>Seus dados locais ficam no dispositivo nesta fase.</p></CardContent></Card>
+        <Card className="border-[#E5D7BF] bg-[#FFFCF7]"><CardContent className="space-y-2 pt-5 text-sm text-[#6A5E52]"><p className="font-semibold text-[#5D5248]">Politica de dados e privacidade</p><p>Leia a politica completa na pagina dedicada.</p><Link href="/privacidade" className="text-sm font-semibold text-primary underline">Abrir Politica de Privacidade</Link></CardContent></Card>
       ) : null}
 
       {activeSection === "terms" ? (
-        <Card className="border-[#E5D7BF] bg-[#FFFCF7]"><CardContent className="space-y-2 pt-5 text-sm text-[#6A5E52]"><p className="font-semibold text-[#5D5248]">Termos de Uso</p><p>Conteudo ofensivo pode ser removido.</p></CardContent></Card>
+        <Card className="border-[#E5D7BF] bg-[#FFFCF7]"><CardContent className="space-y-2 pt-5 text-sm text-[#6A5E52]"><p className="font-semibold text-[#5D5248]">Termos de Uso</p><p>Leia os termos completos na pagina dedicada.</p><Link href="/termos" className="text-sm font-semibold text-primary underline">Abrir Termos de Uso</Link></CardContent></Card>
       ) : null}
 
       {showDeleteConfirm ? (

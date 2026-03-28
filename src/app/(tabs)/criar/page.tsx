@@ -90,7 +90,7 @@ export default function CreatePage() {
     return {
       id: `manual-${slugify(title)}-${Date.now()}`,
       title: title.trim(),
-      description: description.trim() || "Receita criada por voce no TemAi.",
+      description: description.trim() || "Receita criada por você no TemAi.",
       ingredients: parseIngredientsText(ingredientsText),
       steps: mapSteps(stepsText),
       prepMinutes: 20,
@@ -174,7 +174,7 @@ export default function CreatePage() {
         : null;
 
     if (!SpeechRecognitionCtor) {
-      setVoiceMessage("Seu navegador nao suporta transcricao por voz.");
+      setVoiceMessage("Seu navegador não suporta transcrição por voz.");
       return;
     }
 
@@ -203,7 +203,7 @@ export default function CreatePage() {
     };
 
     recognition.onerror = () => {
-      setVoiceMessage("Nao foi possivel transcrever o audio.");
+      setVoiceMessage("Não foi possível transcrever o áudio.");
       stopVoiceCapture();
     };
 
@@ -212,7 +212,7 @@ export default function CreatePage() {
       setVoiceTarget(null);
     };
 
-    setVoiceMessage("Transcrevendo audio... fale naturalmente.");
+    setVoiceMessage("Transcrevendo áudio... fale naturalmente.");
     setVoiceTarget(target);
     recognitionRef.current = recognition;
     recognition.start();
@@ -290,9 +290,6 @@ export default function CreatePage() {
             >
               Abrir IA
             </Link>
-            <span className="rounded-full border border-[#EADBC0] bg-white/10 px-4 py-2 text-xs font-semibold text-[#FFF8EA]">
-              Voz no formulario
-            </span>
           </div>
           <p className="mt-3 text-xs text-[#E6D7BF]">
             Por voz: gravar audio -&gt; transcrever -&gt; IA estrutura ingredientes e preparo -&gt; voce revisa antes de salvar.
@@ -325,7 +322,7 @@ export default function CreatePage() {
           <div className="rounded-2xl border border-[#EADFCC] bg-[#FFF9EF] p-4">
             <div className="flex items-center justify-between gap-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8A7351]">
-                Detalhes da receita
+                Adicionar
               </p>
               <Button
                 type="button"
@@ -333,17 +330,17 @@ export default function CreatePage() {
                 className="h-8 border-[#E5D7C1] bg-[#FFFCF7] px-3 text-xs"
                 onClick={() => setIsDetailsOpen((current) => !current)}
               >
-                {isDetailsOpen ? "Ocultar detalhes" : "Adicionar detalhes"}
+                {isDetailsOpen ? "Ocultar" : "Adicionar"}
               </Button>
             </div>
             {!isDetailsOpen ? (
               <p className="mt-2 text-xs text-[#7A6D60]">
-                Ingredientes, preparo, descricao e imagem ficam escondidos para deixar a tela mais limpa.
+                Ingredientes, preparo, descrição e imagem ficam escondidos para deixar a tela mais limpa.
               </p>
             ) : (
               <div className="mt-3 space-y-4">
                 <Textarea
-                  placeholder="Descricao curta (opcional)"
+                  placeholder="Descrição curta (opcional)"
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
                   className="min-h-[84px] border-[#E5D7C1] bg-[#FAF5EC]"
@@ -438,7 +435,7 @@ export default function CreatePage() {
               ) : (
                 <div className="mt-3 rounded-2xl border border-dashed border-[#DECDAF] bg-[#FBF4E8] px-4 py-6 text-center">
                   <p className="text-sm font-medium text-[#7B6A56]">Adicione uma foto para destacar sua receita</p>
-                  <p className="mt-1 text-xs text-[#9B8B78]">Voce pode anexar da galeria ou tirar na hora.</p>
+                  <p className="mt-1 text-xs text-[#9B8B78]">Você pode anexar da galeria ou tirar na hora.</p>
                 </div>
               )}
             </div>
@@ -471,7 +468,7 @@ export default function CreatePage() {
           <Card className="border-[#E5D7C1] bg-[#FFFCF7]">
             <CardContent className="py-8">
               <p className="text-sm text-[#7A6D60]">
-                Voce ainda nao possui receitas salvas. Crie uma acima ou gere pela IA.
+                Você ainda não possui receitas salvas. Crie uma acima ou gere pela IA.
               </p>
             </CardContent>
           </Card>
