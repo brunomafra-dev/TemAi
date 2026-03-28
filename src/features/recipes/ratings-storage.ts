@@ -1,6 +1,6 @@
 "use client";
 
-const RATING_KEY = "temai_recipe_ratings";
+const RATING_KEY = "temai_recipe_ratings_v2";
 
 type RatingMap = Record<string, number>;
 
@@ -34,7 +34,7 @@ export function getUserRecipeRating(recipeId: string): number {
 }
 
 export function setUserRecipeRating(recipeId: string, rating: number): void {
-  const rounded = Math.max(1, Math.min(5, Math.round(rating * 2) / 2));
+  const rounded = Math.max(1, Math.min(10, Math.round(rating)));
   const map = getMap();
   map[recipeId] = rounded;
   saveMap(map);

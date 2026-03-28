@@ -130,7 +130,7 @@ function CreateRecipePageContent() {
                 className={cn(
                   "rounded-2xl border px-2 py-3 text-center transition",
                   mode === entry.value
-                    ? "border-[#C9A86A] bg-[#F6EFDF] text-[#7D6139]"
+                    ? "border-[#C66A3D] bg-[#F8E8E1] text-[#7A4733]"
                     : "border-[#E8DDC8] bg-[#FAF5EC] text-[#6E6258]",
                 )}
               >
@@ -206,7 +206,7 @@ function CreateRecipePageContent() {
           <Button
             onClick={handleGenerateSuggestions}
             disabled={!canGenerate}
-            className="h-12 w-full rounded-2xl bg-[#C9A86A] text-[#FFF9EE] hover:brightness-95"
+            className="h-12 w-full rounded-2xl bg-[#C66A3D] text-[#FFF9EE] hover:brightness-95"
           >
             {isLoading ? "Buscando sugestoes..." : "Gerar 3 sugestoes"}
           </Button>

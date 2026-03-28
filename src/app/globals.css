@@ -6,11 +6,11 @@
   --surface-muted: #f2e9d9;
   --foreground: #2a1e17;
   --muted-foreground: #736459;
-  --primary: #c9a86a;
+  --primary: #c66a3d;
   --primary-foreground: #fffdf8;
   --accent: #ede2cd;
   --border: #e5d7bf;
-  --ring: #c9a86a;
+  --ring: #c66a3d;
   --radius: 1rem;
 }
 
@@ -59,6 +59,6 @@ h3 {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c9a86a;
+  background: #c66a3d;
   border-radius: 999px;
 }

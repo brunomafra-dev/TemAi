@@ -350,7 +350,7 @@ export default function HomePage() {
                   <path d="M9 8V6a3 3 0 0 1 6 0v2" strokeWidth="1.8" />
                 </svg>
                 {pendingShoppingCount > 0 ? (
-                  <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-[#C9A86A] px-1.5 text-center text-[10px] font-bold text-[#2A1E17]">
+                  <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-[#C66A3D] px-1.5 text-center text-[10px] font-bold text-[#2A1E17]">
                     {Math.min(99, pendingShoppingCount)}
                   </span>
                 ) : null}
@@ -415,7 +415,7 @@ export default function HomePage() {
                 <span
                   className={cn(
                     "relative block h-[62px] w-[62px] overflow-hidden rounded-full border-2 shadow-sm transition",
-                    isActive ? "border-[#C9A86A]" : "border-[#E6DCCB]",
+                    isActive ? "border-[#C66A3D]" : "border-[#E6DCCB]",
                   )}
                 >
                   <span
@@ -466,7 +466,7 @@ export default function HomePage() {
                     {entry.recipe.prepMinutes} min
                   </span>
                   <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold text-white">
-                    ★ {entry.rating.toFixed(1)}
+                    ★ {(entry.rating * 2).toFixed(1)}
                   </span>
                 </div>
               </div>
@@ -480,7 +480,7 @@ export default function HomePage() {
                 <p className="text-[11px] font-semibold text-[#B19460]">
                   {entry.views.toLocaleString("pt-BR")} acessos
                 </p>
-                <RatingStars readonly size="sm" value={entry.rating} />
+                <RatingStars readonly size="sm" value={entry.rating * 2} />
               </div>
             </Link>
           ))}
@@ -527,3 +527,4 @@ export default function HomePage() {
     </section>
   );
 }
+

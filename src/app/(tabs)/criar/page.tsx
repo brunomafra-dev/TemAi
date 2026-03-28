@@ -16,6 +16,38 @@ import { slugify } from "@/lib/utils";
 const heroImage =
   "https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=1500&q=80";
 
+type SpeechRecognitionLike = {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+
+type SpeechRecognitionAlternativeLike = {
+  transcript: string;
+};
+
+type SpeechRecognitionResultLike = {
+  0: SpeechRecognitionAlternativeLike;
+  isFinal?: boolean;
+};
+
+type SpeechRecognitionEventLike = {
+  resultIndex: number;
+  results: ArrayLike<SpeechRecognitionResultLike>;
+};
+
+type VoiceWindow = Window & {
+  SpeechRecognition?: SpeechRecognitionCtor;
+  webkitSpeechRecognition?: SpeechRecognitionCtor;
+};
+
 function mapSteps(value: string): string[] {
   return value
     .split(/\n/g)
@@ -30,11 +62,15 @@ export default function CreatePage() {
   const [ingredientsText, setIngredientsText] = useState("");
   const [stepsText, setStepsText] = useState("");
   const [imageDataUrl, setImageDataUrl] = useState("");
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isSaveChoiceOpen, setIsSaveChoiceOpen] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState("");
+  const [voiceTarget, setVoiceTarget] = useState<"ingredients" | "steps" | null>(null);
+  const [voiceMessage, setVoiceMessage] = useState("");
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   const hasFormData = useMemo(
     () => title.trim().length > 0 && ingredientsText.trim().length > 0 && stepsText.trim().length > 0,
@@ -47,6 +83,7 @@ export default function CreatePage() {
     setIngredientsText("");
     setStepsText("");
     setImageDataUrl("");
+    setIsDetailsOpen(false);
   }
 
   function buildManualRecipe(): Recipe {
@@ -84,6 +121,101 @@ export default function CreatePage() {
       setImageDataUrl(typeof reader.result === "string" ? reader.result : "");
     };
     reader.readAsDataURL(file);
+  }
+
+  function isPremiumUser(): boolean {
+    if (typeof window === "undefined") return true;
+    const raw = window.localStorage.getItem("temai_is_premium");
+    if (raw == null) return true;
+    return raw === "true" || raw === "1" || raw.toLowerCase() === "active";
+  }
+
+  function formatIngredientsFromVoice(raw: string): string {
+    return raw
+      .replace(/\s+(virgula|vírgula)\s+/gi, ", ")
+      .replace(/\s+(ponto e virgula|ponto e vírgula)\s+/gi, ", ")
+      .replace(/\s+quebra de linha\s+/gi, ", ")
+      .replace(/\s{2,}/g, " ")
+      .split(/,|\n/g)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  function formatStepsFromVoice(raw: string): string {
+    return raw
+      .replace(/\s+(depois|em seguida|na sequencia|na sequência)\s+/gi, ". ")
+      .replace(/\s+quebra de linha\s+/gi, ". ")
+      .replace(/\s{2,}/g, " ")
+      .split(/\.|\n/g)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  function stopVoiceCapture() {
+    const current = recognitionRef.current;
+    if (!current) return;
+    current.stop();
+    recognitionRef.current = null;
+    setVoiceTarget(null);
+  }
+
+  function startVoiceCapture(target: "ingredients" | "steps") {
+    if (!isPremiumUser()) {
+      setVoiceMessage("Recurso premium: ative o plano para adicionar por voz.");
+      return;
+    }
+
+    const voiceWindow = window as VoiceWindow;
+    const SpeechRecognitionCtor =
+      typeof window !== "undefined"
+        ? (voiceWindow.SpeechRecognition || voiceWindow.webkitSpeechRecognition || null)
+        : null;
+
+    if (!SpeechRecognitionCtor) {
+      setVoiceMessage("Seu navegador nao suporta transcricao por voz.");
+      return;
+    }
+
+    if (voiceTarget) {
+      stopVoiceCapture();
+      return;
+    }
+
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = "pt-BR";
+    recognition.interimResults = true;
+    recognition.continuous = true;
+
+    recognition.onresult = (event: SpeechRecognitionEventLike) => {
+      let transcript = "";
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        transcript += event.results[i][0].transcript || "";
+      }
+
+      if (!transcript.trim()) return;
+      if (target === "ingredients") {
+        setIngredientsText(formatIngredientsFromVoice(transcript));
+      } else {
+        setStepsText(formatStepsFromVoice(transcript));
+      }
+    };
+
+    recognition.onerror = () => {
+      setVoiceMessage("Nao foi possivel transcrever o audio.");
+      stopVoiceCapture();
+    };
+
+    recognition.onend = () => {
+      recognitionRef.current = null;
+      setVoiceTarget(null);
+    };
+
+    setVoiceMessage("Transcrevendo audio... fale naturalmente.");
+    setVoiceTarget(target);
+    recognitionRef.current = recognition;
+    recognition.start();
   }
 
   async function handleSave(localOnly: boolean) {
@@ -154,11 +286,17 @@ export default function CreatePage() {
             </Link>
             <Link
               href="/gerar-receita-ia?mode=text"
-              className="rounded-full bg-[#C9A86A] px-4 py-2 text-xs font-semibold text-[#FFF8EA]"
+              className="rounded-full bg-[#C66A3D] px-4 py-2 text-xs font-semibold text-[#FFF8EA]"
             >
               Abrir IA
             </Link>
+            <span className="rounded-full border border-[#EADBC0] bg-white/10 px-4 py-2 text-xs font-semibold text-[#FFF8EA]">
+              Voz no formulario
+            </span>
           </div>
+          <p className="mt-3 text-xs text-[#E6D7BF]">
+            Por voz: gravar audio -&gt; transcrever -&gt; IA estrutura ingredientes e preparo -&gt; voce revisa antes de salvar.
+          </p>
         </div>
       </header>
 
@@ -166,13 +304,13 @@ export default function CreatePage() {
         <CardHeader>
           <CardTitle className="font-display text-2xl text-[#2A1E17]">Nova receita</CardTitle>
           <CardDescription>
-            Monte sua receita autoral com passos simples e imagem personalizada.
+            Comece pelo nome. Depois, adicione os detalhes quando quiser.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="rounded-2xl border border-[#EADFCC] bg-[#FFF9EF] p-4">
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8A7351]">
-              Informacoes basicas
+              Nome da receita
             </p>
             <div className="space-y-3">
               <Input
@@ -181,33 +319,72 @@ export default function CreatePage() {
                 onChange={(event) => setTitle(event.target.value)}
                 className="h-11 border-[#E5D7C1] bg-[#FAF5EC]"
               />
-              <Textarea
-                placeholder="Descricao curta (opcional)"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                className="min-h-[84px] border-[#E5D7C1] bg-[#FAF5EC]"
-              />
             </div>
           </div>
 
           <div className="rounded-2xl border border-[#EADFCC] bg-[#FFF9EF] p-4">
-            <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8A7351]">
-              Ingredientes e preparo
-            </p>
-            <div className="space-y-3">
-              <Textarea
-                placeholder="Ingredientes separados por virgula"
-                value={ingredientsText}
-                onChange={(event) => setIngredientsText(event.target.value)}
-                className="min-h-[96px] border-[#E5D7C1] bg-[#FAF5EC]"
-              />
-              <Textarea
-                placeholder="Modo de preparo (um passo por linha)"
-                value={stepsText}
-                onChange={(event) => setStepsText(event.target.value)}
-                className="min-h-[135px] border-[#E5D7C1] bg-[#FAF5EC]"
-              />
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8A7351]">
+                Detalhes da receita
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-8 border-[#E5D7C1] bg-[#FFFCF7] px-3 text-xs"
+                onClick={() => setIsDetailsOpen((current) => !current)}
+              >
+                {isDetailsOpen ? "Ocultar detalhes" : "Adicionar detalhes"}
+              </Button>
             </div>
+            {!isDetailsOpen ? (
+              <p className="mt-2 text-xs text-[#7A6D60]">
+                Ingredientes, preparo, descricao e imagem ficam escondidos para deixar a tela mais limpa.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-4">
+                <Textarea
+                  placeholder="Descricao curta (opcional)"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  className="min-h-[84px] border-[#E5D7C1] bg-[#FAF5EC]"
+                />
+                <Textarea
+                  placeholder="Ingredientes separados por virgula"
+                  value={ingredientsText}
+                  onChange={(event) => setIngredientsText(event.target.value)}
+                  className="min-h-[96px] border-[#E5D7C1] bg-[#FAF5EC]"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 border-[#E5D7C1] bg-[#FFFCF7] text-xs"
+                    onClick={() => startVoiceCapture("ingredients")}
+                  >
+                    {voiceTarget === "ingredients" ? "Parar voz (ingredientes)" : "Adicionar ingredientes por voz"}
+                  </Button>
+                </div>
+                <Textarea
+                  placeholder="Modo de preparo (um passo por linha)"
+                  value={stepsText}
+                  onChange={(event) => setStepsText(event.target.value)}
+                  className="min-h-[135px] border-[#E5D7C1] bg-[#FAF5EC]"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 border-[#E5D7C1] bg-[#FFFCF7] text-xs"
+                    onClick={() => startVoiceCapture("steps")}
+                  >
+                    {voiceTarget === "steps" ? "Parar voz (preparo)" : "Adicionar preparo por voz"}
+                  </Button>
+                </div>
+                {voiceMessage ? (
+                  <p className="text-xs font-medium text-[#7A6D60]">{voiceMessage}</p>
+                ) : null}
+              </div>
+            )}
           </div>
 
           <input
@@ -225,45 +402,47 @@ export default function CreatePage() {
             className="hidden"
             onChange={handleImageChange}
           />
-          <div className="rounded-2xl border border-[#EADFCC] bg-[#FFF9EF] p-4">
-            <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8A7351]">
-              Imagem da receita
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="border-[#E5D7C1] bg-[#FFFCF7]"
-                onClick={() => galleryInputRef.current?.click()}
-              >
-                Anexar imagem
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="border-[#E5D7C1] bg-[#FFFCF7]"
-                onClick={() => cameraInputRef.current?.click()}
-              >
-                Tirar foto
-              </Button>
+          {isDetailsOpen ? (
+            <div className="rounded-2xl border border-[#EADFCC] bg-[#FFF9EF] p-4">
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8A7351]">
+                Imagem da receita
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-[#E5D7C1] bg-[#FFFCF7]"
+                  onClick={() => galleryInputRef.current?.click()}
+                >
+                  Anexar imagem
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-[#E5D7C1] bg-[#FFFCF7]"
+                  onClick={() => cameraInputRef.current?.click()}
+                >
+                  Tirar foto
+                </Button>
+              </div>
+              {imageDataUrl ? (
+                <div className="relative mt-3 h-44 w-full overflow-hidden rounded-2xl border border-[#E5D7C1]">
+                  <Image
+                    src={imageDataUrl}
+                    alt="Preview da receita"
+                    fill
+                    unoptimized
+                    className="object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="mt-3 rounded-2xl border border-dashed border-[#DECDAF] bg-[#FBF4E8] px-4 py-6 text-center">
+                  <p className="text-sm font-medium text-[#7B6A56]">Adicione uma foto para destacar sua receita</p>
+                  <p className="mt-1 text-xs text-[#9B8B78]">Voce pode anexar da galeria ou tirar na hora.</p>
+                </div>
+              )}
             </div>
-            {imageDataUrl ? (
-              <div className="relative mt-3 h-44 w-full overflow-hidden rounded-2xl border border-[#E5D7C1]">
-                <Image
-                  src={imageDataUrl}
-                  alt="Preview da receita"
-                  fill
-                  unoptimized
-                  className="object-cover"
-                />
-              </div>
-            ) : (
-              <div className="mt-3 rounded-2xl border border-dashed border-[#DECDAF] bg-[#FBF4E8] px-4 py-6 text-center">
-                <p className="text-sm font-medium text-[#7B6A56]">Adicione uma foto para destacar sua receita</p>
-                <p className="mt-1 text-xs text-[#9B8B78]">Voce pode anexar da galeria ou tirar na hora.</p>
-              </div>
-            )}
-          </div>
+          ) : null}
           {saveFeedback ? (
             <div className="rounded-xl border border-[#E5D7C1] bg-[#FAF5EC] px-3 py-2 text-sm text-[#6A5E52]">
               {saveFeedback}
@@ -271,7 +450,7 @@ export default function CreatePage() {
           ) : null}
 
           <Button
-            className="h-12 w-full rounded-2xl bg-[#C9A86A] text-[#FFF9EE] shadow-[0_16px_28px_-20px_rgba(42,30,23,0.8)] hover:brightness-95"
+            className="h-12 w-full rounded-2xl bg-[#C66A3D] text-[#FFF9EE] shadow-[0_16px_28px_-20px_rgba(42,30,23,0.8)] hover:brightness-95"
             onClick={handleCreateRecipe}
             disabled={!hasFormData}
           >
@@ -300,7 +479,7 @@ export default function CreatePage() {
           <div className="space-y-3">
             {recipes.slice(0, 4).map((recipe) => (
               <div key={recipe.id} className="space-y-2">
-                <RecipeCard recipe={recipe} href={`/receita/${recipe.id}?origin=saved`} />
+                <RecipeCard recipe={recipe} href={`/receita/${recipe.id}?origin=manual`} />
                 <Button
                   variant="outline"
                   size="sm"
@@ -325,7 +504,7 @@ export default function CreatePage() {
             <div className="mt-4 grid gap-2">
               <Button
                 type="button"
-                className="h-11 rounded-2xl bg-[#C9A86A] text-[#FFF9EE] hover:brightness-95"
+                className="h-11 rounded-2xl bg-[#C66A3D] text-[#FFF9EE] hover:brightness-95"
                 onClick={() => handleSave(false)}
                 disabled={isPublishing}
               >

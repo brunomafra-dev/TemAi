@@ -1,13 +1,11 @@
-﻿"use client";
+"use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { RatingStars } from "@/components/recipes/rating-stars";
 import { RecipeCard } from "@/components/recipes/recipe-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { Recipe } from "@/features/recipes/types";
-import { getUserRecipeRating, setUserRecipeRating } from "@/features/recipes/ratings-storage";
 
 const libraryFilters = [
   { id: "todas", label: "Todas" },
@@ -56,7 +54,6 @@ function LibraryPageContent() {
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [ratings, setRatings] = useState<Record<string, number>>({});
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
@@ -100,7 +97,6 @@ function LibraryPageContent() {
           if (data.pagination?.page && data.pagination.page !== page) {
             setPage(data.pagination.page);
           }
-          setRatings(Object.fromEntries(data.recipes.map((recipe) => [recipe.id, getUserRecipeRating(recipe.id)])));
         }
       } catch {
         if (isMounted) {
@@ -128,11 +124,6 @@ function LibraryPageContent() {
     }
 
     return [...pages].sort((a, b) => a - b);
-  }
-
-  function onRate(recipeId: string, rating: number) {
-    setUserRecipeRating(recipeId, rating);
-    setRatings((current) => ({ ...current, [recipeId]: rating }));
   }
 
   function buildRecipeHref(recipeId: string): string {
@@ -188,7 +179,7 @@ function LibraryPageContent() {
             }}
             className={
               selectedFilter === filter.id
-                ? "rounded-full border border-[#C9A86A] bg-[#F6EFDF] px-4 py-2 text-xs font-semibold text-[#7D6139]"
+                ? "rounded-full border border-[#C66A3D] bg-[#F8E8E1] px-4 py-2 text-xs font-semibold text-[#7A4733]"
                 : "rounded-full border border-[#E5D7BF] bg-[#FFFCF7] px-4 py-2 text-xs font-semibold text-[#857A6E]"
             }
           >
@@ -212,23 +203,12 @@ function LibraryPageContent() {
       ) : (
         <div className="space-y-3">
           {recipes.map((recipe) => (
-            <div key={recipe.id} className="space-y-2">
-              <RecipeCard
-                recipe={recipe}
-                href={buildRecipeHref(recipe.id)}
-                footerLabel={`Fonte: ${recipe.sourceLabel}`}
-              />
-              <div className="rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] px-3 py-2">
-                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#7D715F]">
-                  Sua avaliacao
-                </p>
-                <RatingStars
-                  size="sm"
-                  value={ratings[recipe.id] ?? 0}
-                  onChange={(rating) => onRate(recipe.id, rating)}
-                />
-              </div>
-            </div>
+            <RecipeCard
+              key={recipe.id}
+              recipe={recipe}
+              href={buildRecipeHref(recipe.id)}
+              footerLabel={`Fonte: ${recipe.sourceLabel}`}
+            />
           ))}
         </div>
       )}
@@ -258,7 +238,7 @@ function LibraryPageContent() {
                   onClick={() => setPage(pageNumber)}
                   className={
                     pageNumber === page
-                      ? "rounded-full border border-[#C9A86A] bg-[#F6EFDF] px-3 py-1 text-xs font-semibold text-[#7D6139]"
+                      ? "rounded-full border border-[#C66A3D] bg-[#F8E8E1] px-3 py-1 text-xs font-semibold text-[#7A4733]"
                       : "rounded-full border border-[#E5D7BF] bg-white px-3 py-1 text-xs font-semibold text-[#6A5E52]"
                   }
                 >

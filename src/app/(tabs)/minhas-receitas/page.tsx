@@ -215,7 +215,7 @@ export default function MyRecipesPage() {
         ) : (
           recipes.map((recipe) => (
             <div key={recipe.id} className="space-y-2">
-              <RecipeCard recipe={recipe} href={`/receita/${recipe.id}?origin=saved`} />
+              <RecipeCard recipe={recipe} href={`/receita/${recipe.id}?origin=manual`} />
               <Button
                 variant={publishedById[recipe.id] ? "secondary" : "default"}
                 size="sm"

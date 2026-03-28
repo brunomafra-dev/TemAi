@@ -147,7 +147,7 @@ export default function LibraryContent() {
             onClick={() => setSelectedFilter(filter.id)}
             className={
               selectedFilter === filter.id
-                ? "rounded-full border border-[#C9A86A] bg-[#F6EFDF] px-4 py-2 text-xs font-semibold text-[#7D6139]"
+                ? "rounded-full border border-[#C66A3D] bg-[#F8E8E1] px-4 py-2 text-xs font-semibold text-[#7A4733]"
                 : "rounded-full border border-[#E5D7BF] bg-[#FFFCF7] px-4 py-2 text-xs font-semibold text-[#857A6E]"
             }
           >
@@ -219,7 +219,7 @@ export default function LibraryContent() {
                   onClick={() => setPage(pageNumber)}
                   className={
                     pageNumber === page
-                      ? "rounded-full border border-[#C9A86A] bg-[#F6EFDF] px-3 py-1 text-xs font-semibold text-[#7D6139]"
+                      ? "rounded-full border border-[#C66A3D] bg-[#F8E8E1] px-3 py-1 text-xs font-semibold text-[#7A4733]"
                       : "rounded-full border border-[#E5D7BF] bg-white px-3 py-1 text-xs font-semibold text-[#6A5E52]"
                   }
                 >
