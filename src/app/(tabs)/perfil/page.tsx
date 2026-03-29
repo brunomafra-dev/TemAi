@@ -1,8 +1,8 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import {
   type UserProfile,
 } from "@/features/profile/storage";
 import { getMyRecipes, getSavedRecipeRefs } from "@/features/recipes/local-storage";
+import { getSupabaseBrowserClient } from "@/lib/supabase-client";
 import {
   clearCheckedShoppingItems,
   getShoppingListItems,
@@ -27,12 +28,13 @@ import {
 
 const sections = [
   { id: "edit", label: "Editar Perfil" },
+  { id: "badges", label: "Insignias" },
   { id: "shopping", label: "Lista de Compras" },
   { id: "author", label: "Receitas Autorais" },
   { id: "saved", label: "Receitas Salvas" },
-  { id: "notifications", label: "Notificações" },
+  { id: "notifications", label: "Notificacoes" },
   { id: "support", label: "Suporte / Fale conosco" },
-  { id: "privacy", label: "Política de dados e privacidade" },
+  { id: "privacy", label: "Politica de dados e privacidade" },
   { id: "terms", label: "Termos de Uso" },
   { id: "logout", label: "Sair da conta" },
   { id: "delete", label: "Excluir conta" },
@@ -44,23 +46,20 @@ function getBadgeBySlug(slug: string) {
   return BADGE_CATALOG.find((badge) => badge.slug === slug) || BADGE_CATALOG[0];
 }
 
-function getInitialSection(value: string | null): SectionId | null {
-  if (!value) return null;
-  return sections.some((section) => section.id === value) ? (value as SectionId) : null;
+function sanitizeUsername(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[^a-z0-9._]/g, "")
+    .slice(0, 24);
 }
 
 export default function ProfilePage() {
-  return (
-    <Suspense fallback={<div className="pt-5">Carregando perfil...</div>}>
-      <ProfilePageContent />
-    </Suspense>
-  );
-}
-
-function ProfilePageContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const activeSection = getInitialSection(searchParams.get("section"));
+  const [activeModal, setActiveModal] = useState<SectionId | null>(null);
+  const [modalStage, setModalStage] = useState<"enter" | "open" | "exit">("open");
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [profile, setProfile] = useState<UserProfile>(() => getUserProfile());
   const [workingProfile, setWorkingProfile] = useState<UserProfile>(() => getUserProfile());
@@ -68,8 +67,11 @@ function ProfilePageContent() {
   const [shoppingMode, setShoppingMode] = useState<"geral" | "por_receita">("geral");
   const [selectedRecipeFilter, setSelectedRecipeFilter] = useState<string>("all");
   const [notificationPrefs, setNotificationPrefs] = useState(() => getNotificationPrefs());
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [cloudMessage, setCloudMessage] = useState("");
+  const [badgeHint, setBadgeHint] = useState("");
+  const [profileMessage, setProfileMessage] = useState("");
+  const [checkingUsername, setCheckingUsername] = useState(false);
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [usernameSuggestion, setUsernameSuggestion] = useState("");
 
   const myRecipes = useMemo(() => getMyRecipes(), []);
   const savedRefs = useMemo(() => getSavedRecipeRefs(), []);
@@ -100,6 +102,9 @@ function ProfilePageContent() {
     ? profile.selectedBadge
     : unlockedBadges[0] || "estagiario";
   const selectedBadge = getBadgeBySlug(selectedBadgeSlug);
+  const usernameHandle = profile.username?.trim()
+    ? `@${profile.username.trim().replace(/^@+/, "")}`
+    : `@${[profile.firstName, profile.lastName].join("_").toLowerCase().replace(/\s+/g, "_")}`;
 
   const shoppingRecipeOptions = useMemo(
     () => Array.from(new Map(shoppingItems.map((item) => [item.recipeId, item.recipeTitle])).entries()),
@@ -133,11 +138,9 @@ function ProfilePageContent() {
         if (!isMounted || !remote) return;
         setProfile(remote);
         setWorkingProfile(remote);
-        setCloudMessage("Perfil sincronizado com sua conta.");
       })
       .catch(() => {
         if (!isMounted) return;
-        setCloudMessage("Perfil local ativo. Faca login para sincronizar entre dispositivos.");
       });
 
     return () => {
@@ -145,12 +148,28 @@ function ProfilePageContent() {
     };
   }, []);
 
-  function changeSection(nextSection: SectionId | null) {
-    if (!nextSection) {
-      router.replace("/perfil", { scroll: false });
-      return;
-    }
-    router.replace(`/perfil?section=${nextSection}`, { scroll: false });
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+      if (openTimeoutRef.current) clearTimeout(openTimeoutRef.current);
+    };
+  }, []);
+
+  function openModal(section: SectionId) {
+    if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    if (openTimeoutRef.current) clearTimeout(openTimeoutRef.current);
+    setActiveModal(section);
+    setModalStage("enter");
+    openTimeoutRef.current = setTimeout(() => setModalStage("open"), 12);
+  }
+
+  function closeModal() {
+    setModalStage("exit");
+    if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    closeTimeoutRef.current = setTimeout(() => {
+      setActiveModal(null);
+      setModalStage("open");
+    }, 180);
   }
 
   function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -167,20 +186,102 @@ function ProfilePageContent() {
   }
 
   async function saveProfileChanges() {
+    const nextUsername = sanitizeUsername(workingProfile.username || "");
+    if (nextUsername.length < 3) {
+      setProfileMessage("Seu @ precisa ter pelo menos 3 caracteres.");
+      return;
+    }
+
+    const currentUsername = sanitizeUsername(profile.username || "");
+    if (nextUsername !== currentUsername && usernameAvailable !== true) {
+      setProfileMessage("Esse @ ja esta em uso. Escolha outro.");
+      return;
+    }
+
     const selected = unlockedBadges.includes(workingProfile.selectedBadge)
       ? workingProfile.selectedBadge
       : unlockedBadges[0] || "estagiario";
 
-    const next = { ...workingProfile, selectedBadge: selected, unlockedBadges };
+    const next = { ...workingProfile, username: nextUsername, selectedBadge: selected, unlockedBadges };
     saveUserProfile(next);
     setProfile(next);
     setWorkingProfile(next);
     const synced = await saveUserProfileToCloud(next);
-    setCloudMessage(
+    setProfileMessage(
       synced
-        ? "Perfil salvo e sincronizado com sucesso."
-        : "Perfil salvo localmente. Login necessario para sincronizar.",
+        ? "Perfil atualizado com sucesso."
+        : "Perfil salvo localmente. Faca login para sincronizar.",
     );
+  }
+
+  async function checkUsernameAvailability(raw: string) {
+    const next = sanitizeUsername(raw);
+    setWorkingProfile((current) => ({ ...current, username: next }));
+    setUsernameAvailable(null);
+    setUsernameSuggestion("");
+    setProfileMessage("");
+
+    if (next.length < 3) return;
+
+    const currentUsername = sanitizeUsername(profile.username || "");
+    if (next === currentUsername) {
+      setUsernameAvailable(true);
+      return;
+    }
+
+    const client = getSupabaseBrowserClient();
+    if (!client) return;
+
+    setCheckingUsername(true);
+    const { data, error } = await client.rpc("is_username_available", {
+      p_username: next,
+    });
+    setCheckingUsername(false);
+
+    if (error) {
+      setProfileMessage("Nao foi possivel validar o @ agora.");
+      return;
+    }
+
+    setUsernameAvailable(Boolean(data));
+    if (!data) {
+      const suggestion = await suggestAvailableUsername(next);
+      setUsernameSuggestion(suggestion);
+    }
+  }
+
+  async function suggestAvailableUsername(baseRaw: string): Promise<string> {
+    const client = getSupabaseBrowserClient();
+    if (!client) return "";
+    const base = sanitizeUsername(baseRaw).slice(0, 20);
+    if (base.length < 3) return "";
+
+    for (let i = 1; i <= 30; i += 1) {
+      const candidate = `${base}${i}`;
+      const { data, error } = await client.rpc("is_username_available", {
+        p_username: candidate,
+      });
+      if (!error && data) return candidate;
+    }
+
+    return "";
+  }
+
+  async function selectBadge(slug: string) {
+    const unlocked = unlockedBadges.includes(slug);
+    const badge = getBadgeBySlug(slug);
+
+    if (!unlocked) {
+      setBadgeHint(`Para desbloquear: ${badge.description}`);
+      return;
+    }
+
+    const next = { ...profile, selectedBadge: slug, unlockedBadges };
+    saveUserProfile(next);
+    setProfile(next);
+    setWorkingProfile(next);
+    setBadgeHint(`Insignia ativa: ${badge.label}`);
+    await saveUserProfileToCloud(next);
   }
 
   function toggleNotification(key: keyof typeof notificationPrefs) {
@@ -206,8 +307,182 @@ function ProfilePageContent() {
 
   function deleteLocalAccount() {
     localStorage.clear();
-    setShowDeleteConfirm(false);
+    closeModal();
     router.push("/");
+  }
+
+  function renderModalBody() {
+    switch (activeModal) {
+      case "edit":
+        return (
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-[#5D5248]">Editar Perfil</p>
+            <label className="block rounded-xl border border-[#E8DBC8] bg-[#FAF4EA] px-3 py-2 text-xs text-[#6B6055]">
+              Foto de perfil
+              <input type="file" accept="image/*" className="mt-2 block w-full" onChange={handlePhotoUpload} />
+            </label>
+            <Input placeholder="Nome" value={workingProfile.firstName} onChange={(e) => setWorkingProfile((c) => ({ ...c, firstName: e.target.value }))} />
+            <Input placeholder="Sobrenome" value={workingProfile.lastName} onChange={(e) => setWorkingProfile((c) => ({ ...c, lastName: e.target.value }))} />
+            <div className="space-y-1">
+              <Input
+                placeholder="@seuusername"
+                value={workingProfile.username}
+                onChange={(e) => void checkUsernameAvailability(e.target.value)}
+              />
+              <p className="text-xs text-[#6A5E52]">
+                {checkingUsername
+                  ? "Verificando disponibilidade..."
+                  : usernameAvailable === true
+                    ? "@ disponivel"
+                    : usernameAvailable === false
+                      ? "@ ja em uso"
+                      : "Use letras, numeros, . e _"}
+              </p>
+              {usernameAvailable === false && usernameSuggestion ? (
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-primary underline"
+                  onClick={() => void checkUsernameAvailability(usernameSuggestion)}
+                >
+                  Usar sugestao: @{usernameSuggestion}
+                </button>
+              ) : null}
+            </div>
+            {profileMessage ? (
+              <p className="rounded-lg border border-[#E5D7BF] bg-white px-3 py-2 text-xs text-[#6A5E52]">
+                {profileMessage}
+              </p>
+            ) : null}
+            <Button className="w-full" onClick={() => void saveProfileChanges()}>Salvar alteracoes</Button>
+          </div>
+        );
+      case "shopping":
+        return (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-[#5D5248]">Lista de Compras</p>
+              <div className="flex gap-2">
+                <Button variant="secondary" size="sm" onClick={selectAllShoppingItems}>Selecionar todos</Button>
+                <Button variant="secondary" size="sm" onClick={() => setShoppingItems(clearCheckedShoppingItems())}>Limpar concluidos</Button>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setShoppingMode("geral")} className={shoppingMode === "geral" ? "rounded-full border border-[#C66A3D] bg-[#F8E8E1] px-3 py-1 text-xs font-semibold text-[#7A4733]" : "rounded-full border border-[#E5D7BF] bg-white px-3 py-1 text-xs font-semibold text-[#6A5E52]"}>Geral</button>
+              <button onClick={() => setShoppingMode("por_receita")} className={shoppingMode === "por_receita" ? "rounded-full border border-[#C66A3D] bg-[#F8E8E1] px-3 py-1 text-xs font-semibold text-[#7A4733]" : "rounded-full border border-[#E5D7BF] bg-white px-3 py-1 text-xs font-semibold text-[#6A5E52]"}>Por receita</button>
+            </div>
+            {shoppingMode === "por_receita" ? (
+              <select value={selectedRecipeFilter} onChange={(e) => setSelectedRecipeFilter(e.target.value)} className="h-10 w-full rounded-xl border border-[#E5D7BF] bg-white px-3 text-sm">
+                <option value="all">Todas as receitas</option>
+                {shoppingRecipeOptions.map(([recipeId, recipeTitle]) => <option key={recipeId} value={recipeId}>{recipeTitle}</option>)}
+              </select>
+            ) : null}
+            <div className="max-h-[45vh] space-y-2 overflow-auto pr-1">
+              {shoppingItems.length === 0 ? <p className="text-sm text-[#7A6D60]">Sua lista esta vazia.</p> : shoppingMode === "geral" ? mergedShoppingItems.map((item) => (
+                <label key={item.name.toLowerCase()} className="flex items-center justify-between rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm">
+                  <span className={item.checked ? "line-through text-[#9A8D7E]" : "text-[#4F4338]"}>{item.name}</span>
+                  <input type="checkbox" checked={item.checked} onChange={() => toggleMergedItem(item.ids)} />
+                </label>
+              )) : filteredShoppingItems.map((item) => (
+                <div key={item.id} className="flex items-center justify-between rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm">
+                  <label className="flex items-center gap-2"><input type="checkbox" checked={item.checked} onChange={() => setShoppingItems(toggleShoppingItemChecked(item.id))} /><span className={item.checked ? "line-through text-[#9A8D7E]" : "text-[#4F4338]"}>{item.name}</span></label>
+                  <Button size="sm" variant="outline" onClick={() => setShoppingItems(removeShoppingItem(item.id))}>Remover</Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      case "badges":
+        return (
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-[#5D5248]">Insignias</p>
+            <p className="text-xs text-[#7A6D60]">
+              Toque para ativar. As bloqueadas mostram o requisito.
+            </p>
+            <div className="grid grid-cols-1 gap-2">
+              {BADGE_CATALOG.map((badge) => {
+                const unlocked = unlockedBadges.includes(badge.slug);
+                const isSelected = selectedBadgeSlug === badge.slug;
+                return (
+                  <button
+                    key={badge.slug}
+                    onClick={() => void selectBadge(badge.slug)}
+                    className={
+                      unlocked
+                        ? `rounded-xl border px-3 py-2 text-left text-sm ${isSelected ? "border-[#C66A3D] bg-[#F8E8E1]" : "border-[#E5D7BF] bg-white"}`
+                        : "rounded-xl border border-[#DFDFDF] bg-[#F5F5F5] px-3 py-2 text-left text-sm text-[#8A8A8A]"
+                    }
+                  >
+                    <p className="font-semibold">{badge.label}</p>
+                    <p className="text-xs">{badge.description}</p>
+                  </button>
+                );
+              })}
+            </div>
+            {badgeHint ? (
+              <p className="rounded-lg border border-[#E5D7BF] bg-white px-3 py-2 text-xs text-[#6A5E52]">
+                {badgeHint}
+              </p>
+            ) : null}
+          </div>
+        );
+      case "author":
+        return (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-[#5D5248]">Receitas Autorais</p>
+            <p className="text-sm text-[#7A6D60]">{myRecipes.length} receitas autorais.</p>
+            <Link href="/minhas-receitas" className="inline-flex rounded-full border border-[#C66A3D] bg-[#F8E8E1] px-4 py-2 text-xs font-semibold text-[#7A4733]">Abrir Minhas Receitas</Link>
+          </div>
+        );
+      case "saved":
+        return (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-[#5D5248]">Receitas Salvas</p>
+            <div className="max-h-[45vh] space-y-2 overflow-auto pr-1">
+              {savedRefs.length === 0 ? <p className="text-sm text-[#7A6D60]">Voce ainda nao salvou receitas.</p> : savedRefs.map((item) => <p key={`${item.recipeId}-${item.savedAt}`} className="rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-xs">{item.recipeId}</p>)}
+            </div>
+          </div>
+        );
+      case "notifications":
+        return (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-[#5D5248]">Notificacoes</p>
+            {[{ key: "recipeRating", label: "Sua receita recebeu classificacao" }, { key: "newBadge", label: "Voce ganhou um novo badge" }, { key: "publishSuccess", label: "Receita publicada com sucesso" }, { key: "shoppingUpdates", label: "Atualizacoes da lista de compras" }].map((item) => (
+              <label key={item.key} className="flex items-center justify-between rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm">
+                <span>{item.label}</span>
+                <input type="checkbox" checked={Boolean(notificationPrefs[item.key as keyof typeof notificationPrefs])} onChange={() => toggleNotification(item.key as keyof typeof notificationPrefs)} />
+              </label>
+            ))}
+          </div>
+        );
+      case "support":
+        return <p className="text-sm text-[#6A5E52]">Em breve: canal oficial de suporte dentro do app.</p>;
+      case "privacy":
+        return <Link href="/privacidade" className="text-sm font-semibold text-primary underline">Abrir Politica de Privacidade</Link>;
+      case "terms":
+        return <Link href="/termos" className="text-sm font-semibold text-primary underline">Abrir Termos de Uso</Link>;
+      case "logout":
+        return (
+          <div className="space-y-3">
+            <p className="text-sm text-[#6A5E52]">Deseja encerrar a sessao local agora?</p>
+            <Button className="w-full" onClick={() => { alert("Sessao local encerrada. (Auth real entra na proxima fase)"); closeModal(); }}>
+              Sair da conta
+            </Button>
+          </div>
+        );
+      case "delete":
+        return (
+          <div className="space-y-3">
+            <p className="text-lg font-semibold text-[#4F4338]">Tem certeza que deseja excluir sua conta?</p>
+            <p className="text-sm text-[#7A6D60]">Essa acao remove dados locais deste dispositivo.</p>
+            <div className="flex gap-2">
+              <Button variant="secondary" className="flex-1" onClick={closeModal}>Cancelar</Button>
+              <Button className="flex-1" onClick={deleteLocalAccount}>Excluir conta</Button>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
   }
 
   return (
@@ -229,6 +504,7 @@ function ProfilePageContent() {
             )}
             <div>
               <h1 className="font-display text-2xl">{profile.firstName} {profile.lastName}</h1>
+              <p className="mt-0.5 text-xs text-[#E8DDCB]">{usernameHandle}</p>
               <p className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${selectedBadge.colorClass}`}>{selectedBadge.label}</p>
             </div>
           </div>
@@ -237,31 +513,13 @@ function ProfilePageContent() {
 
       <Card className="border-[#E5D7BF] bg-[#FFFCF7]">
         <CardContent className="space-y-2 pt-4">
-          {cloudMessage ? (
-            <p className="rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-xs text-[#6A5E52]">{cloudMessage}</p>
-          ) : null}
           {sections.map((section) => (
             <button
               key={section.id}
-              onClick={() => {
-                if (section.id === "logout") {
-                  alert("Sessao local encerrada. (Auth real entra na proxima fase)");
-                  changeSection(null);
-                  return;
-                }
-                if (section.id === "delete") {
-                  setShowDeleteConfirm(true);
-                  return;
-                }
-                if (activeSection === section.id) {
-                  changeSection(null);
-                  return;
-                }
-                changeSection(section.id);
-              }}
+              onClick={() => openModal(section.id)}
               className={
-                activeSection === section.id
-                  ? "w-full rounded-xl border border-[#C66A3D] bg-[#F8E8E1] px-4 py-3 text-left text-sm font-semibold text-[#7A4733]"
+                section.id === "delete"
+                  ? "w-full rounded-xl border border-[#E8B4B4] bg-[#FFF4F4] px-4 py-3 text-left text-sm font-semibold text-[#B42318]"
                   : "w-full rounded-xl border border-[#E5D7BF] bg-white px-4 py-3 text-left text-sm font-semibold text-[#5E5348]"
               }
             >
@@ -271,100 +529,24 @@ function ProfilePageContent() {
         </CardContent>
       </Card>
 
-      {activeSection === "edit" ? (
-        <Card className="border-[#E5D7BF] bg-[#FFFCF7]"><CardContent className="space-y-4 pt-5">
-          <p className="text-sm font-semibold text-[#5D5248]">Editar Perfil</p>
-          <label className="block rounded-xl border border-[#E8DBC8] bg-[#FAF4EA] px-3 py-2 text-xs text-[#6B6055]">
-            Foto de perfil
-            <input type="file" accept="image/*" className="mt-2 block w-full" onChange={handlePhotoUpload} />
-          </label>
-          <Input placeholder="Nome" value={workingProfile.firstName} onChange={(e) => setWorkingProfile((c) => ({ ...c, firstName: e.target.value }))} />
-          <Input placeholder="Sobrenome" value={workingProfile.lastName} onChange={(e) => setWorkingProfile((c) => ({ ...c, lastName: e.target.value }))} />
-          <Button className="w-full" onClick={() => void saveProfileChanges()}>Salvar alteracoes</Button>
-        </CardContent></Card>
-      ) : null}
-
-      {activeSection === "shopping" ? (
-        <Card className="border-[#E5D7BF] bg-[#FFFCF7]"><CardContent className="space-y-3 pt-5">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-[#5D5248]">Lista de Compras</p>
-            <div className="flex gap-2">
-              <Button variant="secondary" size="sm" onClick={selectAllShoppingItems}>Selecionar todos</Button>
-              <Button variant="secondary" size="sm" onClick={() => setShoppingItems(clearCheckedShoppingItems())}>Limpar concluidos</Button>
+      {activeModal ? (
+        <div
+          className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-colors duration-200 ${
+            modalStage === "open" ? "bg-black/50" : "bg-black/0"
+          }`}
+          onClick={closeModal}
+        >
+          <div
+            className={`w-full max-w-md rounded-2xl bg-[#FFFCF7] p-5 shadow-2xl transition-all duration-200 ${
+              modalStage === "open" ? "translate-y-0 scale-100 opacity-100" : "translate-y-3 scale-95 opacity-0"
+            }`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-semibold text-[#5D5248]">{sections.find((s) => s.id === activeModal)?.label}</p>
+              <button className="text-xs font-semibold text-[#7A6D60]" onClick={closeModal}>Fechar</button>
             </div>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={() => setShoppingMode("geral")} className={shoppingMode === "geral" ? "rounded-full border border-[#C66A3D] bg-[#F8E8E1] px-3 py-1 text-xs font-semibold text-[#7A4733]" : "rounded-full border border-[#E5D7BF] bg-white px-3 py-1 text-xs font-semibold text-[#6A5E52]"}>Geral</button>
-            <button onClick={() => setShoppingMode("por_receita")} className={shoppingMode === "por_receita" ? "rounded-full border border-[#C66A3D] bg-[#F8E8E1] px-3 py-1 text-xs font-semibold text-[#7A4733]" : "rounded-full border border-[#E5D7BF] bg-white px-3 py-1 text-xs font-semibold text-[#6A5E52]"}>Por receita</button>
-          </div>
-          {shoppingMode === "por_receita" ? (
-            <select value={selectedRecipeFilter} onChange={(e) => setSelectedRecipeFilter(e.target.value)} className="h-10 w-full rounded-xl border border-[#E5D7BF] bg-white px-3 text-sm">
-              <option value="all">Todas as receitas</option>
-              {shoppingRecipeOptions.map(([recipeId, recipeTitle]) => <option key={recipeId} value={recipeId}>{recipeTitle}</option>)}
-            </select>
-          ) : null}
-          {shoppingItems.length === 0 ? <p className="text-sm text-[#7A6D60]">Sua lista esta vazia.</p> : shoppingMode === "geral" ? mergedShoppingItems.map((item) => (
-            <label key={item.name.toLowerCase()} className="flex items-center justify-between rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm">
-              <span className={item.checked ? "line-through text-[#9A8D7E]" : "text-[#4F4338]"}>{item.name}</span>
-              <input type="checkbox" checked={item.checked} onChange={() => toggleMergedItem(item.ids)} />
-            </label>
-          )) : filteredShoppingItems.map((item) => (
-            <div key={item.id} className="flex items-center justify-between rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm">
-              <label className="flex items-center gap-2"><input type="checkbox" checked={item.checked} onChange={() => setShoppingItems(toggleShoppingItemChecked(item.id))} /><span className={item.checked ? "line-through text-[#9A8D7E]" : "text-[#4F4338]"}>{item.name}</span></label>
-              <Button size="sm" variant="outline" onClick={() => setShoppingItems(removeShoppingItem(item.id))}>Remover</Button>
-            </div>
-          ))}
-        </CardContent></Card>
-      ) : null}
-
-      {activeSection === "author" ? (
-        <Card className="border-[#E5D7BF] bg-[#FFFCF7]"><CardContent className="space-y-2 pt-5">
-          <p className="text-sm font-semibold text-[#5D5248]">Receitas Autorais</p>
-          <p className="text-sm text-[#7A6D60]">{myRecipes.length} receitas autorais.</p>
-          <Link href="/minhas-receitas" className="inline-flex rounded-full border border-[#C66A3D] bg-[#F8E8E1] px-4 py-2 text-xs font-semibold text-[#7A4733]">Abrir Minhas Receitas</Link>
-        </CardContent></Card>
-      ) : null}
-
-      {activeSection === "saved" ? (
-        <Card className="border-[#E5D7BF] bg-[#FFFCF7]"><CardContent className="space-y-2 pt-5">
-          <p className="text-sm font-semibold text-[#5D5248]">Receitas Salvas</p>
-          {savedRefs.length === 0 ? <p className="text-sm text-[#7A6D60]">Voce ainda nao salvou receitas.</p> : savedRefs.map((item) => <p key={`${item.recipeId}-${item.savedAt}`} className="rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-xs">{item.recipeId}</p>)}
-        </CardContent></Card>
-      ) : null}
-
-      {activeSection === "notifications" ? (
-        <Card className="border-[#E5D7BF] bg-[#FFFCF7]"><CardContent className="space-y-2 pt-5">
-          <p className="text-sm font-semibold text-[#5D5248]">Notificacoes</p>
-          {[{ key: "recipeRating", label: "Sua receita recebeu classificacao" }, { key: "newBadge", label: "Voce ganhou um novo badge" }, { key: "publishSuccess", label: "Receita publicada com sucesso" }, { key: "shoppingUpdates", label: "Atualizacoes da lista de compras" }].map((item) => (
-            <label key={item.key} className="flex items-center justify-between rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm">
-              <span>{item.label}</span>
-              <input type="checkbox" checked={Boolean(notificationPrefs[item.key as keyof typeof notificationPrefs])} onChange={() => toggleNotification(item.key as keyof typeof notificationPrefs)} />
-            </label>
-          ))}
-        </CardContent></Card>
-      ) : null}
-
-      {activeSection === "support" ? (
-        <Card className="border-[#E5D7BF] bg-[#FFFCF7]"><CardContent className="space-y-2 pt-5 text-sm text-[#6A5E52]"><p className="font-semibold text-[#5D5248]">Suporte / Fale conosco</p><p>Em breve: canal oficial de suporte dentro do app.</p></CardContent></Card>
-      ) : null}
-
-      {activeSection === "privacy" ? (
-        <Card className="border-[#E5D7BF] bg-[#FFFCF7]"><CardContent className="space-y-2 pt-5 text-sm text-[#6A5E52]"><p className="font-semibold text-[#5D5248]">Politica de dados e privacidade</p><p>Leia a politica completa na pagina dedicada.</p><Link href="/privacidade" className="text-sm font-semibold text-primary underline">Abrir Politica de Privacidade</Link></CardContent></Card>
-      ) : null}
-
-      {activeSection === "terms" ? (
-        <Card className="border-[#E5D7BF] bg-[#FFFCF7]"><CardContent className="space-y-2 pt-5 text-sm text-[#6A5E52]"><p className="font-semibold text-[#5D5248]">Termos de Uso</p><p>Leia os termos completos na pagina dedicada.</p><Link href="/termos" className="text-sm font-semibold text-primary underline">Abrir Termos de Uso</Link></CardContent></Card>
-      ) : null}
-
-      {showDeleteConfirm ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-[#FFFCF7] p-5 shadow-2xl">
-            <p className="text-lg font-semibold text-[#4F4338]">Tem certeza que deseja excluir sua conta?</p>
-            <p className="mt-2 text-sm text-[#7A6D60]">Essa acao remove dados locais deste dispositivo.</p>
-            <div className="mt-4 flex gap-2">
-              <Button variant="secondary" className="flex-1" onClick={() => setShowDeleteConfirm(false)}>Cancelar</Button>
-              <Button className="flex-1" onClick={deleteLocalAccount}>Excluir conta</Button>
-            </div>
+            {renderModalBody()}
           </div>
         </div>
       ) : null}

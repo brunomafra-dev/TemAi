@@ -30,6 +30,7 @@ export default function AuthPage() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [usernameSuggestion, setUsernameSuggestion] = useState("");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -48,6 +49,7 @@ export default function AuthPage() {
     const next = sanitizeUsername(raw);
     setUsername(next);
     setUsernameAvailable(null);
+    setUsernameSuggestion("");
     setMessage("");
     if (next.length < 3 || !client) return;
 
@@ -61,6 +63,26 @@ export default function AuthPage() {
       return;
     }
     setUsernameAvailable(Boolean(data));
+    if (!data) {
+      const suggestion = await suggestAvailableUsername(next);
+      setUsernameSuggestion(suggestion);
+    }
+  }
+
+  async function suggestAvailableUsername(baseRaw: string): Promise<string> {
+    if (!client) return "";
+    const base = sanitizeUsername(baseRaw).slice(0, 20);
+    if (base.length < 3) return "";
+
+    for (let i = 1; i <= 30; i += 1) {
+      const candidate = `${base}${i}`;
+      const { data, error } = await client.rpc("is_username_available", {
+        p_username: candidate,
+      });
+      if (!error && data) return candidate;
+    }
+
+    return "";
   }
 
   async function handleLogin() {
@@ -248,6 +270,15 @@ export default function AuthPage() {
                         ? "@ ja em uso"
                         : "Use letras, numeros, . e _"}
                 </p>
+                {usernameAvailable === false && usernameSuggestion ? (
+                  <button
+                    type="button"
+                    className="text-xs font-semibold text-primary underline"
+                    onClick={() => void checkUsernameAvailability(usernameSuggestion)}
+                  >
+                    Usar sugestao: @{usernameSuggestion}
+                  </button>
+                ) : null}
               </div>
             </>
           ) : null}

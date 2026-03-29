@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -136,6 +136,9 @@ export default function HomePage() {
   >([]);
   const currentBadgeLabel =
     BADGE_CATALOG.find((badge) => badge.slug === profile.selectedBadge)?.label || "🌱 Estagiario";
+  const usernameHandle = profile.username?.trim()
+    ? `@${profile.username.trim().replace(/^@+/, "")}`
+    : `@${[profile.firstName, profile.lastName].join("_").toLowerCase().replace(/\s+/g, "_")}`;
 
   useEffect(() => {
     let isMounted = true;
@@ -321,6 +324,7 @@ export default function HomePage() {
               )}
               <div>
                 <p className="font-display text-2xl leading-none">Ola, {profile.firstName} 👋</p>
+                <p className="mt-1 text-xs text-[#E9DCC6]">{usernameHandle}</p>
                 <p className="mt-1 text-xs font-semibold text-[#E9DCC6]">{currentBadgeLabel}</p>
               </div>
             </div>
@@ -527,4 +531,5 @@ export default function HomePage() {
     </section>
   );
 }
+
 

@@ -58,6 +58,14 @@ function LibraryPageContent() {
   const [totalItems, setTotalItems] = useState(0);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const nav = window.performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    if (nav?.type === "reload") {
+      setSeed(createSeed());
+    }
+  }, []);
+
+  useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
 
     if (search.trim()) params.set("q", search.trim());
