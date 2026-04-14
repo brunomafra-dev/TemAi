@@ -92,9 +92,16 @@ function decodeHtmlEntities(value: string): string {
 
 function getSupabaseEnv() {
   try {
+    let key = "";
+    try {
+      key = serverEnv.supabaseServiceRoleKey();
+    } catch {
+      key = serverEnv.supabaseAnonKey();
+    }
+
     return {
       url: serverEnv.supabaseUrl(),
-      key: serverEnv.supabaseServiceRoleKey(),
+      key,
     };
   } catch {
     return { url: "", key: "" };
