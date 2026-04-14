@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { getSupabaseBrowserClient } from "@/lib/supabase-client";
-import { saveUserProfileToCloud, type UserProfile } from "@/features/profile/storage";
+import { saveUserProfile, type UserProfile } from "@/features/profile/storage";
 
 type Mode = "login" | "register" | "forgot";
 
@@ -92,11 +92,41 @@ export default function AuthPage() {
     }
     setIsSubmitting(true);
     setMessage("");
-    const { error } = await client.auth.signInWithPassword({
-      email: email.trim(),
-      password,
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: email.trim(),
+        password,
+      }),
     });
+    const data = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      retryAfterSeconds?: number;
+      session?: { accessToken?: string; refreshToken?: string };
+    };
     setIsSubmitting(false);
+    if (!response.ok) {
+      if (response.status === 429) {
+        const retry = data.retryAfterSeconds ? ` Tente em ${data.retryAfterSeconds}s.` : "";
+        setMessage((data.message || "Muitas tentativas.") + retry);
+      } else {
+        setMessage(data.message || "Falha no login.");
+      }
+      return;
+    }
+
+    const accessToken = data.session?.accessToken || "";
+    const refreshToken = data.session?.refreshToken || "";
+    if (!accessToken || !refreshToken) {
+      setMessage("Falha ao criar sessao.");
+      return;
+    }
+
+    const { error } = await client.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
     if (error) {
       setMessage(error.message || "Falha no login.");
       return;
@@ -117,20 +147,26 @@ export default function AuthPage() {
     setIsSubmitting(true);
     setMessage("");
 
-    const redirectTo =
-      typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined;
-
-    const { data, error } = await client.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        emailRedirectTo: redirectTo,
-      },
+    const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : "";
+    const response = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: name.trim(),
+        username: sanitizeUsername(username),
+        email: email.trim(),
+        password,
+        acceptedTerms,
+        redirectTo,
+      }),
     });
-
-    if (error) {
+    const data = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      session?: { accessToken?: string; refreshToken?: string } | null;
+    };
+    if (!response.ok) {
       setIsSubmitting(false);
-      setMessage(error.message || "Falha ao cadastrar.");
+      setMessage(data.message || "Falha ao cadastrar.");
       return;
     }
 
@@ -151,14 +187,20 @@ export default function AuthPage() {
       acceptedPrivacyAt: nowIso,
     };
 
-    if (data.user) {
-      await saveUserProfileToCloud(profile);
+    saveUserProfile(profile);
+
+    if (data.session?.accessToken && data.session.refreshToken) {
+      await client.auth.setSession({
+        access_token: data.session.accessToken,
+        refresh_token: data.session.refreshToken,
+      });
+      setIsSubmitting(false);
+      router.replace("/");
+      return;
     }
 
     setIsSubmitting(false);
-    setMessage(
-      "Conta criada. Verifique seu email para confirmar e entrar pelo link.",
-    );
+    setMessage(data.message || "Conta criada. Verifique seu email para confirmar e entrar pelo link.");
   }
 
   async function handleForgotPassword() {
@@ -174,19 +216,30 @@ export default function AuthPage() {
     setIsSubmitting(true);
     setMessage("");
     const redirectTo =
-      typeof window !== "undefined" ? `${window.location.origin}/auth/reset-password` : undefined;
-
-    const { error } = await client.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo,
+      typeof window !== "undefined" ? `${window.location.origin}/auth/reset-password` : "";
+    const response = await fetch("/api/auth/forgot-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: email.trim(),
+        redirectTo,
+      }),
     });
+    const data = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      retryAfterSeconds?: number;
+    };
     setIsSubmitting(false);
-
-    if (error) {
-      setMessage(error.message || "Falha ao enviar email de recuperacao.");
+    if (!response.ok) {
+      if (response.status === 429) {
+        const retry = data.retryAfterSeconds ? ` Tente em ${data.retryAfterSeconds}s.` : "";
+        setMessage((data.message || "Muitas tentativas.") + retry);
+      } else {
+        setMessage(data.message || "Falha ao enviar email de recuperacao.");
+      }
       return;
     }
-
-    setMessage("Enviamos um link para redefinir sua senha no seu email.");
+    setMessage(data.message || "Enviamos um link para redefinir sua senha no seu email.");
   }
 
   return (

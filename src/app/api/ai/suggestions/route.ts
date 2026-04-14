@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { generateRecipeSuggestions } from "@/features/recipes/ai-generator";
 import { parseIngredientsText } from "@/features/recipes/helpers";
 import type { InputMode } from "@/features/recipes/types";
+import {
+  parseJsonObjectBody,
+  readRequiredString,
+  validationErrorResponse,
+} from "@/lib/input-validation";
 
 interface SuggestionsPayload {
   ingredientsText?: string;
@@ -10,12 +15,13 @@ interface SuggestionsPayload {
 
 export async function POST(request: Request) {
   try {
-    const payload = (await request.json()) as SuggestionsPayload;
-    const ingredientsText = payload.ingredientsText?.trim();
-
-    if (!ingredientsText) {
-      return NextResponse.json({ message: "Informe ao menos um ingrediente." }, { status: 400 });
-    }
+    const payload = (await parseJsonObjectBody(request, { maxBytes: 12 * 1024 })) as SuggestionsPayload &
+      Record<string, unknown>;
+    const ingredientsText = readRequiredString(payload, "ingredientsText", {
+      fieldName: "Ingredientes",
+      minLength: 1,
+      maxLength: 4000,
+    });
 
     const ingredients = parseIngredientsText(ingredientsText);
     if (!ingredients.length) {
@@ -24,7 +30,9 @@ export async function POST(request: Request) {
 
     const response = generateRecipeSuggestions(ingredients);
     return NextResponse.json(response);
-  } catch {
+  } catch (error) {
+    const validationResponse = validationErrorResponse(error);
+    if (validationResponse) return validationResponse;
     return NextResponse.json({ message: "Erro ao gerar sugestoes." }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import type { ImportedRecipeDraft } from "@/features/recipes/import-from-url";
+import { serverEnv } from "@/lib/env-server";
 
 interface PremiumRecipeShape {
   title: string;
@@ -44,10 +45,10 @@ function safeParseJsonObject(value: string): PremiumRecipeShape | null {
 }
 
 async function requestPremiumReview(input: PremiumRecipeShape): Promise<PremiumRecipeShape | null> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  const apiKey = serverEnv.openaiApiKey();
   if (!apiKey) return null;
 
-  const model = process.env.OPENAI_TRANSLATION_MODEL?.trim() || "gpt-4.1-mini";
+  const model = serverEnv.openaiTranslationModel();
   const prompt = [
     "Revise a receita para PT-BR natural e culinario, sem inventar ingredientes ou etapas.",
     "Mantenha sentido original, ajuste concordancia, fluidez, medidas e termos de cozinha.",
@@ -109,4 +110,3 @@ export async function premiumReviewRecipe(recipe: ImportedRecipeDraft): Promise<
     steps: reviewed.steps.map(cleanupLine).filter(Boolean).slice(0, 30),
   };
 }
-

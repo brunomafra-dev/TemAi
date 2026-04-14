@@ -5,6 +5,13 @@ import {
 } from "@/features/recipes/import-from-url";
 import { upsertImportedRecipeToSupabase } from "@/features/recipes/supabase-library";
 import { collectMealDbRecipesForImport } from "@/features/recipes/themealdb";
+import {
+  parseJsonObjectBody,
+  readOptionalBoolean,
+  readOptionalEnum,
+  readOptionalNumber,
+  validationErrorResponse,
+} from "@/lib/input-validation";
 
 interface ImportBatchPayload {
   source?: "tudogostoso" | "themealdb";
@@ -19,16 +26,31 @@ function delay(ms: number) {
 
 export async function POST(request: Request) {
   try {
-    const payload = (await request.json()) as ImportBatchPayload;
-    const source = payload.source || "tudogostoso";
-    const requestedCount = payload.count ?? 20;
+    const payload = (await parseJsonObjectBody(request, { maxBytes: 8 * 1024 })) as ImportBatchPayload &
+      Record<string, unknown>;
+    const source = readOptionalEnum(payload, "source", ["tudogostoso", "themealdb"] as const, "tudogostoso", "Fonte");
+    const requestedCount = readOptionalNumber(payload, "count", {
+      fieldName: "Quantidade",
+      min: 1,
+      max: 500,
+      integer: true,
+      defaultValue: 20,
+    });
     const count = Math.max(20, Math.min(50, requestedCount));
-    const minRating = Math.max(0, Math.min(5, payload.minRating ?? 4.5));
-    const premiumReview = payload.premiumReview ?? true;
-
-    if (source !== "tudogostoso" && source !== "themealdb") {
-      return NextResponse.json({ message: "Fonte nao suportada para importacao em lote." }, { status: 400 });
-    }
+    const minRating = Math.max(
+      0,
+      Math.min(
+        5,
+        readOptionalNumber(payload, "minRating", {
+          fieldName: "Nota minima",
+          min: 0,
+          max: 5,
+          integer: false,
+          defaultValue: 4.5,
+        }),
+      ),
+    );
+    const premiumReview = readOptionalBoolean(payload, "premiumReview", true);
 
     if (source === "themealdb") {
       const drafts = await collectMealDbRecipesForImport(count, { premiumReview });
@@ -111,6 +133,8 @@ export async function POST(request: Request) {
       failed: failed.slice(0, 20),
     });
   } catch (error) {
+    const validationResponse = validationErrorResponse(error);
+    if (validationResponse) return validationResponse;
     return NextResponse.json(
       { message: error instanceof Error ? error.message : "Erro na importacao em lote." },
       { status: 500 },

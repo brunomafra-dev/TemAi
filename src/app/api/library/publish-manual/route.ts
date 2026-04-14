@@ -5,6 +5,16 @@ import {
   upsertImportedRecipeToSupabase,
 } from "@/features/recipes/supabase-library";
 import type { LibraryCategory } from "@/features/recipes/types";
+import {
+  InputValidationError,
+  parseJsonObjectBody,
+  readOptionalEnum,
+  readOptionalNumber,
+  readOptionalString,
+  readRequiredString,
+  readStringArray,
+  validationErrorResponse,
+} from "@/lib/input-validation";
 
 interface PublishManualPayload {
   title?: string;
@@ -53,15 +63,73 @@ function isPremiumAllowed(authorHandle: string): boolean {
 
 export async function POST(request: Request) {
   try {
-    const payload = (await request.json()) as PublishManualPayload;
+    const payload = (await parseJsonObjectBody(request, { maxBytes: 96 * 1024 })) as PublishManualPayload &
+      Record<string, unknown>;
 
-    const title = payload.title?.trim() || "";
-    const description = payload.description?.trim() || "";
-    const ingredients = Array.isArray(payload.ingredients) ? payload.ingredients.map((i) => i.trim()).filter(Boolean) : [];
-    const steps = Array.isArray(payload.steps) ? payload.steps.map((s) => s.trim()).filter(Boolean) : [];
-    const category = payload.category && allowedCategories.has(payload.category) ? payload.category : "principais";
-    const authorName = payload.authorName?.trim() || "Usuario TemAi";
+    const title = readRequiredString(payload, "title", {
+      fieldName: "Titulo",
+      minLength: 3,
+      maxLength: 160,
+    });
+    const description =
+      readOptionalString(payload, "description", {
+        fieldName: "Descricao",
+        maxLength: 5000,
+      }) || "";
+    const ingredients = readStringArray(payload, "ingredients", {
+      fieldName: "Ingredientes",
+      maxItems: 120,
+      itemMaxLength: 160,
+      minItems: 1,
+    });
+    const steps = readStringArray(payload, "steps", {
+      fieldName: "Modo de preparo",
+      maxItems: 120,
+      itemMaxLength: 800,
+      minItems: 1,
+    });
+    const category = readOptionalEnum(
+      payload,
+      "category",
+      [...allowedCategories] as LibraryCategory[],
+      "principais",
+      "Categoria",
+    );
+    const authorName =
+      readOptionalString(payload, "authorName", {
+        fieldName: "Autor",
+        maxLength: 80,
+      }) || "Usuario TemAi";
     const authorHandle = normalizeAuthorHandle(authorName);
+    const prepMinutes = readOptionalNumber(payload, "prepMinutes", {
+      fieldName: "Tempo de preparo",
+      min: 5,
+      max: 240,
+      integer: true,
+      defaultValue: 20,
+    });
+    const servings = readOptionalNumber(payload, "servings", {
+      fieldName: "Porcoes",
+      min: 1,
+      max: 20,
+      integer: true,
+      defaultValue: 2,
+    });
+    const imageUrl = readOptionalString(payload, "imageUrl", {
+      fieldName: "Imagem",
+      maxLength: 1000,
+    });
+    if (imageUrl) {
+      let parsedImageUrl: URL;
+      try {
+        parsedImageUrl = new URL(imageUrl);
+      } catch {
+        throw new InputValidationError("URL da imagem malformada.");
+      }
+      if (!["http:", "https:"].includes(parsedImageUrl.protocol)) {
+        throw new InputValidationError("URL da imagem invalida.");
+      }
+    }
 
     if (!isPremiumAllowed(authorHandle)) {
       return NextResponse.json(
@@ -71,10 +139,6 @@ export async function POST(request: Request) {
         },
         { status: 403 },
       );
-    }
-
-    if (!title || ingredients.length === 0 || steps.length === 0) {
-      return NextResponse.json({ message: "Dados insuficientes para publicar receita." }, { status: 400 });
     }
 
     const unique = Date.now().toString(36).slice(-6);
@@ -87,9 +151,9 @@ export async function POST(request: Request) {
       category,
       ingredients,
       steps,
-      prepMinutes: Math.max(5, Math.min(240, Number(payload.prepMinutes) || 20)),
-      servings: Math.max(1, Math.min(20, Number(payload.servings) || 2)),
-      imageUrl: payload.imageUrl || undefined,
+      prepMinutes,
+      servings,
+      imageUrl: imageUrl || undefined,
       sourceName: `@${authorHandle}`,
       sourceUrl: `temai://community/${slug}`,
     });
@@ -102,6 +166,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
+    const validationResponse = validationErrorResponse(error);
+    if (validationResponse) return validationResponse;
     return NextResponse.json(
       { message: error instanceof Error ? error.message : "Falha ao publicar receita." },
       { status: 500 },

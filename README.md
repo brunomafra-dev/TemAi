@@ -80,9 +80,24 @@ supabase db query < supabase/seed/recipes_br_seed.sql
 ```env
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_URL=...
+SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
 THEMEALDB_API_KEY=1
+OPENAI_API_KEY=
+OPENAI_TRANSLATION_MODEL=gpt-4.1-mini
 ```
 
 Com isso, a biblioteca passa a ler primeiro da tabela `recipes_br` (PT-BR).  
 Se nao houver dados/config, o app cai para fallback automaticamente.
+
+## Seguranca de segredos
+
+- Nunca commitar `.env.local`.
+- Chaves sensiveis ficam somente no backend (`SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`).
+- Variaveis `NEXT_PUBLIC_*` sao publicas por design e nao devem conter segredos.
+- Rode antes de push:
+
+```bash
+npm run security:scan-secrets
+```

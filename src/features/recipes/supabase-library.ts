@@ -1,5 +1,6 @@
 ﻿import type { LibraryCategory, Recipe } from "@/features/recipes/types";
 import type { ImportedRecipeDraft } from "@/features/recipes/import-from-url";
+import { serverEnv } from "@/lib/env-server";
 
 interface SupabaseRecipeRow {
   id: string;
@@ -90,9 +91,14 @@ function decodeHtmlEntities(value: string): string {
 }
 
 function getSupabaseEnv() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
-  return { url, key };
+  try {
+    return {
+      url: serverEnv.supabaseUrl(),
+      key: serverEnv.supabaseServiceRoleKey(),
+    };
+  } catch {
+    return { url: "", key: "" };
+  }
 }
 
 function canUseSupabase(): boolean {
@@ -417,3 +423,5 @@ export async function refreshAuthorBadgesInSupabase(authorHandle: string): Promi
     throw new Error(`Falha ao atualizar badges do autor: ${errorText}`);
   }
 }
+
+

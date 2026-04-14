@@ -1,14 +1,15 @@
 "use client";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { publicEnv } from "@/lib/env-public";
 
 let cachedClient: SupabaseClient | null = null;
 
 export function getSupabaseBrowserClient(): SupabaseClient | null {
   if (cachedClient) return cachedClient;
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  const url = publicEnv.supabaseUrl;
+  const anonKey = publicEnv.supabaseAnonKey;
 
   if (!url || !anonKey) {
     return null;

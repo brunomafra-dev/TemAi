@@ -1,5 +1,6 @@
 import type { Recipe } from "@/features/recipes/types";
 import type { ImportedRecipeDraft } from "@/features/recipes/import-from-url";
+import { serverEnv } from "@/lib/env-server";
 import { premiumReviewRecipe } from "@/features/recipes/premium-review";
 import {
   translateIngredientToPortuguese,
@@ -87,7 +88,7 @@ const AREA_PT: Record<string, string> = {
 };
 
 function getMealDbKey(): string {
-  return process.env.THEMEALDB_API_KEY?.trim() || "1";
+  return serverEnv.theMealDbApiKey();
 }
 
 function mapIngredients(meal: MealDbMeal): string[] {
@@ -230,4 +231,3 @@ export async function getMealDbRecipeById(mealId: string): Promise<Recipe | null
   if (!data.meals?.length) return null;
   return mapMealToRecipe(data.meals[0]);
 }
-
