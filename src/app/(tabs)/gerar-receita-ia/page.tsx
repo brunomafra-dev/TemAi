@@ -36,6 +36,7 @@ function CreateRecipePageContent() {
   const [isPhotoPickerOpen, setIsPhotoPickerOpen] = useState(false);
   const [selectedAudioName, setSelectedAudioName] = useState("");
   const [selectedPhotoName, setSelectedPhotoName] = useState("");
+  const [includeNutritionEstimate, setIncludeNutritionEstimate] = useState(false);
 
   useEffect(() => {
     const requestedMode = searchParams.get("mode");
@@ -74,7 +75,8 @@ function CreateRecipePageContent() {
 
   function openRecipe(suggestion: RecipeSuggestion) {
     const ingredientsQuery = response?.normalizedIngredients.join(",") ?? "";
-    router.push(`/receita/${suggestion.id}?origin=ai&ingredients=${encodeURIComponent(ingredientsQuery)}`);
+    const nutritionFlag = includeNutritionEstimate ? "&nutrition=1" : "";
+    router.push(`/receita/${suggestion.id}?origin=ai&ingredients=${encodeURIComponent(ingredientsQuery)}${nutritionFlag}`);
   }
 
   function pickFromCamera() {
@@ -202,6 +204,15 @@ function CreateRecipePageContent() {
               className="min-h-[120px] border-[#E5D7C1] bg-[#FAF5EC]"
             />
           </div>
+
+          <label className="flex items-center gap-2 rounded-2xl border border-[#E5D7C1] bg-[#FAF5EC] px-3 py-2 text-sm text-[#5E5348]">
+            <input
+              type="checkbox"
+              checked={includeNutritionEstimate}
+              onChange={(event) => setIncludeNutritionEstimate(event.target.checked)}
+            />
+            Incluir estimativa nutricional (opcional)
+          </label>
 
           <Button
             onClick={handleGenerateSuggestions}

@@ -455,7 +455,22 @@ export default function ProfilePage() {
           </div>
         );
       case "support":
-        return <p className="text-sm text-[#6A5E52]">Em breve: canal oficial de suporte dentro do app.</p>;
+        return (
+          <div className="space-y-2">
+            <p className="text-sm text-[#6A5E52]">
+              Para suporte, duvidas de conta, assinatura ou privacidade, fale com nossa equipe:
+            </p>
+            <a
+              href="mailto:suporte@temaiapp.com?subject=TemAi%20-%20Suporte"
+              className="inline-flex rounded-full border border-[#C66A3D] bg-[#F8E8E1] px-4 py-2 text-xs font-semibold text-[#7A4733]"
+            >
+              Enviar email para suporte
+            </a>
+            <p className="text-xs text-[#7A6D60]">
+              Email de privacidade/LGPD: privacidade@temaiapp.com
+            </p>
+          </div>
+        );
       case "privacy":
         return <Link href="/privacidade" className="text-sm font-semibold text-primary underline">Abrir Politica de Privacidade</Link>;
       case "terms":

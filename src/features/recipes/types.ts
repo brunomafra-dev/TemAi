@@ -10,6 +10,15 @@ export type LibraryCategory =
 
 export type RecipeOrigin = "ai" | "library" | "manual";
 
+export interface NutritionEstimate {
+  caloriesKcal: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  perServing: boolean;
+  disclaimer: string;
+}
+
 export interface RecipeSuggestion {
   id: string;
   title: string;
@@ -28,6 +37,7 @@ export interface Recipe {
   prepMinutes: number;
   servings: number;
   imageUrl?: string;
+  nutrition?: NutritionEstimate;
   sourceLabel: string;
   origin: RecipeOrigin;
 }
@@ -46,4 +56,5 @@ export interface SuggestionRequestBody {
 export interface FullRecipeRequestBody {
   suggestionId: string;
   ingredients: string[];
+  includeNutrition?: boolean;
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { generateFullRecipe } from "@/features/recipes/ai-generator";
 import {
   parseJsonObjectBody,
+  readOptionalBoolean,
   readRequiredString,
   readStringArray,
   validationErrorResponse,
@@ -10,6 +11,7 @@ import {
 interface RecipePayload {
   suggestionId?: string;
   ingredients?: string[];
+  includeNutrition?: boolean;
 }
 
 export async function POST(request: Request) {
@@ -31,8 +33,9 @@ export async function POST(request: Request) {
             itemMaxLength: 120,
             minItems: 0,
           });
+    const includeNutrition = readOptionalBoolean(payload, "includeNutrition", false);
 
-    const recipe = generateFullRecipe(suggestionId, ingredients);
+    const recipe = generateFullRecipe(suggestionId, ingredients, includeNutrition);
     return NextResponse.json(recipe);
   } catch (error) {
     const validationResponse = validationErrorResponse(error);

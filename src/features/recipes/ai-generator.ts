@@ -1,5 +1,10 @@
 import { uniqueIngredients } from "@/features/recipes/helpers";
-import type { Recipe, RecipeSuggestion, SuggestionsResponse } from "@/features/recipes/types";
+import type {
+  NutritionEstimate,
+  Recipe,
+  RecipeSuggestion,
+  SuggestionsResponse,
+} from "@/features/recipes/types";
 
 interface RecipeTemplate {
   id: string;
@@ -135,6 +140,55 @@ const AI_TEMPLATES: RecipeTemplate[] = [
   },
 ];
 
+interface NutritionMacro {
+  caloriesKcal: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+}
+
+const nutritionKeywordMap: Array<{ regex: RegExp; macro: NutritionMacro }> = [
+  { regex: /\b(frango|peito de frango)\b/i, macro: { caloriesKcal: 165, proteinG: 31, carbsG: 0, fatG: 3.6 } },
+  { regex: /\b(ovo|ovos)\b/i, macro: { caloriesKcal: 78, proteinG: 6.3, carbsG: 0.6, fatG: 5.3 } },
+  { regex: /\b(arroz)\b/i, macro: { caloriesKcal: 130, proteinG: 2.7, carbsG: 28, fatG: 0.3 } },
+  { regex: /\b(macarrao|massa|spaghetti|penne)\b/i, macro: { caloriesKcal: 157, proteinG: 5.8, carbsG: 30.9, fatG: 0.9 } },
+  { regex: /\b(queijo)\b/i, macro: { caloriesKcal: 113, proteinG: 7, carbsG: 0.9, fatG: 9 } },
+  { regex: /\b(atum)\b/i, macro: { caloriesKcal: 132, proteinG: 28, carbsG: 0, fatG: 1 } },
+  { regex: /\b(lentilha|grao de bico)\b/i, macro: { caloriesKcal: 116, proteinG: 9, carbsG: 20, fatG: 0.4 } },
+  { regex: /\b(banana)\b/i, macro: { caloriesKcal: 89, proteinG: 1.1, carbsG: 23, fatG: 0.3 } },
+  { regex: /\b(aveia)\b/i, macro: { caloriesKcal: 389, proteinG: 16.9, carbsG: 66.3, fatG: 6.9 } },
+  { regex: /\b(creme de leite)\b/i, macro: { caloriesKcal: 340, proteinG: 2.1, carbsG: 3, fatG: 35 } },
+  { regex: /\b(mostarda)\b/i, macro: { caloriesKcal: 66, proteinG: 3.7, carbsG: 5.8, fatG: 4.4 } },
+  { regex: /\b(tomate|cebola|cenoura|alho)\b/i, macro: { caloriesKcal: 30, proteinG: 1, carbsG: 6, fatG: 0.2 } },
+];
+
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+function estimateNutritionPerServing(ingredients: string[], servings: number): NutritionEstimate {
+  const totals: NutritionMacro = { caloriesKcal: 0, proteinG: 0, carbsG: 0, fatG: 0 };
+
+  ingredients.forEach((ingredient) => {
+    const match = nutritionKeywordMap.find((entry) => entry.regex.test(ingredient));
+    if (!match) return;
+    totals.caloriesKcal += match.macro.caloriesKcal;
+    totals.proteinG += match.macro.proteinG;
+    totals.carbsG += match.macro.carbsG;
+    totals.fatG += match.macro.fatG;
+  });
+
+  const divisor = Math.max(1, servings);
+  return {
+    caloriesKcal: round1(totals.caloriesKcal / divisor),
+    proteinG: round1(totals.proteinG / divisor),
+    carbsG: round1(totals.carbsG / divisor),
+    fatG: round1(totals.fatG / divisor),
+    perServing: true,
+    disclaimer: "Estimativa aproximada por porcao. Pode variar conforme marca e preparo.",
+  };
+}
+
 function scoreTemplate(template: RecipeTemplate, normalizedIngredients: string[]): {
   suggestion: RecipeSuggestion;
   score: number;
@@ -187,12 +241,16 @@ export function generateRecipeSuggestions(ingredients: string[]): SuggestionsRes
   };
 }
 
-export function generateFullRecipe(suggestionId: string, ingredients: string[]): Recipe {
+export function generateFullRecipe(
+  suggestionId: string,
+  ingredients: string[],
+  includeNutrition = false,
+): Recipe {
   const template = AI_TEMPLATES.find((item) => item.id === suggestionId);
   const normalizedIngredients = uniqueIngredients(ingredients);
 
   if (!template) {
-    return {
+    const fallbackRecipe: Recipe = {
       id: suggestionId,
       title: "Receita personalizada",
       description: "Receita sugerida pelo TemAi a partir dos seus ingredientes.",
@@ -210,6 +268,13 @@ export function generateFullRecipe(suggestionId: string, ingredients: string[]):
       sourceLabel: "TemAi IA",
       origin: "ai",
     };
+    if (includeNutrition) {
+      fallbackRecipe.nutrition = estimateNutritionPerServing(
+        fallbackRecipe.ingredients,
+        fallbackRecipe.servings,
+      );
+    }
+    return fallbackRecipe;
   }
 
   const combinedIngredients = uniqueIngredients([
@@ -218,7 +283,7 @@ export function generateFullRecipe(suggestionId: string, ingredients: string[]):
     ...normalizedIngredients,
   ]);
 
-  return {
+  const recipe: Recipe = {
     id: template.id,
     title: template.title,
     description: template.description,
@@ -232,4 +297,8 @@ export function generateFullRecipe(suggestionId: string, ingredients: string[]):
     sourceLabel: "TemAi IA",
     origin: "ai",
   };
+  if (includeNutrition) {
+    recipe.nutrition = estimateNutritionPerServing(recipe.ingredients, recipe.servings);
+  }
+  return recipe;
 }

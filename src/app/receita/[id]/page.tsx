@@ -245,6 +245,7 @@ export default function RecipeDetailsPage() {
     () => parseIngredientsQuery(searchParams.get("ingredients")),
     [searchParams],
   );
+  const shouldIncludeNutrition = searchParams.get("nutrition") === "1";
 
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [isLoading, setIsLoading] = useState(origin === "ai");
@@ -336,6 +337,7 @@ export default function RecipeDetailsPage() {
           const rebuilt = await fetchFullRecipe({
             suggestionId: recipeId,
             ingredients: savedRef.ingredientsSnapshot || ingredientList,
+            includeNutrition: shouldIncludeNutrition,
           });
           if (isMounted) {
             setRecipe(rebuilt);
@@ -372,6 +374,7 @@ export default function RecipeDetailsPage() {
         const fullRecipe = await fetchFullRecipe({
           suggestionId: recipeId,
           ingredients: ingredientList,
+          includeNutrition: shouldIncludeNutrition,
         });
 
         if (isMounted) {
@@ -397,7 +400,7 @@ export default function RecipeDetailsPage() {
     return () => {
       isMounted = false;
     };
-  }, [ingredientList, origin, recipeId]);
+  }, [ingredientList, origin, recipeId, shouldIncludeNutrition]);
 
   useEffect(() => {
     if (!isShoppingOpen) return;
@@ -609,6 +612,20 @@ export default function RecipeDetailsPage() {
                 <Badge>Serve ~{scaledServings} pessoa(s)</Badge>
                 <Badge>{recipe.sourceLabel}</Badge>
               </div>
+              {recipe.nutrition ? (
+                <details className="rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] p-3">
+                  <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-[#7A6D60]">
+                    Resumo nutricional (estimativa)
+                  </summary>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-sm text-[#4F4338]">
+                    <p>Kcal: {recipe.nutrition.caloriesKcal}</p>
+                    <p>Proteina: {recipe.nutrition.proteinG} g</p>
+                    <p>Carbo: {recipe.nutrition.carbsG} g</p>
+                    <p>Gordura: {recipe.nutrition.fatG} g</p>
+                  </div>
+                  <p className="mt-2 text-xs text-[#7A6D60]">{recipe.nutrition.disclaimer}</p>
+                </details>
+              ) : null}
               <div className="space-y-2 rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-[#7A6D60]">
                   Multiplicador de porcoes
