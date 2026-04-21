@@ -1,3 +1,4 @@
+import { memo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +11,7 @@ interface RecipeCardProps {
   footerLabel?: string;
 }
 
-export function RecipeCard({ recipe, href, footerLabel }: RecipeCardProps) {
+export const RecipeCard = memo(function RecipeCard({ recipe, href, footerLabel }: RecipeCardProps) {
   return (
     <Link href={href} className="block">
       <Card className="overflow-hidden border-[#E5D7C1] bg-[#FFFCF7] shadow-[0_20px_35px_-25px_rgba(42,30,23,0.7)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_42px_-24px_rgba(42,30,23,0.75)]">
@@ -54,4 +55,6 @@ export function RecipeCard({ recipe, href, footerLabel }: RecipeCardProps) {
       </Card>
     </Link>
   );
-}
+});
+
+RecipeCard.displayName = "RecipeCard";

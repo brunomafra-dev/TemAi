@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RecipeCard } from "@/components/recipes/recipe-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { parseIngredientsText } from "@/features/recipes/helpers";
 import { getMyRecipes, removeMyRecipe, upsertMyRecipe } from "@/features/recipes/local-storage";
+import { getSubscriptionState, syncSubscriptionFromCloud, type SubscriptionState } from "@/features/profile/subscription-storage";
 import type { Recipe } from "@/features/recipes/types";
 import { slugify } from "@/lib/utils";
 
@@ -55,6 +56,30 @@ function mapSteps(value: string): string[] {
     .filter(Boolean);
 }
 
+const SavedRecipeRow = memo(function SavedRecipeRow({
+  recipe,
+  onDelete,
+}: {
+  recipe: Recipe;
+  onDelete: (recipeId: string) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <RecipeCard recipe={recipe} href={`/receita/${recipe.id}?origin=manual`} />
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full border-[#E5D7C1] bg-[#FFFCF7]"
+        onClick={() => onDelete(recipe.id)}
+      >
+        Remover da lista
+      </Button>
+    </div>
+  );
+});
+
+SavedRecipeRow.displayName = "SavedRecipeRow";
+
 export default function CreatePage() {
   const [recipes, setRecipes] = useState<Recipe[]>(() => getMyRecipes());
   const [title, setTitle] = useState("");
@@ -68,14 +93,29 @@ export default function CreatePage() {
   const [saveFeedback, setSaveFeedback] = useState("");
   const [voiceTarget, setVoiceTarget] = useState<"ingredients" | "steps" | null>(null);
   const [voiceMessage, setVoiceMessage] = useState("");
+  const [subscription, setSubscription] = useState<SubscriptionState>(() => getSubscriptionState());
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    syncSubscriptionFromCloud()
+      .then((remote) => {
+        if (!mounted || !remote) return;
+        setSubscription(remote);
+      })
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const hasFormData = useMemo(
     () => title.trim().length > 0 && ingredientsText.trim().length > 0 && stepsText.trim().length > 0,
     [ingredientsText, stepsText, title],
   );
+  const visibleRecipes = useMemo(() => recipes.slice(0, 4), [recipes]);
 
   function clearForm() {
     setTitle("");
@@ -109,9 +149,9 @@ export default function CreatePage() {
     setIsSaveChoiceOpen(true);
   }
 
-  function handleDeleteRecipe(recipeId: string) {
+  const handleDeleteRecipe = useCallback((recipeId: string) => {
     setRecipes(removeMyRecipe(recipeId));
-  }
+  }, []);
 
   function handleImageChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -124,10 +164,7 @@ export default function CreatePage() {
   }
 
   function isPremiumUser(): boolean {
-    if (typeof window === "undefined") return true;
-    const raw = window.localStorage.getItem("temai_is_premium");
-    if (raw == null) return true;
-    return raw === "true" || raw === "1" || raw.toLowerCase() === "active";
+    return subscription.plan === "premium" && subscription.status === "active";
   }
 
   function formatIngredientsFromVoice(raw: string): string {
@@ -474,18 +511,8 @@ export default function CreatePage() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {recipes.slice(0, 4).map((recipe) => (
-              <div key={recipe.id} className="space-y-2">
-                <RecipeCard recipe={recipe} href={`/receita/${recipe.id}?origin=manual`} />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full border-[#E5D7C1] bg-[#FFFCF7]"
-                  onClick={() => handleDeleteRecipe(recipe.id)}
-                >
-                  Remover da lista
-                </Button>
-              </div>
+            {visibleRecipes.map((recipe) => (
+              <SavedRecipeRow key={recipe.id} recipe={recipe} onDelete={handleDeleteRecipe} />
             ))}
           </div>
         )}

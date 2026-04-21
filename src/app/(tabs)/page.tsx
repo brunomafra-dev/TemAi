@@ -1,8 +1,9 @@
 ﻿"use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { RatingStars } from "@/components/recipes/rating-stars";
 import { BADGE_CATALOG } from "@/features/profile/badges";
 import { getUserProfile } from "@/features/profile/storage";
@@ -63,6 +64,7 @@ const categories = [
 
 const popularCategories = ["principais", "veggie", "massas", "kids", "sobremesas", "lanches", "bebidas"] as const;
 const POPULAR_CACHE_KEY = "temai:home:popular:v1";
+type Category = (typeof categories)[number];
 
 const libraryMetaById: Record<
   string,
@@ -123,6 +125,92 @@ const libraryMetaById: Record<
     views: 990,
   },
 };
+
+type PopularRecipeEntry = {
+  recipe: Recipe;
+  rating: number;
+  image: string;
+  author: string;
+  views: number;
+};
+
+const CategoryButton = memo(function CategoryButton({
+  category,
+  isActive,
+  onSelect,
+}: {
+  category: Category;
+  isActive: boolean;
+  onSelect: (categoryId: string) => void;
+}) {
+  return (
+    <button
+      onClick={() => onSelect(category.id)}
+      className="flex min-w-[76px] flex-col items-center gap-2"
+    >
+      <span
+        className={cn(
+          "relative block h-[62px] w-[62px] overflow-hidden rounded-full border-2 shadow-sm transition",
+          isActive ? "border-[#C66A3D]" : "border-[#E6DCCB]",
+        )}
+      >
+        <span
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${category.image})` }}
+        />
+      </span>
+      <span
+        className={cn(
+          "text-xs font-semibold",
+          isActive ? "text-[#7E633A]" : "text-[#6E6258]",
+        )}
+      >
+        {category.label}
+      </span>
+    </button>
+  );
+});
+
+CategoryButton.displayName = "CategoryButton";
+
+const PopularRecipeCard = memo(function PopularRecipeCard({ entry }: { entry: PopularRecipeEntry }) {
+  return (
+    <Link
+      href={`/receita/${entry.recipe.id}?origin=library`}
+      className="flex overflow-hidden rounded-[1.4rem] border border-[#E7DCCB] bg-[#FFFCF7] shadow-[0_16px_30px_-26px_rgba(42,30,23,0.75)]"
+    >
+      <div className="relative min-h-[122px] w-[40%] shrink-0 overflow-hidden">
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${entry.image})` }}
+        />
+        <div className="absolute inset-0 bg-[#2A1E17]/30" />
+        <div className="absolute left-2 top-2 flex gap-1.5">
+          <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold text-white">
+            {entry.recipe.prepMinutes} min
+          </span>
+          <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold text-white">
+            ★ {(entry.rating * 2).toFixed(1)}
+          </span>
+        </div>
+      </div>
+      <div className="flex flex-1 flex-col justify-between p-3">
+        <div>
+          <p className="line-clamp-2 text-sm font-semibold text-[#2A1E17]">
+            {entry.recipe.title}
+          </p>
+          <p className="mt-1 text-xs text-[#7E7366]">por {entry.author}</p>
+        </div>
+        <p className="text-[11px] font-semibold text-[#B19460]">
+          {entry.views.toLocaleString("pt-BR")} acessos
+        </p>
+        <RatingStars readonly size="sm" value={entry.rating * 2} />
+      </div>
+    </Link>
+  );
+});
+
+PopularRecipeCard.displayName = "PopularRecipeCard";
 
 export default function HomePage() {
   const router = useRouter();
@@ -216,29 +304,30 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    const imageUrls = [heroImage, ctaImage, ...categories.map((category) => category.image)];
+    const imageUrls = [heroImage, ctaImage];
     imageUrls.forEach((url) => {
-      const img = new Image();
+      const img = new window.Image();
       img.src = url;
     });
   }, []);
 
-  function openGeneratorMenu() {
+  const openGeneratorMenu = useCallback(() => {
     setIsGeneratorMenuOpen(true);
-  }
+  }, []);
 
-  function closeGeneratorMenu() {
+  const closeGeneratorMenu = useCallback(() => {
     setIsGeneratorMenuOpen(false);
-  }
+  }, []);
 
-  function redirectToCreate(mode: "text" | "audio" | "photo") {
+  const redirectToCreate = useCallback((mode: "text" | "audio" | "photo") => {
     setIsGeneratorMenuOpen(false);
     router.push(`/gerar-receita-ia?mode=${mode}`);
-  }
+  }, [router]);
 
-  function navigateToLibraryCategory(categoryId: string) {
+  const selectLibraryCategory = useCallback((categoryId: string) => {
+    setSelectedCategory(categoryId);
     router.push(`/biblioteca?category=${encodeURIComponent(categoryId)}`);
-  }
+  }, [router]);
 
   const fallbackPopularRecipes = useMemo(() => {
     return LIBRARY_RECIPES.map((recipe) => {
@@ -312,9 +401,13 @@ export default function HomePage() {
           <div className="mb-5 flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
               {profile.photoDataUrl ? (
-                <img
+                <Image
                   src={profile.photoDataUrl}
                   alt="Foto do usuario"
+                  width={48}
+                  height={48}
+                  sizes="48px"
+                  unoptimized
                   className="h-12 w-12 rounded-full border border-white/35 object-cover"
                 />
               ) : (
@@ -405,39 +498,14 @@ export default function HomePage() {
         <h3 className="text-lg font-semibold">Categorias</h3>
 
         <div className="flex gap-3 overflow-x-auto pb-2">
-          {categories.map((category) => {
-            const isActive = category.id === selectedCategory;
-            return (
-              <button
-                key={category.id}
-                onClick={() => {
-                  setSelectedCategory(category.id);
-                  navigateToLibraryCategory(category.id);
-                }}
-                className="flex min-w-[76px] flex-col items-center gap-2"
-              >
-                <span
-                  className={cn(
-                    "relative block h-[62px] w-[62px] overflow-hidden rounded-full border-2 shadow-sm transition",
-                    isActive ? "border-[#C66A3D]" : "border-[#E6DCCB]",
-                  )}
-                >
-                  <span
-                    className="absolute inset-0 bg-cover bg-center"
-                    style={{ backgroundImage: `url(${category.image})` }}
-                  />
-                </span>
-                <span
-                  className={cn(
-                    "text-xs font-semibold",
-                    isActive ? "text-[#7E633A]" : "text-[#6E6258]",
-                  )}
-                >
-                  {category.label}
-                </span>
-              </button>
-            );
-          })}
+          {categories.map((category) => (
+            <CategoryButton
+              key={category.id}
+              category={category}
+              isActive={category.id === selectedCategory}
+              onSelect={selectLibraryCategory}
+            />
+          ))}
         </div>
       </section>
 
@@ -454,39 +522,7 @@ export default function HomePage() {
 
         <div className="space-y-3">
           {popularRecipes.map((entry) => (
-            <Link
-              key={entry.recipe.id}
-              href={`/receita/${entry.recipe.id}?origin=library`}
-              className="flex overflow-hidden rounded-[1.4rem] border border-[#E7DCCB] bg-[#FFFCF7] shadow-[0_16px_30px_-26px_rgba(42,30,23,0.75)]"
-            >
-              <div className="relative min-h-[122px] w-[40%] shrink-0 overflow-hidden">
-                <div
-                  className="absolute inset-0 bg-cover bg-center"
-                  style={{ backgroundImage: `url(${entry.image})` }}
-                />
-                <div className="absolute inset-0 bg-[#2A1E17]/30" />
-                <div className="absolute left-2 top-2 flex gap-1.5">
-                  <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold text-white">
-                    {entry.recipe.prepMinutes} min
-                  </span>
-                  <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold text-white">
-                    ★ {(entry.rating * 2).toFixed(1)}
-                  </span>
-                </div>
-              </div>
-              <div className="flex flex-1 flex-col justify-between p-3">
-                <div>
-                  <p className="line-clamp-2 text-sm font-semibold text-[#2A1E17]">
-                    {entry.recipe.title}
-                  </p>
-                  <p className="mt-1 text-xs text-[#7E7366]">por {entry.author}</p>
-                </div>
-                <p className="text-[11px] font-semibold text-[#B19460]">
-                  {entry.views.toLocaleString("pt-BR")} acessos
-                </p>
-                <RatingStars readonly size="sm" value={entry.rating * 2} />
-              </div>
-            </Link>
+            <PopularRecipeCard key={entry.recipe.id} entry={entry} />
           ))}
         </div>
       </section>

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +10,7 @@ interface SuggestionCardProps {
   onOpenRecipe: (suggestion: RecipeSuggestion) => void;
 }
 
-export function SuggestionCard({ suggestion, buttonLabel, onOpenRecipe }: SuggestionCardProps) {
+export const SuggestionCard = memo(function SuggestionCard({ suggestion, buttonLabel, onOpenRecipe }: SuggestionCardProps) {
   return (
     <Card>
       <CardHeader>
@@ -37,4 +38,6 @@ export function SuggestionCard({ suggestion, buttonLabel, onOpenRecipe }: Sugges
       </CardFooter>
     </Card>
   );
-}
+});
+
+SuggestionCard.displayName = "SuggestionCard";

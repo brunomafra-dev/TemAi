@@ -1,13 +1,19 @@
-"use client";
+﻿"use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SuggestionCard } from "@/components/recipes/suggestion-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { fetchAiSuggestions } from "@/features/recipes/api-client";
+import {
+  consumeAiGenerationAttempt,
+  getSubscriptionState,
+  syncSubscriptionFromCloud,
+  type SubscriptionState,
+} from "@/features/profile/subscription-storage";
 import type { InputMode, RecipeSuggestion, SuggestionsResponse } from "@/features/recipes/types";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +43,9 @@ function CreateRecipePageContent() {
   const [selectedAudioName, setSelectedAudioName] = useState("");
   const [selectedPhotoName, setSelectedPhotoName] = useState("");
   const [includeNutritionEstimate, setIncludeNutritionEstimate] = useState(false);
+  const [subscription, setSubscription] = useState<SubscriptionState>(() => getSubscriptionState());
+
+  const isPremium = subscription.plan === "premium" && subscription.status === "active";
 
   useEffect(() => {
     const requestedMode = searchParams.get("mode");
@@ -44,11 +53,31 @@ function CreateRecipePageContent() {
       return;
     }
 
+    if (!isPremium && requestedMode !== "text") {
+      setMode("text");
+      setErrorMessage("Audio e foto sao recursos premium.");
+      return;
+    }
+
     setMode(requestedMode);
     if (requestedMode === "photo") {
       setIsPhotoPickerOpen(true);
     }
-  }, [searchParams]);
+  }, [isPremium, searchParams]);
+
+  useEffect(() => {
+    let mounted = true;
+    syncSubscriptionFromCloud()
+      .then((remote) => {
+        if (!mounted || !remote) return;
+        setSubscription(remote);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const canGenerate = useMemo(
     () => ingredientsText.trim().length > 0 && !isLoading,
@@ -56,6 +85,16 @@ function CreateRecipePageContent() {
   );
 
   async function handleGenerateSuggestions() {
+    if (!isPremium && mode !== "text") {
+      setErrorMessage("Plano free permite IA apenas por texto.");
+      return;
+    }
+
+    if (!isPremium && subscription.aiGenerationsUsedThisMonth >= subscription.aiGenerationsLimitThisMonth) {
+      setErrorMessage("Plano free atingiu o limite de 3 geracoes de IA neste mes.");
+      return;
+    }
+
     setIsLoading(true);
     setErrorMessage("");
 
@@ -66,6 +105,9 @@ function CreateRecipePageContent() {
       });
 
       setResponse(data);
+      if (!isPremium) {
+        setSubscription(consumeAiGenerationAttempt());
+      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Erro ao buscar sugestoes.");
     } finally {
@@ -73,21 +115,21 @@ function CreateRecipePageContent() {
     }
   }
 
-  function openRecipe(suggestion: RecipeSuggestion) {
+  const openRecipe = useCallback((suggestion: RecipeSuggestion) => {
     const ingredientsQuery = response?.normalizedIngredients.join(",") ?? "";
     const nutritionFlag = includeNutritionEstimate ? "&nutrition=1" : "";
     router.push(`/receita/${suggestion.id}?origin=ai&ingredients=${encodeURIComponent(ingredientsQuery)}${nutritionFlag}`);
-  }
+  }, [includeNutritionEstimate, response?.normalizedIngredients, router]);
 
-  function pickFromCamera() {
+  const pickFromCamera = useCallback(() => {
     cameraInputRef.current?.click();
     setIsPhotoPickerOpen(false);
-  }
+  }, []);
 
-  function pickFromGallery() {
+  const pickFromGallery = useCallback(() => {
     galleryInputRef.current?.click();
     setIsPhotoPickerOpen(false);
-  }
+  }, []);
 
   function handlePhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -117,6 +159,13 @@ function CreateRecipePageContent() {
         <CardHeader>
           <CardTitle>Criar receita com IA</CardTitle>
           <CardDescription>Fluxo em duas etapas: sugestoes primeiro, receita completa depois.</CardDescription>
+          {!isPremium ? (
+            <p className="text-xs text-[#7A6D60]">
+              Plano free: {subscription.aiGenerationsUsedThisMonth}/{subscription.aiGenerationsLimitThisMonth} geracoes neste mes.
+            </p>
+          ) : (
+            <p className="text-xs text-[#7A6D60]">Plano premium: geracoes ilimitadas + audio e foto.</p>
+          )}
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-3 gap-2">
@@ -124,6 +173,10 @@ function CreateRecipePageContent() {
               <button
                 key={entry.value}
                 onClick={() => {
+                  if (!isPremium && entry.value !== "text") {
+                    setErrorMessage("Audio e foto sao recursos premium.");
+                    return;
+                  }
                   setMode(entry.value);
                   if (entry.value === "photo") {
                     setIsPhotoPickerOpen(true);
@@ -144,26 +197,20 @@ function CreateRecipePageContent() {
 
           {mode === "audio" ? (
             <div className="space-y-2">
-              <label className="block text-xs font-semibold uppercase tracking-wide text-[#8C775A]">
-                Audio
-              </label>
+              <label className="block text-xs font-semibold uppercase tracking-wide text-[#8C775A]">Audio</label>
               <input
                 type="file"
                 accept="audio/*"
                 onChange={handleAudioChange}
                 className="block w-full rounded-2xl border border-[#E5D7C1] bg-[#FAF5EC] px-3 py-3 text-sm"
               />
-              {selectedAudioName ? (
-                <p className="text-xs text-[#7A6D60]">Arquivo: {selectedAudioName}</p>
-              ) : null}
+              {selectedAudioName ? <p className="text-xs text-[#7A6D60]">Arquivo: {selectedAudioName}</p> : null}
             </div>
           ) : null}
 
           {mode === "photo" ? (
             <div className="space-y-2">
-              <label className="block text-xs font-semibold uppercase tracking-wide text-[#8C775A]">
-                Foto
-              </label>
+              <label className="block text-xs font-semibold uppercase tracking-wide text-[#8C775A]">Foto</label>
               <div className="flex gap-2">
                 <button
                   onClick={() => setIsPhotoPickerOpen(true)}
@@ -172,9 +219,7 @@ function CreateRecipePageContent() {
                   Abrir opcoes de foto
                 </button>
               </div>
-              {selectedPhotoName ? (
-                <p className="text-xs text-[#7A6D60]">Imagem: {selectedPhotoName}</p>
-              ) : null}
+              {selectedPhotoName ? <p className="text-xs text-[#7A6D60]">Imagem: {selectedPhotoName}</p> : null}
               <input
                 ref={cameraInputRef}
                 type="file"
@@ -194,9 +239,7 @@ function CreateRecipePageContent() {
           ) : null}
 
           <div className="space-y-2">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-[#8C775A]">
-              Ingredientes
-            </label>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-[#8C775A]">Ingredientes</label>
             <Textarea
               value={ingredientsText}
               onChange={(event) => setIngredientsText(event.target.value)}
@@ -259,9 +302,7 @@ function CreateRecipePageContent() {
             </CardHeader>
             <CardContent className="space-y-3">
               {response.alsoCanMake.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Nada por enquanto. Tente adicionar mais ingredientes.
-                </p>
+                <p className="text-sm text-muted-foreground">Nada por enquanto. Tente adicionar mais ingredientes.</p>
               ) : (
                 response.alsoCanMake.map((suggestion) => (
                   <button
@@ -270,9 +311,7 @@ function CreateRecipePageContent() {
                     onClick={() => openRecipe(suggestion)}
                   >
                     <p className="text-sm font-semibold">{suggestion.title}</p>
-                    <p className="text-xs text-[#7A6D60]">
-                      Precisa de: {suggestion.missingIngredients.join(", ")}
-                    </p>
+                    <p className="text-xs text-[#7A6D60]">Precisa de: {suggestion.missingIngredients.join(", ")}</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {suggestion.matchedIngredients.slice(0, 3).map((ingredient) => (
                         <Badge key={`also-${suggestion.id}-${ingredient}`}>tem {ingredient}</Badge>

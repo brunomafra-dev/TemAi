@@ -1,13 +1,16 @@
 ﻿"use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { BADGE_CATALOG, inferUnlockedBadgesByRecipes } from "@/features/profile/badges";
 import { getNotificationPrefs, saveNotificationPrefs } from "@/features/profile/notifications-storage";
+import { createSupportTicket, getMySupportTickets, type SupportTicket } from "@/features/profile/support-tickets";
+import { getSubscriptionState, syncSubscriptionFromCloud, type SubscriptionState } from "@/features/profile/subscription-storage";
 import {
   getUserProfile,
   saveUserProfile,
@@ -28,6 +31,7 @@ import {
 
 const sections = [
   { id: "edit", label: "Editar Perfil" },
+  { id: "subscription", label: "Gerenciar assinatura" },
   { id: "badges", label: "Insignias" },
   { id: "shopping", label: "Lista de Compras" },
   { id: "author", label: "Receitas Autorais" },
@@ -40,7 +44,50 @@ const sections = [
   { id: "delete", label: "Excluir conta" },
 ] as const;
 
+const notificationItems = [
+  { key: "recipeRating", label: "Sua receita recebeu classificacao" },
+  { key: "newBadge", label: "Voce ganhou um novo badge" },
+  { key: "publishSuccess", label: "Receita publicada com sucesso" },
+  { key: "shoppingUpdates", label: "Atualizacoes da lista de compras" },
+] as const;
+
 type SectionId = (typeof sections)[number]["id"];
+type SupportQuickOption =
+  | "beneficios"
+  | "free-vs-premium"
+  | "cancelamento"
+  | "cobranca"
+  | "login"
+  | "falar-humano";
+
+type SupportMessage = {
+  from: "user" | "bot";
+  text: string;
+  options?: SupportQuickOption[];
+};
+
+const ProfileSectionButton = memo(function ProfileSectionButton({
+  section,
+  onOpen,
+}: {
+  section: (typeof sections)[number];
+  onOpen: (section: SectionId) => void;
+}) {
+  return (
+    <button
+      onClick={() => onOpen(section.id)}
+      className={
+        section.id === "delete"
+          ? "w-full rounded-xl border border-[#E8B4B4] bg-[#FFF4F4] px-4 py-3 text-left text-sm font-semibold text-[#B42318]"
+          : "w-full rounded-xl border border-[#E5D7BF] bg-white px-4 py-3 text-left text-sm font-semibold text-[#5E5348]"
+      }
+    >
+      {section.label}
+    </button>
+  );
+});
+
+ProfileSectionButton.displayName = "ProfileSectionButton";
 
 function getBadgeBySlug(slug: string) {
   return BADGE_CATALOG.find((badge) => badge.slug === slug) || BADGE_CATALOG[0];
@@ -67,11 +114,23 @@ export default function ProfilePage() {
   const [shoppingMode, setShoppingMode] = useState<"geral" | "por_receita">("geral");
   const [selectedRecipeFilter, setSelectedRecipeFilter] = useState<string>("all");
   const [notificationPrefs, setNotificationPrefs] = useState(() => getNotificationPrefs());
+  const [subscription, setSubscription] = useState<SubscriptionState>(() => getSubscriptionState());
   const [badgeHint, setBadgeHint] = useState("");
   const [profileMessage, setProfileMessage] = useState("");
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [usernameSuggestion, setUsernameSuggestion] = useState("");
+  const [supportInput, setSupportInput] = useState("");
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
+  const [supportTicketMessage, setSupportTicketMessage] = useState("");
+  const [creatingSupportTicket, setCreatingSupportTicket] = useState(false);
+  const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([
+    {
+      from: "bot",
+      text: "Oi! Sou o suporte virtual do TemAi. Escolha uma opcao abaixo ou digite sua duvida.",
+      options: ["beneficios", "free-vs-premium", "cobranca", "falar-humano"],
+    },
+  ]);
 
   const myRecipes = useMemo(() => getMyRecipes(), []);
   const savedRefs = useMemo(() => getSavedRecipeRefs(), []);
@@ -105,6 +164,10 @@ export default function ProfilePage() {
   const usernameHandle = profile.username?.trim()
     ? `@${profile.username.trim().replace(/^@+/, "")}`
     : `@${[profile.firstName, profile.lastName].join("_").toLowerCase().replace(/\s+/g, "_")}`;
+  const activeModalTitle = useMemo(
+    () => sections.find((section) => section.id === activeModal)?.label,
+    [activeModal],
+  );
 
   const shoppingRecipeOptions = useMemo(
     () => Array.from(new Map(shoppingItems.map((item) => [item.recipeId, item.recipeTitle])).entries()),
@@ -149,28 +212,61 @@ export default function ProfilePage() {
   }, []);
 
   useEffect(() => {
+    if (activeModal !== "support") return;
+    let isMounted = true;
+    getMySupportTickets(5)
+      .then((tickets) => {
+        if (!isMounted) return;
+        setSupportTickets(tickets);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeModal]);
+
+  useEffect(() => {
+    let isMounted = true;
+    syncSubscriptionFromCloud()
+      .then((remote) => {
+        if (!isMounted || !remote) return;
+        setSubscription(remote);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
       if (openTimeoutRef.current) clearTimeout(openTimeoutRef.current);
     };
   }, []);
 
-  function openModal(section: SectionId) {
+  const openModal = useCallback((section: SectionId) => {
     if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
     if (openTimeoutRef.current) clearTimeout(openTimeoutRef.current);
     setActiveModal(section);
     setModalStage("enter");
     openTimeoutRef.current = setTimeout(() => setModalStage("open"), 12);
-  }
+  }, []);
 
-  function closeModal() {
+  const closeModal = useCallback(() => {
     setModalStage("exit");
     if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
     closeTimeoutRef.current = setTimeout(() => {
       setActiveModal(null);
       setModalStage("open");
     }, 180);
-  }
+  }, []);
 
   function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -284,26 +380,32 @@ export default function ProfilePage() {
     await saveUserProfileToCloud(next);
   }
 
-  function toggleNotification(key: keyof typeof notificationPrefs) {
-    const next = { ...notificationPrefs, [key]: !notificationPrefs[key] };
-    setNotificationPrefs(next);
-    saveNotificationPrefs(next);
-  }
+  const toggleNotification = useCallback((key: keyof typeof notificationPrefs) => {
+    setNotificationPrefs((current) => {
+      const next = { ...current, [key]: !current[key] };
+      saveNotificationPrefs(next);
+      return next;
+    });
+  }, []);
 
-  function toggleMergedItem(ids: string[]) {
+  const toggleMergedItem = useCallback((ids: string[]) => {
     const idSet = new Set(ids);
-    const targetChecked = shoppingItems.filter((item) => idSet.has(item.id)).every((item) => item.checked);
-    const next = shoppingItems.map((item) => (idSet.has(item.id) ? { ...item, checked: !targetChecked } : item));
-    setShoppingItems(next);
-    saveShoppingListItems(next);
-  }
+    setShoppingItems((current) => {
+      const targetChecked = current.filter((item) => idSet.has(item.id)).every((item) => item.checked);
+      const next = current.map((item) => (idSet.has(item.id) ? { ...item, checked: !targetChecked } : item));
+      saveShoppingListItems(next);
+      return next;
+    });
+  }, []);
 
-  function selectAllShoppingItems() {
+  const selectAllShoppingItems = useCallback(() => {
     const visibleIds = new Set(filteredShoppingItems.map((item) => item.id));
-    const next = shoppingItems.map((item) => (visibleIds.has(item.id) ? { ...item, checked: true } : item));
-    setShoppingItems(next);
-    saveShoppingListItems(next);
-  }
+    setShoppingItems((current) => {
+      const next = current.map((item) => (visibleIds.has(item.id) ? { ...item, checked: true } : item));
+      saveShoppingListItems(next);
+      return next;
+    });
+  }, [filteredShoppingItems]);
 
   function deleteLocalAccount() {
     localStorage.clear();
@@ -311,8 +413,257 @@ export default function ProfilePage() {
     router.push("/");
   }
 
+  function optionLabel(option: SupportQuickOption): string {
+    switch (option) {
+      case "beneficios":
+        return "Beneficios Premium";
+      case "free-vs-premium":
+        return "Free vs Premium";
+      case "cancelamento":
+        return "Cancelar assinatura";
+      case "cobranca":
+        return "Cobranca";
+      case "login":
+        return "Problemas de login";
+      case "falar-humano":
+        return "Falar com humano";
+      default:
+        return "Opcao";
+    }
+  }
+
+  function optionPrompt(option: SupportQuickOption): string {
+    switch (option) {
+      case "beneficios":
+        return "Quais sao os beneficios do Premium?";
+      case "free-vs-premium":
+        return "Qual a diferenca entre Free e Premium?";
+      case "cancelamento":
+        return "Como faco para cancelar assinatura?";
+      case "cobranca":
+        return "Tenho duvida de cobranca.";
+      case "login":
+        return "Nao estou conseguindo entrar na conta.";
+      case "falar-humano":
+        return "Quero falar com suporte humano.";
+      default:
+        return "Preciso de ajuda.";
+    }
+  }
+
+  function replySupport(message: string): SupportMessage {
+    const text = message.toLowerCase();
+    if (
+      text.includes("beneficio") ||
+      text.includes("vantagem") ||
+      text.includes("premium") ||
+      text.includes("vale a pena")
+    ) {
+      return {
+        from: "bot",
+        text:
+          "Premium (R$ 24,90/mes) inclui: geracao ilimitada com IA, uso de voz e imagem na IA, receitas autorais por voz e badges exclusivos. Se voce usa o app todo dia, costuma compensar rapido.",
+        options: ["free-vs-premium", "cancelamento", "cobranca"],
+      };
+    }
+    if (
+      text.includes("free") ||
+      text.includes("diferen") ||
+      text.includes("compar") ||
+      text.includes("limite")
+    ) {
+      return {
+        from: "bot",
+        text:
+          "Free: 3 geracoes IA por mes, somente texto e badges padrao. Premium: ilimitado, IA com voz/imagem, receita autoral por voz e badges premium.",
+        options: ["beneficios", "cancelamento", "falar-humano"],
+      };
+    }
+    if (text.includes("cancelar") || text.includes("cancelamento")) {
+      return {
+        from: "bot",
+        text:
+          "Voce pode cancelar quando quiser. O premium continua ativo ate o fim do ciclo ja pago. Na renovacao seguinte, nao sera cobrado de novo.",
+        options: ["cobranca", "falar-humano"],
+      };
+    }
+    if (
+      text.includes("cobranca") ||
+      text.includes("cobrança") ||
+      text.includes("cartao") ||
+      text.includes("cartão") ||
+      text.includes("pix")
+    ) {
+      return {
+        from: "bot",
+        text:
+          "Para cobranca: confira o historico na loja (Google Play/App Store). Se houver cobranca duplicada ou erro, envie email com print e data para suporte@temaiapp.com.",
+        options: ["falar-humano", "cancelamento"],
+      };
+    }
+    if (text.includes("senha") || text.includes("login") || text.includes("email") || text.includes("conta")) {
+      return {
+        from: "bot",
+        text:
+          "Se nao consegue entrar, use 'esqueci minha senha' na tela de login. Confira tambem seu email de confirmacao e pasta spam.",
+        options: ["falar-humano", "cobranca"],
+      };
+    }
+    if (text.includes("humano") || text.includes("atendente")) {
+      return {
+        from: "bot",
+        text:
+          "Perfeito. Para atendimento humano, envie para suporte@temaiapp.com com: assunto, email da conta, print e descricao do problema.",
+        options: ["cobranca", "login"],
+      };
+    }
+    return {
+      from: "bot",
+      text:
+        "Posso te ajudar com beneficios do premium, diferenca free vs premium, cobranca, cancelamento e login.",
+      options: ["beneficios", "free-vs-premium", "cancelamento", "login"],
+    };
+  }
+
+  function sendSupportPreset(option: SupportQuickOption) {
+    const prompt = optionPrompt(option);
+    setSupportMessages((current) => [...current, { from: "user", text: prompt }]);
+    const bot = replySupport(prompt);
+    setTimeout(() => {
+      setSupportMessages((current) => [...current, bot]);
+      if (option === "falar-humano") {
+        void openHumanSupportTicket(prompt);
+      }
+    }, 160);
+  }
+
+  function sendSupportMessage() {
+    const message = supportInput.trim();
+    if (!message) return;
+    setSupportMessages((current) => [...current, { from: "user", text: message }]);
+    setSupportInput("");
+    const bot = replySupport(message);
+    setTimeout(() => {
+      setSupportMessages((current) => [...current, bot]);
+      if (message.toLowerCase().includes("humano") || message.toLowerCase().includes("atendente")) {
+        void openHumanSupportTicket(message);
+      }
+    }, 180);
+  }
+
+  async function openHumanSupportTicket(userMessage: string) {
+    if (creatingSupportTicket) return;
+    setCreatingSupportTicket(true);
+    setSupportTicketMessage("");
+
+    const created = await createSupportTicket({
+      subject: "Atendimento humano via chat do app",
+      message: userMessage,
+      metadata: {
+        channel: "perfil_support_chat",
+      },
+    });
+
+    setCreatingSupportTicket(false);
+
+    if (!created) {
+      setSupportTicketMessage("Nao foi possivel abrir ticket agora. Tente novamente ou envie email.");
+      return;
+    }
+
+    setSupportTicketMessage(`Ticket aberto com sucesso. Protocolo: ${created.id.slice(0, 8).toUpperCase()}`);
+    setSupportTickets((current) => [created, ...current].slice(0, 5));
+    setSupportMessages((current) => [
+      ...current,
+      {
+        from: "bot",
+        text: `Pronto! Seu ticket foi aberto com protocolo ${created.id.slice(0, 8).toUpperCase()}.`,
+        options: ["cobranca", "login"],
+      },
+    ]);
+  }
+
+  function statusLabel(status: SupportTicket["status"]): string {
+    switch (status) {
+      case "open":
+        return "Aberto";
+      case "in_progress":
+        return "Em andamento";
+      case "resolved":
+        return "Resolvido";
+      case "closed":
+        return "Fechado";
+      default:
+        return "Aberto";
+    }
+  }
+
   function renderModalBody() {
     switch (activeModal) {
+      case "subscription": {
+        const isPremium = subscription.plan === "premium";
+        const premiumUntil = subscription.premiumUntil
+          ? new Date(`${subscription.premiumUntil}T12:00:00`).toLocaleDateString("pt-BR")
+          : null;
+        const renewsAt = subscription.renewsAt
+          ? new Date(`${subscription.renewsAt}T12:00:00`).toLocaleDateString("pt-BR")
+          : null;
+
+        return (
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-[#E5D7BF] bg-white p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#8A7A69]">Plano atual</p>
+              <div className="mt-2 flex items-center justify-between">
+                <p className="text-lg font-semibold text-[#4F4338]">{isPremium ? "Premium" : "Free"}</p>
+                <span
+                  className={
+                    isPremium
+                      ? "rounded-full border border-[#C66A3D] bg-[#F8E8E1] px-2 py-0.5 text-xs font-semibold text-[#7A4733]"
+                      : "rounded-full border border-[#D6C8B4] bg-[#F7F0E4] px-2 py-0.5 text-xs font-semibold text-[#6E6358]"
+                  }
+                >
+                  {isPremium ? "Ativo" : "Basico"}
+                </span>
+              </div>
+              {isPremium ? (
+                <div className="mt-2 space-y-1 text-xs text-[#6E6154]">
+                  <p>Premium ativo ate: {premiumUntil || "Nao informado"}</p>
+                  <p>Proxima renovacao: {renewsAt || "Nao informado"}</p>
+                  <p>Mensalidade: R$ 24,90/mes</p>
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-[#6E6154]">
+                  Uso mensal de IA: {subscription.aiGenerationsUsedThisMonth}/{subscription.aiGenerationsLimitThisMonth}
+                </p>
+              )}
+            </div>
+            <div className="rounded-2xl border border-[#E5D7BF] bg-white p-3">
+              <p className="text-sm font-semibold text-[#5D5248]">Assinatura Premium</p>
+              <p className="mt-1 text-xs text-[#6A5E52]">Valor atual: R$ 24,90 por mes.</p>
+            </div>
+
+            <div className="rounded-2xl border border-[#E5D7BF] bg-white p-3">
+              <p className="text-sm font-semibold text-[#5D5248]">Beneficios Premium</p>
+              <ul className="mt-2 space-y-1 text-xs text-[#6A5E52]">
+                <li>• Geracao de receitas ilimitadas com IA</li>
+                <li>• Adicionar suas receitas autorais com voz</li>
+                <li>• Gerar receitas com IA utilizando imagem e voz</li>
+                <li>• Badges exclusivos para premium</li>
+              </ul>
+            </div>
+
+            <div className="rounded-2xl border border-[#E5D7BF] bg-white p-3">
+              <p className="text-sm font-semibold text-[#5D5248]">Plano Free (restricoes)</p>
+              <ul className="mt-2 space-y-1 text-xs text-[#6A5E52]">
+                <li>• Limite de 3 receitas geradas com IA por mes</li>
+                <li>• Receitas geradas com IA so com texto</li>
+                <li>• Adicao de receitas autorais so por texto</li>
+                <li>• Badges padrao</li>
+              </ul>
+            </div>
+          </div>
+        );
+      }
       case "edit":
         return (
           <div className="space-y-3">
@@ -446,7 +797,7 @@ export default function ProfilePage() {
         return (
           <div className="space-y-2">
             <p className="text-sm font-semibold text-[#5D5248]">Notificacoes</p>
-            {[{ key: "recipeRating", label: "Sua receita recebeu classificacao" }, { key: "newBadge", label: "Voce ganhou um novo badge" }, { key: "publishSuccess", label: "Receita publicada com sucesso" }, { key: "shoppingUpdates", label: "Atualizacoes da lista de compras" }].map((item) => (
+            {notificationItems.map((item) => (
               <label key={item.key} className="flex items-center justify-between rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm">
                 <span>{item.label}</span>
                 <input type="checkbox" checked={Boolean(notificationPrefs[item.key as keyof typeof notificationPrefs])} onChange={() => toggleNotification(item.key as keyof typeof notificationPrefs)} />
@@ -460,6 +811,76 @@ export default function ProfilePage() {
             <p className="text-sm text-[#6A5E52]">
               Para suporte, duvidas de conta, assinatura ou privacidade, fale com nossa equipe:
             </p>
+            <div className="rounded-xl border border-[#E5D7BF] bg-white p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#7A6D60]">Chat de suporte</p>
+              <div className="mt-2 max-h-44 space-y-2 overflow-auto rounded-lg border border-[#EADFCC] bg-[#FAF5EC] p-2">
+                {supportMessages.map((item, index) => (
+                  <div key={`${item.from}-${index}`} className="space-y-1">
+                    <p
+                      className={
+                        item.from === "user"
+                          ? "rounded-lg bg-[#F8E8E1] px-2 py-1 text-xs text-[#5E4134]"
+                          : "rounded-lg bg-white px-2 py-1 text-xs text-[#5E5348]"
+                      }
+                    >
+                      {item.text}
+                    </p>
+                    {item.from === "bot" && item.options?.length ? (
+                      <div className="flex flex-wrap gap-1">
+                        {item.options.map((option) => (
+                          <button
+                            key={`${index}-${option}`}
+                            type="button"
+                            className="rounded-full border border-[#E5D7BF] bg-white px-2 py-1 text-[11px] font-semibold text-[#6A5E52]"
+                            onClick={() => sendSupportPreset(option)}
+                          >
+                            {optionLabel(option)}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <Input
+                  placeholder="Digite sua duvida"
+                  value={supportInput}
+                  onChange={(e) => setSupportInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      sendSupportMessage();
+                    }
+                  }}
+                />
+                <Button size="sm" onClick={sendSupportMessage}>Enviar</Button>
+              </div>
+              {supportTicketMessage ? (
+                <p className="mt-2 rounded-lg border border-[#E5D7BF] bg-[#FAF4EA] px-2 py-1 text-xs text-[#6A5E52]">
+                  {supportTicketMessage}
+                </p>
+              ) : null}
+            </div>
+            <div className="rounded-xl border border-[#E5D7BF] bg-white p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#7A6D60]">Seus tickets recentes</p>
+              {supportTickets.length === 0 ? (
+                <p className="mt-2 text-xs text-[#7A6D60]">Nenhum ticket aberto ainda.</p>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  {supportTickets.map((ticket) => (
+                    <div key={ticket.id} className="rounded-lg border border-[#EADFCC] bg-[#FAF5EC] px-2 py-1">
+                      <p className="text-xs font-semibold text-[#5E5348]">
+                        {ticket.subject}
+                      </p>
+                      <p className="text-[11px] text-[#7A6D60]">
+                        Protocolo: {ticket.id.slice(0, 8).toUpperCase()} • {statusLabel(ticket.status)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <a
               href="mailto:suporte@temaiapp.com?subject=TemAi%20-%20Suporte"
               className="inline-flex rounded-full border border-[#C66A3D] bg-[#F8E8E1] px-4 py-2 text-xs font-semibold text-[#7A4733]"
@@ -511,7 +932,7 @@ export default function ProfilePage() {
         <div className="relative z-10 px-5 pb-6 pt-7 text-[#FDF7EC]">
           <div className="flex items-center gap-3">
             {profile.photoDataUrl ? (
-              <img src={profile.photoDataUrl} alt="Foto de perfil" className="h-14 w-14 rounded-full border border-white/35 object-cover" />
+              <Image src={profile.photoDataUrl} alt="Foto de perfil" width={56} height={56} sizes="56px" unoptimized className="h-14 w-14 rounded-full border border-white/35 object-cover" />
             ) : (
               <div className="flex h-14 w-14 items-center justify-center rounded-full border border-white/35 bg-white/15 text-xl font-semibold">
                 {profile.firstName.slice(0, 1).toUpperCase()}
@@ -529,17 +950,11 @@ export default function ProfilePage() {
       <Card className="border-[#E5D7BF] bg-[#FFFCF7]">
         <CardContent className="space-y-2 pt-4">
           {sections.map((section) => (
-            <button
+            <ProfileSectionButton
               key={section.id}
-              onClick={() => openModal(section.id)}
-              className={
-                section.id === "delete"
-                  ? "w-full rounded-xl border border-[#E8B4B4] bg-[#FFF4F4] px-4 py-3 text-left text-sm font-semibold text-[#B42318]"
-                  : "w-full rounded-xl border border-[#E5D7BF] bg-white px-4 py-3 text-left text-sm font-semibold text-[#5E5348]"
-              }
-            >
-              {section.label}
-            </button>
+              section={section}
+              onOpen={openModal}
+            />
           ))}
         </CardContent>
       </Card>
@@ -558,7 +973,7 @@ export default function ProfilePage() {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-semibold text-[#5D5248]">{sections.find((s) => s.id === activeModal)?.label}</p>
+              <p className="text-sm font-semibold text-[#5D5248]">{activeModalTitle}</p>
               <button className="text-xs font-semibold text-[#7A6D60]" onClick={closeModal}>Fechar</button>
             </div>
             {renderModalBody()}

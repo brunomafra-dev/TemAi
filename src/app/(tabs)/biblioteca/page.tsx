@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { RecipeCard } from "@/components/recipes/recipe-card";
 import { Card, CardContent } from "@/components/ui/card";
@@ -123,7 +123,7 @@ function LibraryPageContent() {
     };
   }, [search, selectedFilter, page, seed]);
 
-  function buildVisiblePages(): number[] {
+  const visiblePages = useMemo(() => {
     if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
 
     const pages = new Set<number>([1, totalPages]);
@@ -132,9 +132,9 @@ function LibraryPageContent() {
     }
 
     return [...pages].sort((a, b) => a - b);
-  }
+  }, [page, totalPages]);
 
-  function buildRecipeHref(recipeId: string): string {
+  const buildRecipeHref = useCallback((recipeId: string): string => {
     const params = new URLSearchParams();
     params.set("origin", "library");
     if (search.trim()) params.set("q", search.trim());
@@ -142,7 +142,7 @@ function LibraryPageContent() {
     params.set("page", String(page));
     params.set("seed", seed);
     return `/receita/${recipeId}?${params.toString()}`;
-  }
+  }, [page, search, seed, selectedFilter]);
 
   return (
     <section className="space-y-5 pb-2">
@@ -237,7 +237,7 @@ function LibraryPageContent() {
             >
               Anterior
             </button>
-            {buildVisiblePages().map((pageNumber, index, arr) => (
+            {visiblePages.map((pageNumber, index, arr) => (
               <div key={pageNumber} className="flex items-center gap-2">
                 {index > 0 && pageNumber - arr[index - 1] > 1 ? (
                   <span className="text-xs text-[#8B7E70]">...</span>
