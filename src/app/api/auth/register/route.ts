@@ -4,7 +4,6 @@ import { getSupabaseAnonServerClient, getSupabaseServiceRoleClient } from "@/lib
 import {
   parseJsonObjectBody,
   readOptionalBoolean,
-  readOptionalString,
   readRequiredString,
   validationErrorResponse,
 } from "@/lib/input-validation";
@@ -15,7 +14,6 @@ interface RegisterPayload {
   email?: string;
   password?: string;
   acceptedTerms?: boolean;
-  redirectTo?: string;
 }
 
 function sanitizeUsername(value: string): string {
@@ -32,12 +30,6 @@ function splitName(name: string): { firstName: string; lastName: string } {
     firstName: parts[0] || "Chef",
     lastName: parts.slice(1).join(" "),
   };
-}
-
-function getSafeRedirectTo(request: Request, raw?: string): string {
-  const origin = new URL(request.url).origin;
-  if (raw && raw.startsWith(origin)) return raw;
-  return `${origin}/auth/callback`;
 }
 
 export async function POST(request: Request) {
@@ -69,10 +61,6 @@ export async function POST(request: Request) {
       }),
     );
     const acceptedTerms = readOptionalBoolean(payload, "acceptedTerms", false);
-    const redirectTo = readOptionalString(payload, "redirectTo", {
-      fieldName: "Redirect",
-      maxLength: 400,
-    });
 
     if (!acceptedTerms) {
       return NextResponse.json({ message: "Aceite os termos para continuar." }, { status: 400 });
@@ -109,25 +97,32 @@ export async function POST(request: Request) {
     }
 
     const anonClient = getSupabaseAnonServerClient();
-    const { data, error } = await anonClient.auth.signUp({
+    const { data, error } = await serviceClient.auth.admin.createUser({
       email,
       password,
-      options: {
-        emailRedirectTo: getSafeRedirectTo(request, redirectTo),
+      email_confirm: true,
+      user_metadata: {
+        full_name: fullName,
+        username,
       },
     });
 
     if (error || !data.user) {
+      const normalizedMessage = error?.message.toLowerCase() || "";
+      if (
+        normalizedMessage.includes("already") ||
+        normalizedMessage.includes("registered") ||
+        normalizedMessage.includes("exists")
+      ) {
+        return NextResponse.json(
+          { message: "Este email ja esta cadastrado. Use Entrar ou Esqueci minha senha." },
+          { status: 409 },
+        );
+      }
+
       return NextResponse.json(
         { message: error?.message || "Falha ao cadastrar." },
         { status: 400 },
-      );
-    }
-
-    if (Array.isArray(data.user.identities) && data.user.identities.length === 0) {
-      return NextResponse.json(
-        { message: "Este email ja esta cadastrado. Use Entrar ou Esqueci minha senha." },
-        { status: 409 },
       );
     }
 
@@ -148,6 +143,8 @@ export async function POST(request: Request) {
     );
 
     if (profileError) {
+      await serviceClient.auth.admin.deleteUser(data.user.id);
+
       if (profileError.message.toLowerCase().includes("profiles_username_unique_idx")) {
         return NextResponse.json({ message: "@ ja em uso. Escolha outro." }, { status: 409 });
       }
@@ -157,14 +154,24 @@ export async function POST(request: Request) {
       );
     }
 
+    const signIn = await anonClient.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (signIn.error || !signIn.data.session) {
+      return NextResponse.json(
+        { message: "Conta criada. Entre com seu email e senha para continuar.", session: null },
+        { status: 201 },
+      );
+    }
+
     return NextResponse.json({
-      message: "Conta criada. Verifique seu email para confirmar e entrar pelo link.",
-      session: data.session
-        ? {
-            accessToken: data.session.access_token,
-            refreshToken: data.session.refresh_token,
-          }
-        : null,
+      message: "Conta criada com sucesso.",
+      session: {
+        accessToken: signIn.data.session.access_token,
+        refreshToken: signIn.data.session.refresh_token,
+      },
     });
   } catch (error) {
     const validationResponse = validationErrorResponse(error);

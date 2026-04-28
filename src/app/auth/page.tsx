@@ -200,7 +200,7 @@ export default function AuthPage() {
     }
 
     setIsSubmitting(false);
-    setMessage(data.message || "Conta criada. Verifique seu email para confirmar e entrar pelo link.");
+    setMessage(data.message || "Conta criada. Entre com seu email e senha para continuar.");
   }
 
   async function handleForgotPassword() {
@@ -271,7 +271,7 @@ export default function AuthPage() {
             {mode === "login"
               ? "Acesse sua conta TemAi."
               : mode === "register"
-                ? "Cadastro com username unico e confirmacao por email."
+                ? "Cadastro com username unico para seu perfil."
                 : "Informe seu email para receber o link de redefinicao."}
           </CardDescription>
         </CardHeader>
