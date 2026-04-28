@@ -1,10 +1,3 @@
-create table if not exists public.auth_rate_limits (
-  key text primary key,
-  attempts integer not null default 0 check (attempts >= 0),
-  window_started_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
 create or replace function public.consume_auth_rate_limit(
   p_key text,
   p_max_attempts integer default 5,
@@ -72,17 +65,5 @@ begin
 end;
 $$;
 
-create or replace function public.reset_auth_rate_limit(p_key text)
-returns void
-language sql
-security definer
-set search_path = public
-as $$
-  delete from public.auth_rate_limits where key = p_key;
-$$;
-
 revoke all on function public.consume_auth_rate_limit(text, integer, integer) from public, anon, authenticated;
-revoke all on function public.reset_auth_rate_limit(text) from public, anon, authenticated;
-
 grant execute on function public.consume_auth_rate_limit(text, integer, integer) to service_role;
-grant execute on function public.reset_auth_rate_limit(text) to service_role;

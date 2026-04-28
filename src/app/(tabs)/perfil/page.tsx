@@ -124,6 +124,7 @@ export default function ProfilePage() {
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
   const [supportTicketMessage, setSupportTicketMessage] = useState("");
   const [creatingSupportTicket, setCreatingSupportTicket] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([
     {
       from: "bot",
@@ -411,6 +412,21 @@ export default function ProfilePage() {
     localStorage.clear();
     closeModal();
     router.push("/");
+  }
+
+  async function signOutAccount() {
+    if (isSigningOut) return;
+
+    setIsSigningOut(true);
+    const client = getSupabaseBrowserClient();
+
+    if (client) {
+      await client.auth.signOut();
+    }
+
+    closeModal();
+    router.replace("/auth");
+    router.refresh();
   }
 
   function optionLabel(option: SupportQuickOption): string {
@@ -899,9 +915,9 @@ export default function ProfilePage() {
       case "logout":
         return (
           <div className="space-y-3">
-            <p className="text-sm text-[#6A5E52]">Deseja encerrar a sessao local agora?</p>
-            <Button className="w-full" onClick={() => { alert("Sessao local encerrada. (Auth real entra na proxima fase)"); closeModal(); }}>
-              Sair da conta
+            <p className="text-sm text-[#6A5E52]">Deseja sair da sua conta neste dispositivo?</p>
+            <Button className="w-full" disabled={isSigningOut} onClick={() => void signOutAccount()}>
+              {isSigningOut ? "Saindo..." : "Sair da conta"}
             </Button>
           </div>
         );
