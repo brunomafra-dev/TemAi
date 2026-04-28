@@ -124,6 +124,13 @@ export async function POST(request: Request) {
       );
     }
 
+    if (Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      return NextResponse.json(
+        { message: "Este email ja esta cadastrado. Use Entrar ou Esqueci minha senha." },
+        { status: 409 },
+      );
+    }
+
     const { firstName, lastName } = splitName(fullName);
     const nowIso = new Date().toISOString();
     const { error: profileError } = await serviceClient.from("profiles").upsert(
@@ -162,6 +169,7 @@ export async function POST(request: Request) {
   } catch (error) {
     const validationResponse = validationErrorResponse(error);
     if (validationResponse) return validationResponse;
+    console.error("[auth/register] Falha ao processar cadastro", error);
     return NextResponse.json({ message: "Falha ao processar cadastro." }, { status: 500 });
   }
 }

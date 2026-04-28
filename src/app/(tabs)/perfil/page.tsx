@@ -408,7 +408,7 @@ export default function ProfilePage() {
     });
   }, [filteredShoppingItems]);
 
-  function deleteLocalAccount() {
+  function deleteLocalData() {
     localStorage.clear();
     closeModal();
     router.push("/");
@@ -924,11 +924,13 @@ export default function ProfilePage() {
       case "delete":
         return (
           <div className="space-y-3">
-            <p className="text-lg font-semibold text-[#4F4338]">Tem certeza que deseja excluir sua conta?</p>
-            <p className="text-sm text-[#7A6D60]">Essa acao remove dados locais deste dispositivo.</p>
+            <p className="text-lg font-semibold text-[#4F4338]">Tem certeza que deseja apagar os dados locais?</p>
+            <p className="text-sm text-[#7A6D60]">
+              Essa acao remove dados salvos neste dispositivo, mas nao exclui sua conta do Supabase.
+            </p>
             <div className="flex gap-2">
               <Button variant="secondary" className="flex-1" onClick={closeModal}>Cancelar</Button>
-              <Button className="flex-1" onClick={deleteLocalAccount}>Excluir conta</Button>
+              <Button className="flex-1" onClick={deleteLocalData}>Apagar dados</Button>
             </div>
           </div>
         );
