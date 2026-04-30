@@ -125,6 +125,8 @@ export default function ProfilePage() {
   const [supportTicketMessage, setSupportTicketMessage] = useState("");
   const [creatingSupportTicket, setCreatingSupportTicket] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteAccountMessage, setDeleteAccountMessage] = useState("");
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([
     {
       from: "bot",
@@ -408,10 +410,41 @@ export default function ProfilePage() {
     });
   }, [filteredShoppingItems]);
 
-  function deleteLocalData() {
+  async function deleteAccount() {
+    if (isDeletingAccount) return;
+
+    setIsDeletingAccount(true);
+    setDeleteAccountMessage("");
+
+    const client = getSupabaseBrowserClient();
+    const sessionRes = client ? await client.auth.getSession() : null;
+    const token = sessionRes?.data.session?.access_token || "";
+
+    if (!client || !token) {
+      setIsDeletingAccount(false);
+      setDeleteAccountMessage("Sessao expirada. Entre novamente para excluir a conta.");
+      return;
+    }
+
+    const response = await fetch("/api/auth/account", {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const payload = (await response.json().catch(() => ({}))) as { message?: string };
+
+    if (!response.ok) {
+      setIsDeletingAccount(false);
+      setDeleteAccountMessage(payload.message || "Nao foi possivel excluir a conta.");
+      return;
+    }
+
+    await client.auth.signOut();
     localStorage.clear();
     closeModal();
-    router.push("/");
+    router.replace("/auth");
+    router.refresh();
   }
 
   async function signOutAccount() {
@@ -924,13 +957,20 @@ export default function ProfilePage() {
       case "delete":
         return (
           <div className="space-y-3">
-            <p className="text-lg font-semibold text-[#4F4338]">Tem certeza que deseja apagar os dados locais?</p>
+            <p className="text-lg font-semibold text-[#4F4338]">Tem certeza que deseja excluir sua conta?</p>
             <p className="text-sm text-[#7A6D60]">
-              Essa acao remove dados salvos neste dispositivo, mas nao exclui sua conta do Supabase.
+              Essa acao remove sua conta do Supabase e apaga os dados locais deste dispositivo.
             </p>
+            {deleteAccountMessage ? (
+              <p className="rounded-lg border border-[#E5D7BF] bg-white px-3 py-2 text-xs text-[#6A5E52]">
+                {deleteAccountMessage}
+              </p>
+            ) : null}
             <div className="flex gap-2">
-              <Button variant="secondary" className="flex-1" onClick={closeModal}>Cancelar</Button>
-              <Button className="flex-1" onClick={deleteLocalData}>Apagar dados</Button>
+              <Button variant="secondary" className="flex-1" disabled={isDeletingAccount} onClick={closeModal}>Cancelar</Button>
+              <Button className="flex-1" disabled={isDeletingAccount} onClick={() => void deleteAccount()}>
+                {isDeletingAccount ? "Excluindo..." : "Excluir conta"}
+              </Button>
             </div>
           </div>
         );
