@@ -36,10 +36,21 @@
   border-color: var(--border);
 }
 
+html {
+  min-height: 100%;
+  background: var(--background);
+  color-scheme: light;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-nunito), sans-serif;
+  min-height: 100dvh;
+  margin: 0;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
   background-image: radial-gradient(
       circle at 20% 0%,
       #fbf5e9 0,
@@ -52,6 +63,33 @@ h1,
 h2,
 h3 {
   font-family: var(--font-lora), serif;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.native-app-shell {
+  min-height: 100dvh;
+  padding-top: max(env(safe-area-inset-top), 0px);
+}
+
+.native-page {
+  min-height: 100dvh;
+  padding-top: max(env(safe-area-inset-top), 1.25rem);
+  padding-bottom: max(env(safe-area-inset-bottom), 1.5rem);
+}
+
+.native-tab-main {
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+}
+
+.native-bottom-nav {
+  padding-bottom: max(env(safe-area-inset-bottom), 0.75rem);
 }
 
 ::-webkit-scrollbar {

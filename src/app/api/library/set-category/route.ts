@@ -6,6 +6,9 @@ import {
   readRequiredString,
   validationErrorResponse,
 } from "@/lib/input-validation";
+import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
+import { rateLimitResponse } from "@/features/security/auth-user";
+import { requireAdminUserId } from "@/features/security/admin-guard";
 
 interface UpdateCategoryPayload {
   recipeId?: string;
@@ -24,7 +27,21 @@ const allowedCategories = new Set<LibraryCategory>([
 
 export async function POST(request: Request) {
   try {
-    const payload = (await parseJsonObjectBody(request, { maxBytes: 8 * 1024 })) as UpdateCategoryPayload &
+    const endpointRateLimit = await consumeAuthRateLimit({
+      route: "library-set-category",
+      request,
+    });
+    if (!endpointRateLimit.allowed) {
+      return rateLimitResponse(endpointRateLimit.retryAfterSeconds);
+    }
+
+    const admin = await requireAdminUserId(request);
+    if (!admin.ok) return admin.response;
+
+    const payload = (await parseJsonObjectBody(request, {
+      maxBytes: 8 * 1024,
+      allowedKeys: ["recipeId", "category"],
+    })) as UpdateCategoryPayload &
       Record<string, unknown>;
     const recipeId = readRequiredString(payload, "recipeId", {
       fieldName: "ID da receita",
@@ -40,7 +57,7 @@ export async function POST(request: Request) {
       pattern: /^[a-z_]+$/,
     });
     if (!allowedCategories.has(categoryRaw as LibraryCategory)) {
-      return NextResponse.json({ message: "Categoria invalida." }, { status: 400 });
+      return NextResponse.json({ message: "Categoria inválida." }, { status: 400 });
     }
     const category = categoryRaw as LibraryCategory;
 

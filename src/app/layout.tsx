@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Lora, Nunito } from "next/font/google";
 import "./globals.css";
 
@@ -13,8 +13,34 @@ const lora = Lora({
 });
 
 export const metadata: Metadata = {
-  title: "TemAi",
-  description: "Descubra receitas com IA a partir dos ingredientes que voce tem.",
+  title: {
+    default: "TemAi",
+    template: "%s | TemAi",
+  },
+  description: "Descubra receitas com IA a partir dos ingredientes que você tem.",
+  applicationName: "TemAi",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "TemAi",
+    statusBarStyle: "default",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    icon: "/icon.png",
+    apple: "/apple-icon.png",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
+  themeColor: "#C66A3D",
+  colorScheme: "light",
 };
 
 export default function RootLayout({
@@ -24,7 +50,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" className={`${nunito.variable} ${lora.variable} h-full`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );
 }

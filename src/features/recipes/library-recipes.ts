@@ -7,7 +7,7 @@ export const LIBRARY_RECIPES: Recipe[] = [
     description: "Classico rapido com alho dourado e toque de salsinha.",
     ingredients: ["macarrao", "alho", "azeite", "sal", "salsinha"],
     steps: [
-      "Cozinhe o macarrao em agua com sal ate ficar al dente.",
+      "Cozinhe o macarrão em água com sal até ficar al dente.",
       "Doure o alho fatiado em azeite, sem queimar.",
       "Misture o macarrao escorrido e finalize com salsinha picada.",
     ],
@@ -39,7 +39,7 @@ export const LIBRARY_RECIPES: Recipe[] = [
     steps: [
       "Misture arroz cozido, legumes e molho de tomate.",
       "Ajuste o sal e transfira para um refratario.",
-      "Cubra com queijo e leve ao forno ate gratinar.",
+      "Cubra com queijo e leve ao forno até gratinar.",
     ],
     prepMinutes: 35,
     servings: 4,
@@ -53,7 +53,7 @@ export const LIBRARY_RECIPES: Recipe[] = [
     ingredients: ["frango", "limao", "alho", "azeite", "sal", "pimenta"],
     steps: [
       "Marine o frango com limao, alho, azeite, sal e pimenta por 20 minutos.",
-      "Grelhe em frigideira quente ate dourar dos dois lados.",
+      "Grelhe em frigideira quente até dourar dos dois lados.",
       "Descanse por 3 minutos antes de servir.",
     ],
     prepMinutes: 30,
@@ -68,7 +68,7 @@ export const LIBRARY_RECIPES: Recipe[] = [
     ingredients: ["banana", "ovo", "farinha de trigo", "acucar", "canela", "fermento"],
     steps: [
       "Amasse as bananas e misture com ovos e acucar.",
-      "Acrescente farinha e canela ate obter massa homogenea.",
+      "Acrescente farinha e canela até obter massa homogênea.",
       "Finalize com fermento e asse em forno medio por 35 minutos.",
     ],
     prepMinutes: 45,
@@ -83,7 +83,7 @@ export const LIBRARY_RECIPES: Recipe[] = [
     ingredients: ["abobora", "cebola", "alho", "gengibre", "sal", "azeite"],
     steps: [
       "Refogue cebola, alho e gengibre em azeite.",
-      "Junte a abobora em cubos, cubra com agua e cozinhe ate amaciar.",
+      "Junte a abóbora em cubos, cubra com água e cozinhe até amaciar.",
       "Bata tudo, ajuste o sal e sirva quente.",
     ],
     prepMinutes: 40,

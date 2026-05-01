@@ -32,7 +32,7 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="sticky bottom-0 z-40 border-t border-[#E7DCC8] bg-[#FFFCF7]/95 px-2 py-3 backdrop-blur">
+    <nav className="native-bottom-nav sticky bottom-0 z-40 border-t border-[#E7DCC8] bg-[#FFFCF7]/95 px-2 pt-2 backdrop-blur">
       <ul className="mx-auto flex max-w-md items-center justify-between gap-1">
         {items.map((item) => {
           const isActive = pathname === item.href;

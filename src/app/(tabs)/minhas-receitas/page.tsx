@@ -14,6 +14,7 @@ import {
 } from "@/features/recipes/local-storage";
 import type { LibraryCategory, Recipe } from "@/features/recipes/types";
 import { parseIngredientsText } from "@/features/recipes/helpers";
+import { buildAuthHeaders } from "@/features/recipes/api-client";
 import { slugify } from "@/lib/utils";
 
 function mapSteps(value: string): string[] {
@@ -68,14 +69,14 @@ export default function MyRecipesPage() {
     const recipe: Recipe = {
       id: `manual-${slugify(title)}-${Date.now()}`,
       title: title.trim(),
-      description: description.trim() || "Receita criada por voce no TemAi.",
+      description: description.trim() || "Receita criada por você no TemAi.",
       category,
       ingredients: parseIngredientsText(ingredientsText),
       steps: mapSteps(stepsText),
       prepMinutes: 20,
       servings: 2,
       imageUrl: imageUrl.trim() || undefined,
-      sourceLabel: "Criada por voce",
+      sourceLabel: "Criada por você",
       origin: "manual",
     };
 
@@ -99,9 +100,10 @@ export default function MyRecipesPage() {
     setPublishingById((current) => ({ ...current, [recipe.id]: true }));
 
     try {
+      const authHeaders = await buildAuthHeaders();
       const response = await fetch("/api/library/publish-manual", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({
           title: recipe.title,
           description: recipe.description,
@@ -208,7 +210,7 @@ export default function MyRecipesPage() {
           <Card>
             <CardContent className="pt-5">
               <p className="text-sm text-muted-foreground">
-                Voce ainda nao salvou receitas. Gere uma na Home para comecar.
+                Você ainda não salvou receitas. Gere uma na Home para começar.
               </p>
             </CardContent>
           </Card>

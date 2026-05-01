@@ -14,7 +14,10 @@ interface LoginPayload {
 
 export async function POST(request: Request) {
   try {
-    const payload = (await parseJsonObjectBody(request, { maxBytes: 8 * 1024 })) as LoginPayload &
+    const payload = (await parseJsonObjectBody(request, {
+      maxBytes: 8 * 1024,
+      allowedKeys: ["email", "password"],
+    })) as LoginPayload &
       Record<string, unknown>;
     const email = readRequiredString(payload, "email", {
       fieldName: "Email",
@@ -55,7 +58,7 @@ export async function POST(request: Request) {
     });
 
     if (error || !data.session) {
-      return NextResponse.json({ message: "Email ou senha invalidos." }, { status: 401 });
+      return NextResponse.json({ message: "Email ou senha inválidos." }, { status: 401 });
     }
 
     await resetAuthRateLimit(rateLimit.key);

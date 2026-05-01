@@ -403,7 +403,7 @@ export default function HomePage() {
               {profile.photoDataUrl ? (
                 <Image
                   src={profile.photoDataUrl}
-                  alt="Foto do usuario"
+                  alt="Foto do usuário"
                   width={48}
                   height={48}
                   sizes="48px"
@@ -425,7 +425,7 @@ export default function HomePage() {
               <Link
                 href="/perfil?section=notifications"
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-[#F5F1E8] transition hover:bg-white/25"
-                aria-label="Notificacoes"
+                aria-label="Notificações"
               >
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor">
                   <path

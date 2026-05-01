@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
+import { rateLimitResponse } from "@/features/security/auth-user";
 import { getRecipeBySlugFromSupabase } from "@/features/recipes/supabase-library";
 import {
   sanitizePathParam,
@@ -6,7 +8,7 @@ import {
 } from "@/lib/input-validation";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -16,11 +18,20 @@ export async function GET(
       maxLength: 160,
       pattern: /^[a-z0-9._-]+$/i,
     });
+    const endpointRateLimit = await consumeAuthRateLimit({
+      route: "library-meal",
+      request,
+      identifier: mealId,
+    });
+    if (!endpointRateLimit.allowed) {
+      return rateLimitResponse(endpointRateLimit.retryAfterSeconds);
+    }
+
     const recipeFromSupabase = await getRecipeBySlugFromSupabase(mealId);
     if (recipeFromSupabase) {
       return NextResponse.json({ recipe: recipeFromSupabase, source: "supabase" });
     }
-    return NextResponse.json({ message: "Receita nao encontrada no Supabase." }, { status: 404 });
+    return NextResponse.json({ message: "Receita não encontrada no Supabase." }, { status: 404 });
   } catch (error) {
     const validationResponse = validationErrorResponse(error);
     if (validationResponse) return validationResponse;

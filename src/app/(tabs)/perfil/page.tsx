@@ -33,23 +33,23 @@ import {
 const sections = [
   { id: "edit", label: "Editar Perfil" },
   { id: "subscription", label: "Gerenciar assinatura" },
-  { id: "badges", label: "Insignias" },
+  { id: "badges", label: "Insígnias" },
   { id: "shopping", label: "Lista de Compras" },
   { id: "author", label: "Receitas Autorais" },
   { id: "saved", label: "Receitas Salvas" },
-  { id: "notifications", label: "Notificacoes" },
+  { id: "notifications", label: "Notificações" },
   { id: "support", label: "Suporte / Fale conosco" },
-  { id: "privacy", label: "Politica de dados e privacidade" },
+  { id: "privacy", label: "Política de dados e privacidade" },
   { id: "terms", label: "Termos de Uso" },
   { id: "logout", label: "Sair da conta" },
   { id: "delete", label: "Excluir conta" },
 ] as const;
 
 const notificationItems = [
-  { key: "recipeRating", label: "Sua receita recebeu classificacao" },
-  { key: "newBadge", label: "Voce ganhou um novo badge" },
+  { key: "recipeRating", label: "Sua receita recebeu classificação" },
+  { key: "newBadge", label: "Você ganhou um novo badge" },
   { key: "publishSuccess", label: "Receita publicada com sucesso" },
-  { key: "shoppingUpdates", label: "Atualizacoes da lista de compras" },
+  { key: "shoppingUpdates", label: "Atualizações da lista de compras" },
 ] as const;
 
 type SectionId = (typeof sections)[number]["id"];
@@ -132,7 +132,7 @@ export default function ProfilePage() {
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([
     {
       from: "bot",
-      text: "Oi! Sou o suporte virtual do TemAi. Escolha uma opcao abaixo ou digite sua duvida.",
+      text: "Oi! Sou o suporte virtual do TemAi. Escolha uma opção abaixo ou digite sua dúvida.",
       options: ["beneficios", "free-vs-premium", "cobranca", "falar-humano"],
     },
   ]);
@@ -340,7 +340,7 @@ export default function ProfilePage() {
     setCheckingUsername(false);
 
     if (error) {
-      setProfileMessage("Nao foi possivel validar o @ agora.");
+      setProfileMessage("Não foi possível validar o @ agora.");
       return;
     }
 
@@ -424,7 +424,7 @@ export default function ProfilePage() {
 
     if (!client || !token) {
       setIsDeletingAccount(false);
-      setDeleteAccountMessage("Sessao expirada. Entre novamente para excluir a conta.");
+      setDeleteAccountMessage("Sessão expirada. Entre novamente para excluir a conta.");
       return;
     }
 
@@ -438,7 +438,7 @@ export default function ProfilePage() {
 
     if (!response.ok) {
       setIsDeletingAccount(false);
-      setDeleteAccountMessage(payload.message || "Nao foi possivel excluir a conta.");
+      setDeleteAccountMessage(payload.message || "Não foi possível excluir a conta.");
       return;
     }
 
@@ -467,34 +467,34 @@ export default function ProfilePage() {
   function optionLabel(option: SupportQuickOption): string {
     switch (option) {
       case "beneficios":
-        return "Beneficios Premium";
+        return "Benefícios Premium";
       case "free-vs-premium":
         return "Free vs Premium";
       case "cancelamento":
         return "Cancelar assinatura";
       case "cobranca":
-        return "Cobranca";
+        return "Cobrança";
       case "login":
         return "Problemas de login";
       case "falar-humano":
         return "Falar com humano";
       default:
-        return "Opcao";
+        return "Opção";
     }
   }
 
   function optionPrompt(option: SupportQuickOption): string {
     switch (option) {
       case "beneficios":
-        return "Quais sao os beneficios do Premium?";
+        return "Quais são os benefícios do Premium?";
       case "free-vs-premium":
-        return "Qual a diferenca entre Free e Premium?";
+        return "Qual a diferença entre Free e Premium?";
       case "cancelamento":
-        return "Como faco para cancelar assinatura?";
+        return "Como faço para cancelar assinatura?";
       case "cobranca":
-        return "Tenho duvida de cobranca.";
+        return "Tenho dúvida de cobrança.";
       case "login":
-        return "Nao estou conseguindo entrar na conta.";
+        return "Não estou conseguindo entrar na conta.";
       case "falar-humano":
         return "Quero falar com suporte humano.";
       default:
@@ -513,7 +513,7 @@ export default function ProfilePage() {
       return {
         from: "bot",
         text:
-          "Premium (R$ 24,90/mes) inclui: geracao ilimitada com IA, uso de voz e imagem na IA, receitas autorais por voz e badges exclusivos. Se voce usa o app todo dia, costuma compensar rapido.",
+          "Premium (R$ 24,90/mês) inclui: geração ilimitada com IA, uso de voz e imagem na IA, receitas autorais por voz e badges exclusivos. Se você usa o app todo dia, costuma compensar rápido.",
         options: ["free-vs-premium", "cancelamento", "cobranca"],
       };
     }
@@ -526,7 +526,7 @@ export default function ProfilePage() {
       return {
         from: "bot",
         text:
-          "Free: 3 geracoes IA por mes, somente texto e badges padrao. Premium: ilimitado, IA com voz/imagem, receita autoral por voz e badges premium.",
+          "Free: 3 gerações IA por mês, somente texto e badges padrão. Premium: ilimitado, IA com voz/imagem, receita autoral por voz e badges premium.",
         options: ["beneficios", "cancelamento", "falar-humano"],
       };
     }
@@ -534,7 +534,7 @@ export default function ProfilePage() {
       return {
         from: "bot",
         text:
-          "Voce pode cancelar quando quiser. O premium continua ativo ate o fim do ciclo ja pago. Na renovacao seguinte, nao sera cobrado de novo.",
+          "Você pode cancelar quando quiser. O premium continua ativo até o fim do ciclo já pago. Na renovação seguinte, não será cobrado de novo.",
         options: ["cobranca", "falar-humano"],
       };
     }
@@ -548,7 +548,7 @@ export default function ProfilePage() {
       return {
         from: "bot",
         text:
-          "Para cobranca: confira o historico na loja (Google Play/App Store). Se houver cobranca duplicada ou erro, envie email com print e data para Mafralabs@outlook.com.",
+          "Para cobrança: confira o histórico na loja (Google Play/App Store). Se houver cobrança duplicada ou erro, envie email com print e data para Mafralabs@outlook.com.",
         options: ["falar-humano", "cancelamento"],
       };
     }
@@ -556,7 +556,7 @@ export default function ProfilePage() {
       return {
         from: "bot",
         text:
-          "Se nao consegue entrar, use 'esqueci minha senha' na tela de login. Confira tambem seu email de confirmacao e pasta spam.",
+          "Se não consegue entrar, use 'esqueci minha senha' na tela de login. Confira também seu email de confirmação e pasta spam.",
         options: ["falar-humano", "cobranca"],
       };
     }
@@ -564,14 +564,14 @@ export default function ProfilePage() {
       return {
         from: "bot",
         text:
-          "Perfeito. Para atendimento humano, envie para Mafralabs@outlook.com com: assunto, email da conta, print e descricao do problema.",
+          "Perfeito. Para atendimento humano, envie para Mafralabs@outlook.com com: assunto, email da conta, print e descrição do problema.",
         options: ["cobranca", "login"],
       };
     }
     return {
       from: "bot",
       text:
-        "Posso te ajudar com beneficios do premium, diferenca free vs premium, cobranca, cancelamento e login.",
+        "Posso te ajudar com benefícios do premium, diferença free vs premium, cobrança, cancelamento e login.",
       options: ["beneficios", "free-vs-premium", "cancelamento", "login"],
     };
   }
@@ -632,7 +632,7 @@ export default function ProfilePage() {
     setCreatingSupportTicket(false);
 
     if (!created) {
-      setSupportTicketMessage("Nao foi possivel abrir ticket agora. Tente novamente ou envie email.");
+      setSupportTicketMessage("Não foi possível abrir ticket agora. Tente novamente ou envie email.");
       return;
     }
 
@@ -687,14 +687,14 @@ export default function ProfilePage() {
                       : "rounded-full border border-[#D6C8B4] bg-[#F7F0E4] px-2 py-0.5 text-xs font-semibold text-[#6E6358]"
                   }
                 >
-                  {isPremium ? "Ativo" : "Basico"}
+                  {isPremium ? "Ativo" : "Básico"}
                 </span>
               </div>
               {isPremium ? (
                 <div className="mt-2 space-y-1 text-xs text-[#6E6154]">
-                  <p>Premium ativo ate: {premiumUntil || "Nao informado"}</p>
-                  <p>Proxima renovacao: {renewsAt || "Nao informado"}</p>
-                  <p>Mensalidade: R$ 24,90/mes</p>
+                  <p>Premium ativo até: {premiumUntil || "Não informado"}</p>
+                  <p>Próxima renovação: {renewsAt || "Não informado"}</p>
+                  <p>Mensalidade: R$ 24,90/mês</p>
                 </div>
               ) : (
                 <p className="mt-2 text-xs text-[#6E6154]">
@@ -704,13 +704,13 @@ export default function ProfilePage() {
             </div>
             <div className="rounded-2xl border border-[#E5D7BF] bg-white p-3">
               <p className="text-sm font-semibold text-[#5D5248]">Assinatura Premium</p>
-              <p className="mt-1 text-xs text-[#6A5E52]">Valor atual: R$ 24,90 por mes.</p>
+              <p className="mt-1 text-xs text-[#6A5E52]">Valor atual: R$ 24,90 por mês.</p>
             </div>
 
             <div className="rounded-2xl border border-[#E5D7BF] bg-white p-3">
-              <p className="text-sm font-semibold text-[#5D5248]">Beneficios Premium</p>
+              <p className="text-sm font-semibold text-[#5D5248]">Benefícios Premium</p>
               <ul className="mt-2 space-y-1 text-xs text-[#6A5E52]">
-                <li>• Geracao de receitas ilimitadas com IA</li>
+                <li>• Geração de receitas ilimitadas com IA</li>
                 <li>• Adicionar suas receitas autorais com voz</li>
                 <li>• Gerar receitas com IA utilizando imagem e voz</li>
                 <li>• Badges exclusivos para premium</li>
@@ -718,12 +718,12 @@ export default function ProfilePage() {
             </div>
 
             <div className="rounded-2xl border border-[#E5D7BF] bg-white p-3">
-              <p className="text-sm font-semibold text-[#5D5248]">Plano Free (restricoes)</p>
+              <p className="text-sm font-semibold text-[#5D5248]">Plano Free (restrições)</p>
               <ul className="mt-2 space-y-1 text-xs text-[#6A5E52]">
-                <li>• Limite de 3 receitas geradas com IA por mes</li>
-                <li>• Receitas geradas com IA so com texto</li>
-                <li>• Adicao de receitas autorais so por texto</li>
-                <li>• Badges padrao</li>
+                <li>• Limite de 3 receitas geradas com IA por mês</li>
+                <li>• Receitas geradas com IA só com texto</li>
+                <li>• Adição de receitas autorais só por texto</li>
+                <li>• Badges padrão</li>
               </ul>
             </div>
           </div>
@@ -749,10 +749,10 @@ export default function ProfilePage() {
                 {checkingUsername
                   ? "Verificando disponibilidade..."
                   : usernameAvailable === true
-                    ? "@ disponivel"
+                    ? "@ disponível"
                     : usernameAvailable === false
-                      ? "@ ja em uso"
-                      : "Use letras, numeros, . e _"}
+                      ? "@ já em uso"
+                      : "Use letras, números, . e _"}
               </p>
               {usernameAvailable === false && usernameSuggestion ? (
                 <button
@@ -760,7 +760,7 @@ export default function ProfilePage() {
                   className="text-xs font-semibold text-primary underline"
                   onClick={() => void checkUsernameAvailability(usernameSuggestion)}
                 >
-                  Usar sugestao: @{usernameSuggestion}
+                  Usar sugestão: @{usernameSuggestion}
                 </button>
               ) : null}
             </div>
@@ -769,7 +769,7 @@ export default function ProfilePage() {
                 {profileMessage}
               </p>
             ) : null}
-            <Button className="w-full" onClick={() => void saveProfileChanges()}>Salvar alteracoes</Button>
+            <Button className="w-full" onClick={() => void saveProfileChanges()}>Salvar alterações</Button>
           </div>
         );
       case "shopping":
@@ -779,7 +779,7 @@ export default function ProfilePage() {
               <p className="text-sm font-semibold text-[#5D5248]">Lista de Compras</p>
               <div className="flex gap-2">
                 <Button variant="secondary" size="sm" onClick={selectAllShoppingItems}>Selecionar todos</Button>
-                <Button variant="secondary" size="sm" onClick={() => setShoppingItems(clearCheckedShoppingItems())}>Limpar concluidos</Button>
+                <Button variant="secondary" size="sm" onClick={() => setShoppingItems(clearCheckedShoppingItems())}>Limpar concluídos</Button>
               </div>
             </div>
             <div className="flex gap-2">
@@ -793,7 +793,7 @@ export default function ProfilePage() {
               </select>
             ) : null}
             <div className="max-h-[45vh] space-y-2 overflow-auto pr-1">
-              {shoppingItems.length === 0 ? <p className="text-sm text-[#7A6D60]">Sua lista esta vazia.</p> : shoppingMode === "geral" ? mergedShoppingItems.map((item) => (
+              {shoppingItems.length === 0 ? <p className="text-sm text-[#7A6D60]">Sua lista está vazia.</p> : shoppingMode === "geral" ? mergedShoppingItems.map((item) => (
                 <label key={item.name.toLowerCase()} className="flex items-center justify-between rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm">
                   <span className={item.checked ? "line-through text-[#9A8D7E]" : "text-[#4F4338]"}>{item.name}</span>
                   <input type="checkbox" checked={item.checked} onChange={() => toggleMergedItem(item.ids)} />
@@ -810,7 +810,7 @@ export default function ProfilePage() {
       case "badges":
         return (
           <div className="space-y-3">
-            <p className="text-sm font-semibold text-[#5D5248]">Insignias</p>
+            <p className="text-sm font-semibold text-[#5D5248]">Insígnias</p>
             <p className="text-xs text-[#7A6D60]">
               Toque para ativar. As bloqueadas mostram o requisito.
             </p>
@@ -854,14 +854,14 @@ export default function ProfilePage() {
           <div className="space-y-2">
             <p className="text-sm font-semibold text-[#5D5248]">Receitas Salvas</p>
             <div className="max-h-[45vh] space-y-2 overflow-auto pr-1">
-              {savedRefs.length === 0 ? <p className="text-sm text-[#7A6D60]">Voce ainda nao salvou receitas.</p> : savedRefs.map((item) => <p key={`${item.recipeId}-${item.savedAt}`} className="rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-xs">{item.recipeId}</p>)}
+              {savedRefs.length === 0 ? <p className="text-sm text-[#7A6D60]">Você ainda não salvou receitas.</p> : savedRefs.map((item) => <p key={`${item.recipeId}-${item.savedAt}`} className="rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-xs">{item.recipeId}</p>)}
             </div>
           </div>
         );
       case "notifications":
         return (
           <div className="space-y-2">
-            <p className="text-sm font-semibold text-[#5D5248]">Notificacoes</p>
+            <p className="text-sm font-semibold text-[#5D5248]">Notificações</p>
             {notificationItems.map((item) => (
               <label key={item.key} className="flex items-center justify-between rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm">
                 <span>{item.label}</span>
@@ -874,7 +874,7 @@ export default function ProfilePage() {
         return (
           <div className="space-y-2">
             <p className="text-sm text-[#6A5E52]">
-              Para suporte, duvidas de conta, assinatura ou privacidade, fale com nossa equipe:
+              Para suporte, dúvidas de conta, assinatura ou privacidade, fale com nossa equipe:
             </p>
             <div className="rounded-xl border border-[#E5D7BF] bg-white p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-[#7A6D60]">Chat de suporte</p>
@@ -914,7 +914,7 @@ export default function ProfilePage() {
               </div>
               <div className="mt-2 flex gap-2">
                 <Input
-                  placeholder="Digite sua duvida"
+                  placeholder="Digite sua dúvida"
                   value={supportInput}
                   onChange={(e) => setSupportInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -963,7 +963,7 @@ export default function ProfilePage() {
           </div>
         );
       case "privacy":
-        return <Link href="/privacidade" className="text-sm font-semibold text-primary underline">Abrir Politica de Privacidade</Link>;
+        return <Link href="/privacidade" className="text-sm font-semibold text-primary underline">Abrir Política de Privacidade</Link>;
       case "terms":
         return <Link href="/termos" className="text-sm font-semibold text-primary underline">Abrir Termos de Uso</Link>;
       case "logout":
@@ -980,7 +980,7 @@ export default function ProfilePage() {
           <div className="space-y-3">
             <p className="text-lg font-semibold text-[#4F4338]">Tem certeza que deseja excluir sua conta?</p>
             <p className="text-sm text-[#7A6D60]">
-              Essa acao remove sua conta do Supabase e apaga os dados locais deste dispositivo.
+              Essa ação remove sua conta do Supabase e apaga os dados locais deste dispositivo.
             </p>
             {deleteAccountMessage ? (
               <p className="rounded-lg border border-[#E5D7BF] bg-white px-3 py-2 text-xs text-[#6A5E52]">

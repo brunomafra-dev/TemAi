@@ -14,6 +14,10 @@ export class InputValidationError extends Error {
 }
 
 type JsonObject = Record<string, unknown>;
+type ParseJsonOptions = {
+  maxBytes?: number;
+  allowedKeys?: readonly string[];
+};
 
 function byteLength(value: string): number {
   return Buffer.byteLength(value, "utf8");
@@ -25,9 +29,24 @@ function assertObject(value: unknown): asserts value is JsonObject {
   }
 }
 
+function assertAllowedKeys(input: JsonObject, allowedKeys?: readonly string[]): void {
+  if (!allowedKeys) return;
+  const allowed = new Set(allowedKeys);
+  const unexpected = Object.keys(input).find((key) => !allowed.has(key));
+  if (unexpected) {
+    throw new InputValidationError(`Campo inesperado: ${unexpected}.`);
+  }
+}
+
+function assertNoUnsafeControlChars(value: string, fieldName: string): void {
+  if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(value)) {
+    throw new InputValidationError(`${fieldName} contém caracteres inválidos.`);
+  }
+}
+
 export async function parseJsonObjectBody(
   request: Request,
-  options?: { maxBytes?: number },
+  options?: ParseJsonOptions,
 ): Promise<JsonObject> {
   const maxBytes = options?.maxBytes ?? DEFAULT_MAX_BODY_BYTES;
   const contentType = request.headers.get("content-type")?.toLowerCase() || "";
@@ -58,6 +77,7 @@ export async function parseJsonObjectBody(
   }
 
   assertObject(parsed);
+  assertAllowedKeys(parsed, options?.allowedKeys);
   return parsed;
 }
 
@@ -72,6 +92,7 @@ interface StringOptions {
 function sanitizeStringValue(raw: string, options: StringOptions): string {
   const value = raw.trim();
   const minLength = options.minLength ?? 0;
+  assertNoUnsafeControlChars(value, options.fieldName);
 
   if (value.length < minLength) {
     throw new InputValidationError(`${options.fieldName} invalido.`);
@@ -146,6 +167,7 @@ export function readStringArray(
       }
       const value = item.trim();
       if (!value) return "";
+      assertNoUnsafeControlChars(value, options.fieldName || key);
       if (value.length > options.itemMaxLength) {
         throw new InputValidationError(`${options.fieldName || key} muito grande.`, 413);
       }
@@ -265,4 +287,17 @@ export function sanitizePathParam(
 export function validationErrorResponse(error: unknown): NextResponse | null {
   if (!(error instanceof InputValidationError)) return null;
   return NextResponse.json({ message: error.message }, { status: error.status });
+}
+
+export function assertRequestContentLength(request: Request, maxBytes: number): void {
+  const contentLengthRaw = request.headers.get("content-length");
+  if (!contentLengthRaw) return;
+
+  const contentLength = Number(contentLengthRaw);
+  if (!Number.isFinite(contentLength) || contentLength < 0) {
+    throw new InputValidationError("Content-Length malformado.");
+  }
+  if (contentLength > maxBytes) {
+    throw new InputValidationError("Payload muito grande.", 413);
+  }
 }

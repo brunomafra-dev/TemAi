@@ -5,6 +5,8 @@ import {
   sanitizeQueryString,
   validationErrorResponse,
 } from "@/lib/input-validation";
+import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
+import { rateLimitResponse } from "@/features/security/auth-user";
 
 function readIntParam(
   value: string | null,
@@ -24,6 +26,14 @@ function readIntParam(
 
 export async function GET(request: Request) {
   try {
+    const endpointRateLimit = await consumeAuthRateLimit({
+      route: "library-search",
+      request,
+    });
+    if (!endpointRateLimit.allowed) {
+      return rateLimitResponse(endpointRateLimit.retryAfterSeconds);
+    }
+
     const url = new URL(request.url);
     const query = sanitizeQueryString(url.searchParams.get("q"), {
       fieldName: "Busca",

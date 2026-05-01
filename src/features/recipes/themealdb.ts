@@ -8,8 +8,6 @@ import {
   translateToPortuguese,
 } from "@/features/recipes/translation";
 
-const THEMEALDB_BASE_URL = "https://www.themealdb.com/api/json/v1";
-
 interface MealDbMeal {
   idMeal: string;
   strMeal: string;
@@ -151,7 +149,7 @@ async function mapMealToRecipe(meal: MealDbMeal): Promise<Recipe> {
 
 async function fetchFromMealDb(path: string): Promise<MealDbResponse> {
   const key = getMealDbKey();
-  const response = await fetch(`${THEMEALDB_BASE_URL}/${key}${path}`, {
+  const response = await fetch(`${serverEnv.theMealDbBaseUrl()}/${key}${path}`, {
     next: { revalidate: 60 * 60 * 8 },
   });
   if (!response.ok) {

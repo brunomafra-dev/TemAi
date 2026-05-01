@@ -259,7 +259,7 @@ function LibraryPageContent() {
               disabled={page >= totalPages}
               className="rounded-full border border-[#E5D7BF] px-3 py-1 text-xs font-semibold text-[#6A5E52] disabled:opacity-45"
             >
-              Proxima
+              Próxima
             </button>
           </div>
         </div>

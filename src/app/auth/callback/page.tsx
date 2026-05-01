@@ -30,7 +30,7 @@ export default function AuthCallbackPage() {
   }, [router]);
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md px-4 py-8">
+    <main className="native-page mx-auto w-full max-w-md px-4">
       <p className="text-sm text-[#6A5E52]">Finalizando login...</p>
     </main>
   );

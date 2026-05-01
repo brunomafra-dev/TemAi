@@ -177,7 +177,7 @@ async function machineTranslate(value: string): Promise<string | null> {
 function polishInstruction(value: string): string {
   return value
     .replace(/\bthen\b/gi, "depois")
-    .replace(/\buntil\b/gi, "ate")
+    .replace(/\buntil\b/gi, "até")
     .replace(/\bminutes?\b/gi, "minutos")
     .replace(/\badd\b/gi, "adicione")
     .replace(/\bmix\b/gi, "misture")
@@ -231,4 +231,3 @@ export async function translateIngredientToPortuguese(value: string): Promise<st
 export async function translateInstructionToPortuguese(value: string): Promise<string> {
   return translateToPortuguese(value, "instruction");
 }
-

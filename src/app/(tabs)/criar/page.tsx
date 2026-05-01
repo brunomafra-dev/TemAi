@@ -138,7 +138,7 @@ export default function CreatePage() {
       prepMinutes: 20,
       servings: 2,
       imageUrl: imageDataUrl || undefined,
-      sourceLabel: "Criada por voce",
+      sourceLabel: "Criada por você",
       origin: "manual",
     };
   }
@@ -170,7 +170,7 @@ export default function CreatePage() {
         stepsText?: string;
       };
       if (!response.ok) {
-        setSaveFeedback(data.message || "Nao foi possivel organizar com IA.");
+        setSaveFeedback(data.message || "Não foi possível organizar com IA.");
         return;
       }
       setDescription(data.description || description);
@@ -178,7 +178,7 @@ export default function CreatePage() {
       setStepsText(data.stepsText || stepsText);
       setSaveFeedback("Receita organizada com IA. Revise antes de salvar.");
     } catch {
-      setSaveFeedback("Nao foi possivel organizar com IA.");
+      setSaveFeedback("Não foi possível organizar com IA.");
     } finally {
       setIsPolishing(false);
     }
@@ -312,10 +312,12 @@ export default function CreatePage() {
 
     setIsPublishing(true);
     try {
+      const authHeaders = await buildAuthHeaders();
       const response = await fetch("/api/library/publish-manual", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...authHeaders,
         },
         body: JSON.stringify({
           title: recipe.title,
@@ -355,7 +357,7 @@ export default function CreatePage() {
           <p className="text-xs uppercase tracking-[0.2em] text-[#EADBC0]">Studio</p>
           <h1 className="mt-2 font-display text-3xl">Criar receita</h1>
           <p className="mt-2 max-w-xs text-sm text-[#E6D7BF]">
-            Monte sua receita e gerencie suas receitas salvas em um so lugar.
+            Monte sua receita e gerencie suas receitas salvas em um só lugar.
           </p>
           <div className="mt-4 flex gap-2">
             <Link
@@ -372,7 +374,7 @@ export default function CreatePage() {
             </Link>
           </div>
           <p className="mt-3 text-xs text-[#E6D7BF]">
-            Por voz: gravar audio -&gt; transcrever -&gt; IA estrutura ingredientes e preparo -&gt; voce revisa antes de salvar.
+            Por voz: gravar áudio -&gt; transcrever -&gt; IA estrutura ingredientes e preparo -&gt; você revisa antes de salvar.
           </p>
         </div>
       </header>
@@ -584,7 +586,7 @@ export default function CreatePage() {
                 onClick={() => handleSave(false)}
                 disabled={isPublishing}
               >
-                Salvar so em Minhas receitas
+                Salvar só em Minhas receitas
               </Button>
               <Button
                 type="button"

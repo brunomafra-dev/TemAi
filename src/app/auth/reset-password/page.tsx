@@ -17,7 +17,7 @@ export default function ResetPasswordPage() {
 
   async function handleReset() {
     if (!client) {
-      setMessage("Supabase nao configurado.");
+      setMessage("Supabase não configurado.");
       return;
     }
     if (password.length < 6) {
@@ -25,7 +25,7 @@ export default function ResetPasswordPage() {
       return;
     }
     if (password !== confirmPassword) {
-      setMessage("As senhas nao conferem.");
+      setMessage("As senhas não conferem.");
       return;
     }
 
@@ -39,16 +39,16 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    setMessage("Senha atualizada com sucesso. Voce ja pode entrar.");
+    setMessage("Senha atualizada com sucesso. Você já pode entrar.");
     setTimeout(() => router.replace("/auth"), 900);
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md px-4 py-6">
+    <main className="native-page mx-auto w-full max-w-md px-4">
       <Card className="border-[#E5D7BF] bg-[#FFFCF7]">
         <CardHeader>
           <CardTitle>Redefinir senha</CardTitle>
-          <CardDescription>Digite sua nova senha para concluir a recuperacao.</CardDescription>
+          <CardDescription>Digite sua nova senha para concluir a recuperação.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <Input

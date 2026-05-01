@@ -4,6 +4,8 @@ import {
   InputValidationError,
   validationErrorResponse,
 } from "@/lib/input-validation";
+import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
+import { rateLimitResponse } from "@/features/security/auth-user";
 
 function readLimit(value: string | null): number {
   if (!value) return 8;
@@ -20,6 +22,14 @@ function readLimit(value: string | null): number {
 
 export async function GET(request: Request) {
   try {
+    const endpointRateLimit = await consumeAuthRateLimit({
+      route: "library-popular",
+      request,
+    });
+    if (!endpointRateLimit.allowed) {
+      return rateLimitResponse(endpointRateLimit.retryAfterSeconds);
+    }
+
     const url = new URL(request.url);
     const limit = readLimit(url.searchParams.get("limit"));
     const fromSupabase = await getPopularRecipesFromSupabase(limit);

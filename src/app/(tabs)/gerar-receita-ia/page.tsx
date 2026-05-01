@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 
 const modes: Array<{ value: InputMode; label: string; emoji: string }> = [
   { value: "photo", label: "Foto", emoji: "📷" },
-  { value: "audio", label: "Audio", emoji: "🎤" },
+  { value: "audio", label: "Áudio", emoji: "🎤" },
   { value: "text", label: "Texto", emoji: "📝" },
 ];
 
@@ -57,7 +57,7 @@ function CreateRecipePageContent() {
 
     if (!isPremium && requestedMode !== "text") {
       setMode("text");
-      setErrorMessage("Audio e foto sao recursos premium.");
+      setErrorMessage("Áudio e foto são recursos premium.");
       return;
     }
 
@@ -93,7 +93,7 @@ function CreateRecipePageContent() {
     }
 
     if (!isPremium && subscription.aiGenerationsUsedThisMonth >= subscription.aiGenerationsLimitThisMonth) {
-      setErrorMessage("Plano free atingiu o limite de 3 geracoes de IA neste mes.");
+      setErrorMessage("Plano free atingiu o limite de 3 gerações de IA neste mês.");
       return;
     }
 
@@ -112,7 +112,7 @@ function CreateRecipePageContent() {
         setSubscription(consumeAiGenerationAttempt());
       }
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Erro ao buscar sugestoes.");
+      setErrorMessage(error instanceof Error ? error.message : "Erro ao buscar sugestões.");
     } finally {
       setIsLoading(false);
     }
@@ -167,10 +167,10 @@ function CreateRecipePageContent() {
           <CardDescription>Fluxo em duas etapas: sugestoes primeiro, receita completa depois.</CardDescription>
           {!isPremium ? (
             <p className="text-xs text-[#7A6D60]">
-              Plano free: {subscription.aiGenerationsUsedThisMonth}/{subscription.aiGenerationsLimitThisMonth} geracoes neste mes.
+              Plano free: {subscription.aiGenerationsUsedThisMonth}/{subscription.aiGenerationsLimitThisMonth} gerações neste mês.
             </p>
           ) : (
-            <p className="text-xs text-[#7A6D60]">Plano premium: geracoes ilimitadas + audio e foto.</p>
+            <p className="text-xs text-[#7A6D60]">Plano premium: gerações ilimitadas + áudio e foto.</p>
           )}
         </CardHeader>
         <CardContent className="space-y-4">
@@ -180,7 +180,7 @@ function CreateRecipePageContent() {
                 key={entry.value}
                 onClick={() => {
                   if (!isPremium && entry.value !== "text") {
-                    setErrorMessage("Audio e foto sao recursos premium.");
+                    setErrorMessage("Áudio e foto são recursos premium.");
                     return;
                   }
                   setMode(entry.value);
@@ -284,7 +284,7 @@ function CreateRecipePageContent() {
       {response ? (
         <section className="space-y-4">
           <div className="space-y-2">
-            <h2 className="text-xl font-semibold">Sugestoes para voce</h2>
+            <h2 className="text-xl font-semibold">Sugestões para você</h2>
             <p className="text-xs text-[#7A6D60]">
               Geradas com base nos ingredientes: {response.normalizedIngredients.join(", ")}.
             </p>
@@ -303,8 +303,8 @@ function CreateRecipePageContent() {
 
           <Card className="border-[#E5D7C1] bg-[#FFFCF7]">
             <CardHeader>
-              <CardTitle>Voce tambem pode fazer</CardTitle>
-              <CardDescription>Receitas que faltam so 1 ou 2 ingredientes.</CardDescription>
+              <CardTitle>Você também pode fazer</CardTitle>
+              <CardDescription>Receitas que faltam só 1 ou 2 ingredientes.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {response.alsoCanMake.length === 0 ? (
@@ -335,7 +335,7 @@ function CreateRecipePageContent() {
         <div className="fixed inset-0 z-50 flex items-end bg-black/45 p-4 sm:items-center sm:justify-center">
           <div className="w-full rounded-[1.8rem] bg-[#FFFCF7] p-5 shadow-2xl sm:max-w-sm">
             <h3 className="text-xl font-semibold text-[#2A1E17]">Selecionar foto</h3>
-            <p className="mt-1 text-sm text-[#7E7366]">Como voce quer enviar a imagem?</p>
+            <p className="mt-1 text-sm text-[#7E7366]">Como você quer enviar a imagem?</p>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <button
                 onClick={pickFromCamera}

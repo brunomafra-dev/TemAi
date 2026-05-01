@@ -59,7 +59,7 @@ export default function AuthPage() {
     });
     setCheckingUsername(false);
     if (error) {
-      setMessage("Nao foi possivel verificar disponibilidade agora.");
+      setMessage("Não foi possível verificar disponibilidade agora.");
       return;
     }
     setUsernameAvailable(Boolean(data));
@@ -87,7 +87,7 @@ export default function AuthPage() {
 
   async function handleLogin() {
     if (!client) {
-      setMessage("Supabase nao configurado.");
+      setMessage("Supabase não configurado.");
       return;
     }
     setIsSubmitting(true);
@@ -119,7 +119,7 @@ export default function AuthPage() {
     const accessToken = data.session?.accessToken || "";
     const refreshToken = data.session?.refreshToken || "";
     if (!accessToken || !refreshToken) {
-      setMessage("Falha ao criar sessao.");
+      setMessage("Falha ao criar sessão.");
       return;
     }
 
@@ -136,7 +136,7 @@ export default function AuthPage() {
 
   async function handleRegister() {
     if (!client) {
-      setMessage("Supabase nao configurado.");
+      setMessage("Supabase não configurado.");
       return;
     }
     if (!canRegister) {
@@ -205,7 +205,7 @@ export default function AuthPage() {
 
   async function handleForgotPassword() {
     if (!client) {
-      setMessage("Supabase nao configurado.");
+      setMessage("Supabase não configurado.");
       return;
     }
     if (!email.trim()) {
@@ -235,7 +235,7 @@ export default function AuthPage() {
         const retry = data.retryAfterSeconds ? ` Tente em ${data.retryAfterSeconds}s.` : "";
         setMessage((data.message || "Muitas tentativas.") + retry);
       } else {
-        setMessage(data.message || "Falha ao enviar email de recuperacao.");
+        setMessage(data.message || "Falha ao enviar email de recuperação.");
       }
       return;
     }
@@ -243,7 +243,7 @@ export default function AuthPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-md px-4 py-6">
+    <main className="native-page mx-auto w-full max-w-md px-4">
       <section className="relative overflow-hidden rounded-[2rem] shadow-[0_20px_45px_-25px_rgba(42,30,23,0.55)]">
         <div
           className="absolute inset-0 bg-cover bg-center"
@@ -271,8 +271,8 @@ export default function AuthPage() {
             {mode === "login"
               ? "Acesse sua conta TemAi."
               : mode === "register"
-                ? "Cadastro com username unico para seu perfil."
-                : "Informe seu email para receber o link de redefinicao."}
+                ? "Cadastro com username único para seu perfil."
+                : "Informe seu email para receber o link de redefinição."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -318,10 +318,10 @@ export default function AuthPage() {
                   {checkingUsername
                     ? "Verificando disponibilidade..."
                     : usernameAvailable === true
-                      ? "@ disponivel"
+                      ? "@ disponível"
                       : usernameAvailable === false
-                        ? "@ ja em uso"
-                        : "Use letras, numeros, . e _"}
+                        ? "@ já em uso"
+                        : "Use letras, números, . e _"}
                 </p>
                 {usernameAvailable === false && usernameSuggestion ? (
                   <button
@@ -329,7 +329,7 @@ export default function AuthPage() {
                     className="text-xs font-semibold text-primary underline"
                     onClick={() => void checkUsernameAvailability(usernameSuggestion)}
                   >
-                    Usar sugestao: @{usernameSuggestion}
+                    Usar sugestão: @{usernameSuggestion}
                   </button>
                 ) : null}
               </div>
@@ -366,7 +366,7 @@ export default function AuthPage() {
                 </Link>{" "}
                 e com a{" "}
                 <Link href="/privacidade" className="font-semibold text-primary underline">
-                  Politica de Privacidade
+                  Política de Privacidade
                 </Link>
                 .
               </span>

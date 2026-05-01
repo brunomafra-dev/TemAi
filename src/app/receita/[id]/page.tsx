@@ -285,7 +285,7 @@ export default function RecipeDetailsPage() {
           setIsLoading(true);
           const response = await fetch(`/api/library/meal/${encodeURIComponent(recipeId)}`);
           if (!response.ok) {
-            throw new Error("Receita da biblioteca nao encontrada.");
+            throw new Error("Receita da biblioteca não encontrada.");
           }
 
           const data = (await response.json()) as { recipe: Recipe };
@@ -303,7 +303,7 @@ export default function RecipeDetailsPage() {
                 ? ""
                 : error instanceof Error
                   ? error.message
-                  : "Nao foi possivel carregar receita da biblioteca.",
+                  : "Não foi possível carregar receita da biblioteca.",
             );
             setIsSaved(Boolean(fallbackRecipe && isRecipeSaved(recipeId)));
           }
@@ -320,12 +320,12 @@ export default function RecipeDetailsPage() {
           setIsLoading(true);
           const savedRef = getSavedRecipeRefs().find((item) => item.recipeId === recipeId);
           if (!savedRef) {
-            throw new Error("Receita salva nao encontrada.");
+            throw new Error("Receita salva não encontrada.");
           }
 
           if (savedRef.sourceOrigin === "library") {
             const response = await fetch(`/api/library/meal/${encodeURIComponent(recipeId)}`);
-            if (!response.ok) throw new Error("Receita da biblioteca nao encontrada.");
+            if (!response.ok) throw new Error("Receita da biblioteca não encontrada.");
             const data = (await response.json()) as { recipe: Recipe };
             if (isMounted) {
               setRecipe(data.recipe);
@@ -349,7 +349,7 @@ export default function RecipeDetailsPage() {
         } catch (error) {
           if (isMounted) {
             setErrorMessage(
-              error instanceof Error ? error.message : "Nao foi possivel carregar receita salva.",
+              error instanceof Error ? error.message : "Não foi possível carregar receita salva.",
             );
           }
         } finally {
@@ -388,7 +388,7 @@ export default function RecipeDetailsPage() {
       } catch (error) {
         if (isMounted) {
           setErrorMessage(
-            error instanceof Error ? error.message : "Nao foi possivel gerar a receita.",
+            error instanceof Error ? error.message : "Não foi possível gerar a receita.",
           );
         }
       } finally {
@@ -461,7 +461,7 @@ export default function RecipeDetailsPage() {
     if (!recipe) return;
     const missing = scaledIngredients.filter((ingredient) => !ownedIngredients[ingredient]);
     if (missing.length === 0) {
-      setShoppingMessage("Perfeito! Voce ja tem todos os ingredientes.");
+      setShoppingMessage("Perfeito! Você já tem todos os ingredientes.");
       return;
     }
 
@@ -537,14 +537,14 @@ export default function RecipeDetailsPage() {
   function createAuthoredFromTouch() {
     if (!recipe) return;
     if (!touchValidation.canCreate) {
-      setTouchError("Seu toque ainda nao passou na validacao completa.");
+      setTouchError("Seu toque ainda não passou na validação completa.");
       return;
     }
 
     const nextIngredients = parseIngredientsText(touchIngredientsText);
     const nextSteps = mapSteps(touchStepsText);
     if (!nextIngredients.length || !nextSteps.length) {
-      setTouchError("Ingredientes e preparo nao podem ficar vazios.");
+      setTouchError("Ingredientes e preparo não podem ficar vazios.");
       return;
     }
 
@@ -558,7 +558,7 @@ export default function RecipeDetailsPage() {
       prepMinutes: recipe.prepMinutes,
       servings: recipe.servings,
       imageUrl: touchImageUrl.trim(),
-      sourceLabel: "Criada por voce",
+      sourceLabel: "Criada por você",
       origin: "manual",
     };
 
@@ -570,7 +570,7 @@ export default function RecipeDetailsPage() {
   }
 
   return (
-    <div className="mx-auto min-h-screen w-full max-w-md px-4 pb-12 pt-5">
+    <div className="native-page mx-auto w-full max-w-md px-4">
       <div className="mb-4">
         <Link href="/" className="text-sm font-semibold text-primary">
           ← Voltar
@@ -596,7 +596,7 @@ export default function RecipeDetailsPage() {
       {!isLoading && !errorMessage && !recipe ? (
         <Card>
           <CardContent className="py-8">
-            <p className="text-sm text-muted-foreground">Receita nao encontrada.</p>
+            <p className="text-sm text-muted-foreground">Receita não encontrada.</p>
           </CardContent>
         </Card>
       ) : null}
@@ -684,7 +684,7 @@ export default function RecipeDetailsPage() {
               {isShoppingOpen ? (
                 <div className="space-y-3 rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] p-3">
                   <p className="text-sm font-semibold text-[#5D5248]">
-                    Marque os ingredientes que voce ja tem em casa:
+                    Marque os ingredientes que você já tem em casa:
                   </p>
                   <div className="space-y-2">
                     {scaledIngredients.map((ingredient) => (

@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   try {
     const userId = await requireAuthUserId(request);
     if (!userId) {
-      return NextResponse.json({ message: "Sessao obrigatoria para usar IA." }, { status: 401 });
+      return NextResponse.json({ message: "Sessão obrigatória para usar IA." }, { status: 401 });
     }
 
     const endpointRateLimit = await consumeAuthRateLimit({
@@ -24,9 +24,12 @@ export async function POST(request: Request) {
       return rateLimitResponse(endpointRateLimit.retryAfterSeconds);
     }
 
-    const payload = await parseJsonObjectBody(request, { maxBytes: 16 * 1024 });
+    const payload = await parseJsonObjectBody(request, {
+      maxBytes: 16 * 1024,
+      allowedKeys: ["title", "description", "ingredientsText", "stepsText"],
+    });
     const title = readRequiredString(payload, "title", {
-      fieldName: "Titulo",
+      fieldName: "Título",
       minLength: 3,
       maxLength: 120,
     });
@@ -40,7 +43,10 @@ export async function POST(request: Request) {
       minLength: 3,
       maxLength: 8000,
     });
-    const description = typeof payload.description === "string" ? payload.description : "";
+    const description =
+      typeof payload.description === "string"
+        ? payload.description.trim().slice(0, 500)
+        : "";
 
     const polished = await polishAuthorRecipeWithOpenAi({
       title,

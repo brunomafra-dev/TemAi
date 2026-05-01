@@ -34,7 +34,10 @@ function splitName(name: string): { firstName: string; lastName: string } {
 
 export async function POST(request: Request) {
   try {
-    const payload = (await parseJsonObjectBody(request, { maxBytes: 16 * 1024 })) as RegisterPayload &
+    const payload = (await parseJsonObjectBody(request, {
+      maxBytes: 16 * 1024,
+      allowedKeys: ["name", "username", "email", "password", "acceptedTerms", "redirectTo"],
+    })) as RegisterPayload &
       Record<string, unknown>;
     const email = readRequiredString(payload, "email", {
       fieldName: "Email",
@@ -93,7 +96,7 @@ export async function POST(request: Request) {
       p_username: username,
     });
     if (availability.error || !availability.data) {
-      return NextResponse.json({ message: "@ ja em uso. Escolha outro." }, { status: 409 });
+      return NextResponse.json({ message: "@ já em uso. Escolha outro." }, { status: 409 });
     }
 
     const anonClient = getSupabaseAnonServerClient();
@@ -115,7 +118,7 @@ export async function POST(request: Request) {
         normalizedMessage.includes("exists")
       ) {
         return NextResponse.json(
-          { message: "Este email ja esta cadastrado. Use Entrar ou Esqueci minha senha." },
+          { message: "Este email já está cadastrado. Use Entrar ou Esqueci minha senha." },
           { status: 409 },
         );
       }
@@ -146,7 +149,7 @@ export async function POST(request: Request) {
       await serviceClient.auth.admin.deleteUser(data.user.id);
 
       if (profileError.message.toLowerCase().includes("profiles_username_unique_idx")) {
-        return NextResponse.json({ message: "@ ja em uso. Escolha outro." }, { status: 409 });
+        return NextResponse.json({ message: "@ já em uso. Escolha outro." }, { status: 409 });
       }
       return NextResponse.json(
         { message: "Conta criada, mas houve falha ao salvar o perfil." },

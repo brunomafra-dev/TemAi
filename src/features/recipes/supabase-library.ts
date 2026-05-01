@@ -142,7 +142,7 @@ function hasAnimalProtein(text: string): boolean {
 async function supabaseFetch(pathAndQuery: string, withCount = false) {
   const { url, key } = getSupabaseEnv();
   if (!url || !key) {
-    throw new Error("Supabase nao configurado.");
+    throw new Error("Supabase não configurado.");
   }
 
   const response = await fetch(`${url}/rest/v1/${pathAndQuery}`, {
@@ -329,7 +329,7 @@ export async function getPopularRecipesFromSupabase(limit = 8): Promise<Array<{ 
 export async function upsertImportedRecipeToSupabase(recipe: ImportedRecipeDraft): Promise<Recipe> {
   const { url, key } = getSupabaseEnv();
   if (!url || !key) {
-    throw new Error("Supabase nao configurado.");
+    throw new Error("Supabase não configurado.");
   }
 
   const payload = {
@@ -379,7 +379,7 @@ export async function updateRecipeCategoryInSupabase(
 ): Promise<Recipe> {
   const { url, key } = getSupabaseEnv();
   if (!url || !key) {
-    throw new Error("Supabase nao configurado.");
+    throw new Error("Supabase não configurado.");
   }
 
   const response = await fetch(
@@ -403,7 +403,7 @@ export async function updateRecipeCategoryInSupabase(
 
   const rows = (await response.json()) as SupabaseRecipeRow[];
   if (!rows.length) {
-    throw new Error("Receita nao encontrada para atualizar categoria.");
+    throw new Error("Receita não encontrada para atualizar categoria.");
   }
 
   return mapRowToRecipe(rows[0]);
@@ -412,7 +412,7 @@ export async function updateRecipeCategoryInSupabase(
 export async function refreshAuthorBadgesInSupabase(authorHandle: string): Promise<void> {
   const { url, key } = getSupabaseEnv();
   if (!url || !key) {
-    throw new Error("Supabase nao configurado.");
+    throw new Error("Supabase não configurado.");
   }
 
   const response = await fetch(`${url}/rest/v1/rpc/refresh_author_badges`, {

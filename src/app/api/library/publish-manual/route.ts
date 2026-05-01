@@ -15,6 +15,9 @@ import {
   readStringArray,
   validationErrorResponse,
 } from "@/lib/input-validation";
+import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
+import { rateLimitResponse, requireAuthUserId } from "@/features/security/auth-user";
+import { serverEnv } from "@/lib/env-server";
 
 interface PublishManualPayload {
   title?: string;
@@ -49,10 +52,10 @@ function normalizeAuthorHandle(value: string): string {
 }
 
 function isPremiumAllowed(authorHandle: string): boolean {
-  const mode = (process.env.COMMUNITY_PUBLISH_MODE || "open").trim().toLowerCase();
+  const mode = serverEnv.communityPublishMode();
   if (mode !== "premium") return true;
 
-  const allowed = (process.env.COMMUNITY_PREMIUM_AUTHORS || "")
+  const allowed = serverEnv.communityPremiumAuthors()
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean)
@@ -63,17 +66,43 @@ function isPremiumAllowed(authorHandle: string): boolean {
 
 export async function POST(request: Request) {
   try {
-    const payload = (await parseJsonObjectBody(request, { maxBytes: 96 * 1024 })) as PublishManualPayload &
+    const endpointRateLimit = await consumeAuthRateLimit({
+      route: "library-publish-manual",
+      request,
+    });
+    if (!endpointRateLimit.allowed) {
+      return rateLimitResponse(endpointRateLimit.retryAfterSeconds);
+    }
+
+    const userId = await requireAuthUserId(request);
+    if (!userId) {
+      return NextResponse.json({ message: "Sessão obrigatória." }, { status: 401 });
+    }
+
+    const payload = (await parseJsonObjectBody(request, {
+      maxBytes: 96 * 1024,
+      allowedKeys: [
+        "title",
+        "description",
+        "ingredients",
+        "steps",
+        "prepMinutes",
+        "servings",
+        "imageUrl",
+        "category",
+        "authorName",
+      ],
+    })) as PublishManualPayload &
       Record<string, unknown>;
 
     const title = readRequiredString(payload, "title", {
-      fieldName: "Titulo",
+      fieldName: "Título",
       minLength: 3,
       maxLength: 160,
     });
     const description =
       readOptionalString(payload, "description", {
-        fieldName: "Descricao",
+        fieldName: "Descrição",
         maxLength: 5000,
       }) || "";
     const ingredients = readStringArray(payload, "ingredients", {
@@ -109,7 +138,7 @@ export async function POST(request: Request) {
       defaultValue: 20,
     });
     const servings = readOptionalNumber(payload, "servings", {
-      fieldName: "Porcoes",
+      fieldName: "Porções",
       min: 1,
       max: 20,
       integer: true,
@@ -127,7 +156,7 @@ export async function POST(request: Request) {
         throw new InputValidationError("URL da imagem malformada.");
       }
       if (!["http:", "https:"].includes(parsedImageUrl.protocol)) {
-        throw new InputValidationError("URL da imagem invalida.");
+        throw new InputValidationError("URL da imagem inválida.");
       }
     }
 
@@ -135,7 +164,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           message:
-            "Publicacao na biblioteca disponivel apenas para premium no momento.",
+            "Publicação na biblioteca disponível apenas para premium no momento.",
         },
         { status: 403 },
       );

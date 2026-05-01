@@ -127,7 +127,7 @@ export default function LibraryContent() {
           <p className="text-xs uppercase tracking-[0.2em] text-[#EADBC0]">Curadoria</p>
           <h1 className="mt-2 font-display text-3xl">Biblioteca de receitas</h1>
           <p className="mt-2 max-w-sm text-sm text-[#E6D7BF]">
-            Explore receitas reais com filtros por categoria e navegacao por paginas.
+            Explore receitas reais com filtros por categoria e navegação por páginas.
           </p>
           <div className="mt-4 rounded-full bg-[#F5F1E8] p-1 shadow-[0_10px_25px_-18px_rgba(0,0,0,0.5)]">
             <Input
@@ -232,7 +232,7 @@ export default function LibraryContent() {
               disabled={page >= totalPages}
               className="rounded-full border border-[#E5D7BF] px-3 py-1 text-xs font-semibold text-[#6A5E52] disabled:opacity-45"
             >
-              Proxima
+              Próxima
             </button>
           </div>
         </div>

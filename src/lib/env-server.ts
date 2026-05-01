@@ -29,4 +29,12 @@ export const serverEnv = {
   openaiAuthorRecipeModel: () => process.env.OPENAI_AUTHOR_RECIPE_MODEL?.trim() || process.env.OPENAI_RECIPE_MODEL?.trim() || "gpt-5.4-mini",
   openaiTranslationModel: () => process.env.OPENAI_TRANSLATION_MODEL?.trim() || "gpt-4.1-mini",
   theMealDbApiKey: () => process.env.THEMEALDB_API_KEY?.trim() || "1",
+  theMealDbBaseUrl: () => process.env.THEMEALDB_BASE_URL?.trim() || "https://www.themealdb.com/api/json/v1",
+  communityPublishMode: () => process.env.COMMUNITY_PUBLISH_MODE?.trim().toLowerCase() || "open",
+  communityPremiumAuthors: () => process.env.COMMUNITY_PREMIUM_AUTHORS?.trim() || "",
+  adminUserIds: () =>
+    (process.env.ADMIN_USER_IDS || "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean),
 };

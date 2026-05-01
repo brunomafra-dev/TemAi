@@ -8,7 +8,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-client";
 
 async function parseResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    let message = "Nao foi possivel concluir a solicitacao.";
+    let message = "Não foi possível concluir a solicitação.";
     try {
       const payload = (await response.json()) as { message?: string };
       if (payload?.message) message = payload.message;

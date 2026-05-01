@@ -7,6 +7,10 @@ import {
   readRequiredString,
   validationErrorResponse,
 } from "@/lib/input-validation";
+import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
+import { rateLimitResponse } from "@/features/security/auth-user";
+import { requireAdminUserId } from "@/features/security/admin-guard";
+import { assertSafeExternalHttpUrl } from "@/features/security/url-guard";
 
 interface ImportPayload {
   url?: string;
@@ -14,7 +18,21 @@ interface ImportPayload {
 
 export async function POST(request: Request) {
   try {
-    const payload = (await parseJsonObjectBody(request, { maxBytes: 8 * 1024 })) as ImportPayload &
+    const endpointRateLimit = await consumeAuthRateLimit({
+      route: "library-import-url",
+      request,
+    });
+    if (!endpointRateLimit.allowed) {
+      return rateLimitResponse(endpointRateLimit.retryAfterSeconds);
+    }
+
+    const admin = await requireAdminUserId(request);
+    if (!admin.ok) return admin.response;
+
+    const payload = (await parseJsonObjectBody(request, {
+      maxBytes: 8 * 1024,
+      allowedKeys: ["url"],
+    })) as ImportPayload &
       Record<string, unknown>;
     const url = readRequiredString(payload, "url", {
       fieldName: "URL",
@@ -28,9 +46,7 @@ export async function POST(request: Request) {
     } catch {
       throw new InputValidationError("URL malformada.");
     }
-    if (!["http:", "https:"].includes(parsed.protocol)) {
-      throw new InputValidationError("URL invalida.");
-    }
+    await assertSafeExternalHttpUrl(parsed);
 
     const draft = await importRecipeFromUrl(parsed.toString());
     const recipe = await upsertImportedRecipeToSupabase(draft);

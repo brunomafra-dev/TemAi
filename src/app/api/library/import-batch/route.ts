@@ -12,6 +12,9 @@ import {
   readOptionalNumber,
   validationErrorResponse,
 } from "@/lib/input-validation";
+import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
+import { rateLimitResponse } from "@/features/security/auth-user";
+import { requireAdminUserId } from "@/features/security/admin-guard";
 
 interface ImportBatchPayload {
   source?: "tudogostoso" | "themealdb";
@@ -26,7 +29,21 @@ function delay(ms: number) {
 
 export async function POST(request: Request) {
   try {
-    const payload = (await parseJsonObjectBody(request, { maxBytes: 8 * 1024 })) as ImportBatchPayload &
+    const endpointRateLimit = await consumeAuthRateLimit({
+      route: "library-import-batch",
+      request,
+    });
+    if (!endpointRateLimit.allowed) {
+      return rateLimitResponse(endpointRateLimit.retryAfterSeconds);
+    }
+
+    const admin = await requireAdminUserId(request);
+    if (!admin.ok) return admin.response;
+
+    const payload = (await parseJsonObjectBody(request, {
+      maxBytes: 8 * 1024,
+      allowedKeys: ["source", "count", "minRating", "premiumReview"],
+    })) as ImportBatchPayload &
       Record<string, unknown>;
     const source = readOptionalEnum(payload, "source", ["tudogostoso", "themealdb"] as const, "tudogostoso", "Fonte");
     const requestedCount = readOptionalNumber(payload, "count", {
@@ -42,7 +59,7 @@ export async function POST(request: Request) {
       Math.min(
         5,
         readOptionalNumber(payload, "minRating", {
-          fieldName: "Nota minima",
+          fieldName: "Nota mínima",
           min: 0,
           max: 5,
           integer: false,
@@ -87,7 +104,7 @@ export async function POST(request: Request) {
 
     const urls = await collectTudoGostosoRecipeUrls(count * 6);
     if (!urls.length) {
-      return NextResponse.json({ message: "Nao foi possivel localizar URLs de receitas para importar." }, { status: 500 });
+      return NextResponse.json({ message: "Não foi possível localizar URLs de receitas para importar." }, { status: 500 });
     }
 
     const imported: Array<{ slug: string; title: string; sourceUrl: string }> = [];
@@ -99,7 +116,7 @@ export async function POST(request: Request) {
         if (!draft.sourceRating || draft.sourceRating < minRating) {
           failed.push({
             url,
-            reason: `Rating abaixo do minimo (${minRating}) ou ausente.`,
+            reason: `Rating abaixo do mínimo (${minRating}) ou ausente.`,
           });
           continue;
         }
@@ -136,7 +153,7 @@ export async function POST(request: Request) {
     const validationResponse = validationErrorResponse(error);
     if (validationResponse) return validationResponse;
     return NextResponse.json(
-      { message: error instanceof Error ? error.message : "Erro na importacao em lote." },
+      { message: error instanceof Error ? error.message : "Erro na importação em lote." },
       { status: 500 },
     );
   }

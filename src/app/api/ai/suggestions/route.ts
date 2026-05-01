@@ -11,6 +11,8 @@ import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse, requireAuthUserId } from "@/features/security/auth-user";
 import { getSupabaseServiceRoleClient } from "@/lib/supabase-admin";
 import {
+  assertRequestContentLength,
+  InputValidationError,
   parseJsonObjectBody,
   readRequiredString,
   validationErrorResponse,
@@ -23,18 +25,36 @@ interface SuggestionsPayload {
 
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 15 * 1024 * 1024;
+const MAX_MULTIPART_BYTES = 16 * 1024 * 1024;
 
 async function readSuggestionsInput(request: Request): Promise<SuggestionsPayload & { file?: File }> {
   const contentType = request.headers.get("content-type")?.toLowerCase() || "";
   if (!contentType.includes("multipart/form-data")) {
-    return (await parseJsonObjectBody(request, { maxBytes: 12 * 1024 })) as SuggestionsPayload;
+    return (await parseJsonObjectBody(request, {
+      maxBytes: 12 * 1024,
+      allowedKeys: ["ingredientsText", "inputMode"],
+    })) as SuggestionsPayload;
   }
 
+  assertRequestContentLength(request, MAX_MULTIPART_BYTES);
   const form = await request.formData();
+  for (const key of form.keys()) {
+    if (!["ingredientsText", "inputMode", "file"].includes(key)) {
+      throw new InputValidationError(`Campo inesperado: ${key}.`);
+    }
+  }
   const file = form.get("file");
+  const rawIngredientsText = String(form.get("ingredientsText") || "").trim();
+  const rawInputMode = String(form.get("inputMode") || "").trim();
+  if (rawIngredientsText.length > 4000) {
+    throw new InputValidationError("Ingredientes muito grande.", 413);
+  }
+  if (!/^(text|audio|photo)$/i.test(rawInputMode)) {
+    throw new InputValidationError("Modo de entrada malformado.");
+  }
   return {
-    ingredientsText: String(form.get("ingredientsText") || ""),
-    inputMode: String(form.get("inputMode") || "") as InputMode,
+    ingredientsText: rawIngredientsText,
+    inputMode: rawInputMode as InputMode,
     file: file instanceof File ? file : undefined,
   };
 }
@@ -42,19 +62,19 @@ async function readSuggestionsInput(request: Request): Promise<SuggestionsPayloa
 function validateUpload(file: File, inputMode: InputMode): NextResponse | null {
   if (inputMode === "photo") {
     if (!file.type.startsWith("image/")) {
-      return NextResponse.json({ message: "Envie um arquivo de imagem valido." }, { status: 415 });
+      return NextResponse.json({ message: "Envie um arquivo de imagem válido." }, { status: 415 });
     }
     if (file.size > MAX_PHOTO_BYTES) {
-      return NextResponse.json({ message: "Foto muito grande. Envie uma imagem de ate 8 MB." }, { status: 413 });
+      return NextResponse.json({ message: "Foto muito grande. Envie uma imagem de até 8 MB." }, { status: 413 });
     }
   }
 
   if (inputMode === "audio") {
     if (!file.type.startsWith("audio/")) {
-      return NextResponse.json({ message: "Envie um arquivo de audio valido." }, { status: 415 });
+      return NextResponse.json({ message: "Envie um arquivo de áudio válido." }, { status: 415 });
     }
     if (file.size > MAX_AUDIO_BYTES) {
-      return NextResponse.json({ message: "Audio muito grande. Envie um arquivo de ate 15 MB." }, { status: 413 });
+      return NextResponse.json({ message: "Áudio muito grande. Envie um arquivo de até 15 MB." }, { status: 413 });
     }
   }
 
@@ -113,7 +133,7 @@ export async function POST(request: Request) {
 
     const authenticatedUserId = await requireAuthUserId(request);
     if (!authenticatedUserId) {
-      return NextResponse.json({ message: "Sessao obrigatoria para usar IA." }, { status: 401 });
+      return NextResponse.json({ message: "Sessão obrigatória para usar IA." }, { status: 401 });
     }
 
     const endpointRateLimit = await consumeAuthRateLimit({
@@ -146,7 +166,7 @@ export async function POST(request: Request) {
       const count = countRes.count || 0;
       if (count >= 3) {
         return NextResponse.json(
-          { message: "Plano free atingiu o limite de 3 geracoes de IA neste mes." },
+          { message: "Plano free atingiu o limite de 3 gerações de IA neste mês." },
           { status: 429 },
         );
       }
@@ -157,7 +177,7 @@ export async function POST(request: Request) {
 
     if (inputMode === "audio") {
       if (!payload.file) {
-        return NextResponse.json({ message: "Envie um arquivo de audio." }, { status: 400 });
+        return NextResponse.json({ message: "Envie um arquivo de áudio." }, { status: 400 });
       }
       const uploadError = validateUpload(payload.file, inputMode);
       if (uploadError) return uploadError;
@@ -182,7 +202,7 @@ export async function POST(request: Request) {
     }
 
     if (!ingredients.length) {
-      return NextResponse.json({ message: "Nao foi possivel identificar ingredientes validos." }, { status: 400 });
+      return NextResponse.json({ message: "Não foi possível identificar ingredientes válidos." }, { status: 400 });
     }
 
     const response = await generateRecipeSuggestionsWithOpenAi(ingredients);
@@ -209,6 +229,6 @@ export async function POST(request: Request) {
     if (isOpenAiGenerationError(error)) {
       return NextResponse.json({ message: error.message }, { status: error.status });
     }
-    return NextResponse.json({ message: "Erro ao gerar sugestoes." }, { status: 500 });
+    return NextResponse.json({ message: "Erro ao gerar sugestões." }, { status: 500 });
   }
 }

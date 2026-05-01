@@ -21,7 +21,10 @@ function getSafeRedirectTo(request: Request, raw?: string): string {
 
 export async function POST(request: Request) {
   try {
-    const payload = (await parseJsonObjectBody(request, { maxBytes: 8 * 1024 })) as ForgotPasswordPayload &
+    const payload = (await parseJsonObjectBody(request, {
+      maxBytes: 8 * 1024,
+      allowedKeys: ["email", "redirectTo"],
+    })) as ForgotPasswordPayload &
       Record<string, unknown>;
     const email = readRequiredString(payload, "email", {
       fieldName: "Email",
@@ -59,11 +62,11 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({
-      message: "Se o email existir, voce recebera um link para redefinir a senha.",
+      message: "Se o email existir, você receberá um link para redefinir a senha.",
     });
   } catch (error) {
     const validationResponse = validationErrorResponse(error);
     if (validationResponse) return validationResponse;
-    return NextResponse.json({ message: "Falha ao processar solicitacao." }, { status: 500 });
+    return NextResponse.json({ message: "Falha ao processar solicitação." }, { status: 500 });
   }
 }

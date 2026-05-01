@@ -37,15 +37,15 @@ export default function TabsLayout({ children }: { children: ReactNode }) {
 
   if (!isReady) {
     return (
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 pt-5">
+      <div className="native-app-shell mx-auto flex w-full max-w-md flex-col px-4 pt-5">
         <p className="text-sm text-[#6A5E52]">Carregando...</p>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-md flex-col">
-      <main className="flex-1 px-4 pb-6 pt-5">{children}</main>
+    <div className="native-app-shell mx-auto flex w-full max-w-md flex-col">
+      <main className="native-tab-main flex-1 px-4 pt-5">{children}</main>
       <BottomNav />
     </div>
   );

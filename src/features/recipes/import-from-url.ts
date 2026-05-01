@@ -190,7 +190,7 @@ export async function importRecipeFromUrl(url: string): Promise<ImportedRecipeDr
   const parsedUrl = new URL(url);
   const response = await fetch(parsedUrl.toString());
   if (!response.ok) {
-    throw new Error("Nao foi possivel acessar a URL da receita.");
+    throw new Error("Não foi possível acessar a URL da receita.");
   }
 
   const html = await response.text();
@@ -203,7 +203,7 @@ export async function importRecipeFromUrl(url: string): Promise<ImportedRecipeDr
   }
 
   if (!recipeNode?.name) {
-    throw new Error("Nao encontrei dados estruturados de receita nesta URL.");
+    throw new Error("Não encontrei dados estruturados de receita nesta URL.");
   }
 
   const title = decodeHtmlEntities(recipeNode.name.trim());
@@ -213,7 +213,7 @@ export async function importRecipeFromUrl(url: string): Promise<ImportedRecipeDr
   const steps = extractInstructions(recipeNode.recipeInstructions);
 
   if (!ingredients.length || !steps.length) {
-    throw new Error("A receita encontrada nao tem ingredientes ou passos suficientes.");
+    throw new Error("A receita encontrada não tem ingredientes ou passos suficientes.");
   }
 
   const description = recipeNode.description

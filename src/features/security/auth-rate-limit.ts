@@ -8,10 +8,18 @@ const RATE_LIMIT_CONFIG = {
   login: { maxAttempts: 5, windowSeconds: 15 * 60 },
   register: { maxAttempts: 5, windowSeconds: 15 * 60 },
   "forgot-password": { maxAttempts: 5, windowSeconds: 15 * 60 },
+  "delete-account": { maxAttempts: 5, windowSeconds: 15 * 60 },
   "ai-suggestions": { maxAttempts: 20, windowSeconds: 60 * 60 },
   "ai-recipe": { maxAttempts: 30, windowSeconds: 60 * 60 },
   "ai-author-recipe": { maxAttempts: 20, windowSeconds: 60 * 60 },
   "support-agent": { maxAttempts: 30, windowSeconds: 60 * 60 },
+  "library-search": { maxAttempts: 120, windowSeconds: 60 },
+  "library-popular": { maxAttempts: 120, windowSeconds: 60 },
+  "library-meal": { maxAttempts: 120, windowSeconds: 60 },
+  "library-import-url": { maxAttempts: 10, windowSeconds: 15 * 60 },
+  "library-import-batch": { maxAttempts: 5, windowSeconds: 60 * 60 },
+  "library-publish-manual": { maxAttempts: 20, windowSeconds: 15 * 60 },
+  "library-set-category": { maxAttempts: 30, windowSeconds: 15 * 60 },
 } as const;
 
 export type RateLimitedRoute = keyof typeof RATE_LIMIT_CONFIG;

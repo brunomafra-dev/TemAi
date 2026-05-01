@@ -19,7 +19,7 @@ function extractJsonObject(text: string): unknown {
     return JSON.parse(trimmed);
   } catch {
     const match = trimmed.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error("JSON nao encontrado.");
+    if (!match) throw new Error("JSON não encontrado.");
     return JSON.parse(match[0]);
   }
 }
@@ -48,7 +48,7 @@ async function callOpenAiJson(params: {
 }): Promise<unknown> {
   const apiKey = serverEnv.openaiApiKey();
   if (!apiKey) {
-    throw new OpenAiGenerationError("IA real ainda nao configurada. Adicione OPENAI_API_KEY e faca redeploy.", 503);
+    throw new OpenAiGenerationError("IA real ainda não configurada. Adicione OPENAI_API_KEY e faça redeploy.", 503);
   }
 
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -94,7 +94,7 @@ async function callOpenAiText(params: {
 }): Promise<string> {
   const apiKey = serverEnv.openaiApiKey();
   if (!apiKey) {
-    throw new OpenAiGenerationError("IA real ainda nao configurada. Adicione OPENAI_API_KEY e faca redeploy.", 503);
+    throw new OpenAiGenerationError("IA real ainda não configurada. Adicione OPENAI_API_KEY e faça redeploy.", 503);
   }
 
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -142,14 +142,14 @@ export async function generateRecipeSuggestionsWithOpenAi(
   normalizedIngredients: string[],
 ): Promise<SuggestionsResponse> {
   const prompt = `
-Voce e o chef do app TemAi. Gere sugestoes em portugues brasileiro usando SOMENTE os ingredientes informados como base.
+Você é o chef do app TemAi. Gere sugestões em português brasileiro usando SOMENTE os ingredientes informados como base.
 
 Ingredientes disponiveis:
 ${normalizedIngredients.map((item) => `- ${item}`).join("\n")}
 
 Regras:
 - Priorize receitas que usem exatamente os ingredientes disponiveis.
-- Nao marque como faltante um ingrediente que aparece na lista.
+- Não marque como faltante um ingrediente que aparece na lista.
 - Se precisar sugerir ingrediente faltante, limite a no maximo 2 itens por receita.
 - Retorne apenas JSON valido, sem markdown.
 - Formato:
@@ -188,7 +188,7 @@ Regras:
 export async function transcribeAudioWithOpenAi(file: File): Promise<string> {
   const apiKey = serverEnv.openaiApiKey();
   if (!apiKey) {
-    throw new OpenAiGenerationError("IA real ainda nao configurada. Adicione OPENAI_API_KEY e faca redeploy.", 503);
+    throw new OpenAiGenerationError("IA real ainda não configurada. Adicione OPENAI_API_KEY e faça redeploy.", 503);
   }
 
   const formData = new FormData();
@@ -205,7 +205,7 @@ export async function transcribeAudioWithOpenAi(file: File): Promise<string> {
 
   const payload = (await response.json().catch(() => ({}))) as { text?: string; error?: { message?: string } };
   if (!response.ok) {
-    const message = payload.error?.message || "Falha ao transcrever audio.";
+    const message = payload.error?.message || "Falha ao transcrever áudio.";
     const normalized = message.toLowerCase();
     if (response.status === 402 || response.status === 429 || normalized.includes("quota") || normalized.includes("billing")) {
       throw new OpenAiGenerationError("IA indisponivel: verifique creditos/billing da OpenAI.", 402);
@@ -228,7 +228,7 @@ export async function identifyIngredientsFromPhotoWithOpenAi(file: File): Promis
           {
             type: "input_text",
             text:
-              "Identifique ingredientes visiveis nesta foto para gerar receitas. Retorne apenas JSON valido no formato {\"ingredients\":[\"ingrediente\"]}. Use nomes simples em portugues brasileiro.",
+              "Identifique ingredientes visíveis nesta foto para gerar receitas. Retorne apenas JSON válido no formato {\"ingredients\":[\"ingrediente\"]}. Use nomes simples em português brasileiro.",
           },
           { type: "input_image", image_url: dataUrl },
         ],
@@ -258,7 +258,7 @@ Regras:
 - Use os ingredientes disponiveis como base.
 - Escreva de forma didatica para cozinheiros iniciantes.
 - Inclua quantidades aproximadas nos ingredientes sempre que fizer sentido.
-- Os passos devem conter fogo baixo/medio/alto, tempo de cada etapa, ponto visual esperado e temperatura de forno quando houver forno.
+- Os passos devem conter fogo baixo/médio/alto, tempo de cada etapa, ponto visual esperado e temperatura de forno quando houver forno.
 - Se incluir ingrediente extra indispensavel, deixe claro na lista.
 - prepMinutes deve representar o tempo medio total.
 - Retorne apenas JSON valido, sem markdown.
@@ -291,7 +291,7 @@ Regras:
       : params.ingredients,
     steps: Array.isArray(parsed.steps)
       ? parsed.steps.filter((entry): entry is string => typeof entry === "string")
-      : ["Prepare os ingredientes, cozinhe ate o ponto desejado e ajuste o tempero."],
+      : ["Prepare os ingredientes, cozinhe até o ponto desejado e ajuste o tempero."],
     prepMinutes: typeof parsed.prepMinutes === "number" ? parsed.prepMinutes : 25,
     servings: typeof parsed.servings === "number" ? parsed.servings : 2,
     sourceLabel: "TemAi IA",
@@ -308,7 +308,7 @@ export async function polishAuthorRecipeWithOpenAi(params: {
   const parsed = (await callOpenAiJson({
     model: serverEnv.openaiAuthorRecipeModel(),
     prompt: `
-Organize uma receita autoral em portugues brasileiro, mantendo a ideia do usuario.
+Organize uma receita autoral em português brasileiro, mantendo a ideia do usuário.
 
 Titulo: ${params.title}
 Descricao atual: ${params.description}
@@ -317,9 +317,9 @@ Preparo/transcricao: ${params.stepsText}
 
 Retorne apenas JSON valido:
 {
-  "description": "descricao curta bonita",
-  "ingredientsText": "um ingrediente por linha, com quantidade quando possivel",
-  "stepsText": "um passo didatico por linha, com tempos, ponto visual, fogo/forno e temperatura quando aplicavel",
+  "description": "descrição curta bonita",
+  "ingredientsText": "um ingrediente por linha, com quantidade quando possível",
+  "stepsText": "um passo didático por linha, com tempos, ponto visual, fogo/forno e temperatura quando aplicável",
   "prepMinutes": 30,
   "servings": 2
 }
@@ -340,10 +340,10 @@ export async function answerSupportWithOpenAi(message: string): Promise<string> 
   return callOpenAiText({
     model: serverEnv.openaiSupportModel(),
     prompt: `
-Voce e o agente de suporte do app TemAi. Responda em portugues brasileiro, com clareza e gentileza.
-Ajude com login, cadastro, exclusao de conta, assinatura, limites de IA, foto/audio/texto, receitas e privacidade.
-Se for problema sensivel de conta/cobranca, oriente a abrir ticket e enviar email da conta, print e descricao.
-Nao invente politicas legais ou promessas de reembolso.
+Você é o agente de suporte do app TemAi. Responda em português brasileiro, com clareza e gentileza.
+Ajude com login, cadastro, exclusão de conta, assinatura, limites de IA, foto/áudio/texto, receitas e privacidade.
+Se for problema sensível de conta/cobrança, oriente a abrir ticket e enviar email da conta, print e descrição.
+Não invente políticas legais ou promessas de reembolso.
 
 Usuario: ${message}
 `,

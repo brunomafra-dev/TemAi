@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   try {
     const userId = await requireAuthUserId(request);
     if (!userId) {
-      return NextResponse.json({ message: "Sessao obrigatoria para usar o suporte." }, { status: 401 });
+      return NextResponse.json({ message: "Sessão obrigatória para usar o suporte." }, { status: 401 });
     }
 
     const endpointRateLimit = await consumeAuthRateLimit({
@@ -24,7 +24,10 @@ export async function POST(request: Request) {
       return rateLimitResponse(endpointRateLimit.retryAfterSeconds);
     }
 
-    const payload = await parseJsonObjectBody(request, { maxBytes: 8 * 1024 });
+    const payload = await parseJsonObjectBody(request, {
+      maxBytes: 8 * 1024,
+      allowedKeys: ["message"],
+    });
     const message = readRequiredString(payload, "message", {
       fieldName: "Mensagem",
       minLength: 1,

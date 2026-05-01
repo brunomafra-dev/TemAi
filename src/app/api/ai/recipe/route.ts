@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   try {
     const userId = await requireAuthUserId(request);
     if (!userId) {
-      return NextResponse.json({ message: "Sessao obrigatoria para usar IA." }, { status: 401 });
+      return NextResponse.json({ message: "Sessão obrigatória para usar IA." }, { status: 401 });
     }
 
     const endpointRateLimit = await consumeAuthRateLimit({
@@ -33,10 +33,13 @@ export async function POST(request: Request) {
       return rateLimitResponse(endpointRateLimit.retryAfterSeconds);
     }
 
-    const payload = (await parseJsonObjectBody(request, { maxBytes: 12 * 1024 })) as RecipePayload &
+    const payload = (await parseJsonObjectBody(request, {
+      maxBytes: 12 * 1024,
+      allowedKeys: ["suggestionId", "suggestionTitle", "ingredients", "includeNutrition"],
+    })) as RecipePayload &
       Record<string, unknown>;
     const suggestionId = readRequiredString(payload, "suggestionId", {
-      fieldName: "ID de sugestao",
+      fieldName: "ID de sugestão",
       minLength: 3,
       maxLength: 120,
       pattern: /^[a-z0-9._-]+$/i,

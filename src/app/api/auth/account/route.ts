@@ -1,17 +1,22 @@
 import { NextResponse } from "next/server";
+import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
+import { rateLimitResponse, readSafeBearerToken } from "@/features/security/auth-user";
 import { getSupabaseServiceRoleClient } from "@/lib/supabase-admin";
-
-function readBearerToken(request: Request): string {
-  const authorization = request.headers.get("authorization") || "";
-  if (!authorization.startsWith("Bearer ")) return "";
-  return authorization.slice(7).trim();
-}
 
 export async function DELETE(request: Request) {
   try {
-    const token = readBearerToken(request);
+    const token = readSafeBearerToken(request);
+    const rateLimit = await consumeAuthRateLimit({
+      route: "delete-account",
+      request,
+      identifier: token || "anonymous",
+    });
+    if (!rateLimit.allowed) {
+      return rateLimitResponse(rateLimit.retryAfterSeconds);
+    }
+
     if (!token) {
-      return NextResponse.json({ message: "Sessao obrigatoria." }, { status: 401 });
+      return NextResponse.json({ message: "Sessão obrigatória." }, { status: 401 });
     }
 
     const supabase = getSupabaseServiceRoleClient();
@@ -19,18 +24,18 @@ export async function DELETE(request: Request) {
     const userId = userRes.data.user?.id || "";
 
     if (userRes.error || !userId) {
-      return NextResponse.json({ message: "Sessao invalida ou expirada." }, { status: 401 });
+      return NextResponse.json({ message: "Sessão inválida ou expirada." }, { status: 401 });
     }
 
     const deleteRes = await supabase.auth.admin.deleteUser(userId);
     if (deleteRes.error) {
       return NextResponse.json(
-        { message: deleteRes.error.message || "Nao foi possivel excluir a conta." },
+        { message: deleteRes.error.message || "Não foi possível excluir a conta." },
         { status: 500 },
       );
     }
 
-    return NextResponse.json({ message: "Conta excluida com sucesso." });
+    return NextResponse.json({ message: "Conta excluída com sucesso." });
   } catch (error) {
     console.error("[auth/account] Falha ao excluir conta", error);
     return NextResponse.json({ message: "Falha ao excluir conta." }, { status: 500 });
