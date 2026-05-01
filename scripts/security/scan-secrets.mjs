@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 const checks = [
-  { name: "OpenAI key", regex: /\bsk-[A-Za-z0-9]{20,}\b/g },
+  { name: "OpenAI key", regex: /\bsk(?:-[A-Za-z0-9_-]+){2,}\b/g },
   { name: "Supabase secret key", regex: /\bsb_secret_[A-Za-z0-9_-]{20,}\b/g },
   { name: "JWT token", regex: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g },
   { name: "Private key", regex: /-----BEGIN (?:RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----/g },

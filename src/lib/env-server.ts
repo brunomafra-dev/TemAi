@@ -22,6 +22,11 @@ export const serverEnv = {
       process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     ),
   openaiApiKey: () => (process.env.OPENAI_API_KEY?.trim() || ""),
+  openaiRecipeModel: () => process.env.OPENAI_RECIPE_MODEL?.trim() || "gpt-5.4-mini",
+  openaiSuggestionsModel: () => process.env.OPENAI_SUGGESTIONS_MODEL?.trim() || "gpt-5.4-mini",
+  openaiAudioModel: () => process.env.OPENAI_AUDIO_MODEL?.trim() || "gpt-4o-mini-transcribe",
+  openaiSupportModel: () => process.env.OPENAI_SUPPORT_MODEL?.trim() || process.env.OPENAI_SUGGESTIONS_MODEL?.trim() || "gpt-5.4-mini",
+  openaiAuthorRecipeModel: () => process.env.OPENAI_AUTHOR_RECIPE_MODEL?.trim() || process.env.OPENAI_RECIPE_MODEL?.trim() || "gpt-5.4-mini",
   openaiTranslationModel: () => process.env.OPENAI_TRANSLATION_MODEL?.trim() || "gpt-4.1-mini",
   theMealDbApiKey: () => process.env.THEMEALDB_API_KEY?.trim() || "1",
 };

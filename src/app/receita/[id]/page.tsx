@@ -245,6 +245,7 @@ export default function RecipeDetailsPage() {
     () => parseIngredientsQuery(searchParams.get("ingredients")),
     [searchParams],
   );
+  const suggestionTitle = searchParams.get("title") || undefined;
   const shouldIncludeNutrition = searchParams.get("nutrition") === "1";
 
   const [recipe, setRecipe] = useState<Recipe | null>(null);
@@ -336,6 +337,7 @@ export default function RecipeDetailsPage() {
 
           const rebuilt = await fetchFullRecipe({
             suggestionId: recipeId,
+            suggestionTitle,
             ingredients: savedRef.ingredientsSnapshot || ingredientList,
             includeNutrition: shouldIncludeNutrition,
           });
@@ -373,6 +375,7 @@ export default function RecipeDetailsPage() {
         setIsLoading(true);
         const fullRecipe = await fetchFullRecipe({
           suggestionId: recipeId,
+          suggestionTitle,
           ingredients: ingredientList,
           includeNutrition: shouldIncludeNutrition,
         });
@@ -400,7 +403,7 @@ export default function RecipeDetailsPage() {
     return () => {
       isMounted = false;
     };
-  }, [ingredientList, origin, recipeId, shouldIncludeNutrition]);
+  }, [ingredientList, origin, recipeId, shouldIncludeNutrition, suggestionTitle]);
 
   useEffect(() => {
     if (!isShoppingOpen) return;

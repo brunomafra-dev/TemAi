@@ -19,6 +19,7 @@ import {
   type UserProfile,
 } from "@/features/profile/storage";
 import { getMyRecipes, getSavedRecipeRefs } from "@/features/recipes/local-storage";
+import { buildAuthHeaders } from "@/features/recipes/api-client";
 import { getSupabaseBrowserClient } from "@/lib/supabase-client";
 import {
   clearCheckedShoppingItems,
@@ -124,6 +125,7 @@ export default function ProfilePage() {
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
   const [supportTicketMessage, setSupportTicketMessage] = useState("");
   const [creatingSupportTicket, setCreatingSupportTicket] = useState(false);
+  const [supportAgentThinking, setSupportAgentThinking] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [deleteAccountMessage, setDeleteAccountMessage] = useState("");
@@ -546,7 +548,7 @@ export default function ProfilePage() {
       return {
         from: "bot",
         text:
-          "Para cobranca: confira o historico na loja (Google Play/App Store). Se houver cobranca duplicada ou erro, envie email com print e data para suporte@temaiapp.com.",
+          "Para cobranca: confira o historico na loja (Google Play/App Store). Se houver cobranca duplicada ou erro, envie email com print e data para Mafralabs@outlook.com.",
         options: ["falar-humano", "cancelamento"],
       };
     }
@@ -562,7 +564,7 @@ export default function ProfilePage() {
       return {
         from: "bot",
         text:
-          "Perfeito. Para atendimento humano, envie para suporte@temaiapp.com com: assunto, email da conta, print e descricao do problema.",
+          "Perfeito. Para atendimento humano, envie para Mafralabs@outlook.com com: assunto, email da conta, print e descricao do problema.",
         options: ["cobranca", "login"],
       };
     }
@@ -591,13 +593,27 @@ export default function ProfilePage() {
     if (!message) return;
     setSupportMessages((current) => [...current, { from: "user", text: message }]);
     setSupportInput("");
-    const bot = replySupport(message);
-    setTimeout(() => {
-      setSupportMessages((current) => [...current, bot]);
-      if (message.toLowerCase().includes("humano") || message.toLowerCase().includes("atendente")) {
-        void openHumanSupportTicket(message);
-      }
-    }, 180);
+    setSupportAgentThinking(true);
+    buildAuthHeaders().then((authHeaders) => fetch("/api/support/agent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders },
+      body: JSON.stringify({ message }),
+    }))
+      .then(async (response) => {
+        const data = (await response.json().catch(() => ({}))) as { message?: string };
+        if (!response.ok) throw new Error(data.message || "Falha no agente.");
+        setSupportMessages((current) => [...current, { from: "bot", text: data.message || replySupport(message).text }]);
+      })
+      .catch(() => {
+        const bot = replySupport(message);
+        setSupportMessages((current) => [...current, bot]);
+      })
+      .finally(() => {
+        setSupportAgentThinking(false);
+        if (message.toLowerCase().includes("humano") || message.toLowerCase().includes("atendente")) {
+          void openHumanSupportTicket(message);
+        }
+      });
   }
 
   async function openHumanSupportTicket(userMessage: string) {
@@ -890,6 +906,11 @@ export default function ProfilePage() {
                     ) : null}
                   </div>
                 ))}
+                {supportAgentThinking ? (
+                  <p className="rounded-lg bg-white px-2 py-1 text-xs text-[#5E5348]">
+                    Agente pensando...
+                  </p>
+                ) : null}
               </div>
               <div className="mt-2 flex gap-2">
                 <Input
@@ -931,13 +952,13 @@ export default function ProfilePage() {
               )}
             </div>
             <a
-              href="mailto:suporte@temaiapp.com?subject=TemAi%20-%20Suporte"
+              href="mailto:Mafralabs@outlook.com?subject=TemAi%20-%20Suporte"
               className="inline-flex rounded-full border border-[#C66A3D] bg-[#F8E8E1] px-4 py-2 text-xs font-semibold text-[#7A4733]"
             >
               Enviar email para suporte
             </a>
             <p className="text-xs text-[#7A6D60]">
-              Email de privacidade/LGPD: privacidade@temaiapp.com
+              Email de suporte e privacidade/LGPD: Mafralabs@outlook.com
             </p>
           </div>
         );

@@ -1,8 +1,16 @@
 import { normalizeText } from "@/lib/utils";
 
 export function parseIngredientsText(input: string): string[] {
-  return input
-    .split(/[,;\n]/g)
+  const normalizedInput = input
+    .replace(/\s+\+\s+/g, ",")
+    .replace(/\s+e\s+/gi, ",")
+    .replace(/\s+com\s+/gi, ",");
+
+  const separatorPattern = /[,;\n]/g;
+  const hasExplicitSeparator = separatorPattern.test(normalizedInput);
+
+  return normalizedInput
+    .split(hasExplicitSeparator ? separatorPattern : /\s+/g)
     .map((item) => normalizeText(item))
     .filter(Boolean);
 }

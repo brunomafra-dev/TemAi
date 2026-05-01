@@ -5,11 +5,11 @@ import type { ReactNode } from "react";
 const dishGallery = [
   {
     src: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80",
-    alt: "Prato principal finalizado com legumes e proteina grelhada",
+    alt: "Prato principal finalizado com legumes e proteína grelhada",
   },
   {
     src: "https://images.unsplash.com/photo-1482049016688-2d3e1b311543?auto=format&fit=crop&w=1200&q=80",
-    alt: "Mesa com cafe da manha e ingredientes simples transformados em refeicao",
+    alt: "Mesa com café da manhã e ingredientes simples transformados em refeição",
   },
   {
     src: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1200&q=80",
@@ -20,53 +20,53 @@ const dishGallery = [
 const testimonials = [
   {
     name: "Marina Costa",
-    role: "Avaliado no Android",
+    role: "Usuária TemAi",
     quote:
-      "Nunca pensei que conseguiria criar pratos desse nivel com tao poucos ingredientes. O TemAi virou meu plano B e meu plano A.",
+      "Nunca pensei que conseguiria criar pratos desse nível com tão poucos ingredientes. O TemAi virou meu plano B e meu plano A.",
     image:
-      "https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=1000&q=80",
+      "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1000&q=85",
   },
   {
     name: "Rafael Nunes",
-    role: "Usuario premium",
+    role: "Usuário premium",
     quote:
       "Eu abria a geladeira e travava. Agora tiro uma foto, recebo ideias boas e ainda economizo porque paro de deixar ingrediente vencer.",
     image:
-      "https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?auto=format&fit=crop&w=1000&q=80",
+      "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1000&q=85",
   },
   {
     name: "Juliana Melo",
-    role: "Review estilo loja",
+    role: "Usuária premium",
     quote:
-      "Uso por audio quando estou cozinhando e o app me ajuda a transformar sobra em janta de verdade. Parece simples, mas muda a rotina.",
+      "Uso por áudio quando estou cozinhando e o app me ajuda a transformar sobra em janta de verdade. Parece simples, mas muda a rotina.",
     image:
-      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1000&q=80",
+      "https://images.unsplash.com/photo-1551218808-94e220e084d2?auto=format&fit=crop&w=1000&q=85",
   },
 ];
 
 const steps = [
   {
-    title: "Mostre o que voce tem",
-    description: "Envie uma foto, descreva por texto ou fale os ingredientes por audio.",
+    title: "Mostre o que você tem",
+    description: "Envie uma foto, descreva por texto ou fale os ingredientes por áudio.",
   },
   {
     title: "Receba ideias com contexto",
-    description: "A IA combina o que voce tem em casa e cria opcoes realistas para o seu momento.",
+    description: "A IA combina o que você tem em casa e cria opções realistas para o seu momento.",
   },
   {
-    title: "Cozinhe com mais seguranca",
-    description: "Voce escolhe uma receita pronta para seguir, salvar, ajustar e compartilhar.",
+    title: "Cozinhe com mais segurança",
+    description: "Você escolhe uma receita pronta para seguir, salvar, ajustar e compartilhar.",
   },
 ];
 
 const benefits = [
-  "Transforma sobra de geladeira em refeicao de verdade",
-  "Ajuda quem nao tem repertorio culinario a decidir rapido",
-  "Economiza tempo, desperdicio e idas desnecessarias ao mercado",
-  "Entrega ideias por foto, audio ou texto no formato mais facil para cada pessoa",
+  "Transforma sobra de geladeira em refeição de verdade",
+  "Ajuda quem não tem repertório culinário a decidir rápido",
+  "Economiza tempo, desperdício e idas desnecessárias ao mercado",
+  "Entrega ideias por foto, áudio ou texto no formato mais fácil para cada pessoa",
 ];
 
-const androidAppUrl = "https://app.temai.com.br/auth";
+const appUrl = "https://temaiapp.vercel.app/";
 const iosPwaGuideUrl = "/site/ios";
 
 function PlayStoreIcon() {
@@ -193,7 +193,7 @@ export default function MarketingPage() {
             <div>
               <p className="font-display text-2xl">TemAi</p>
               <p className="text-xs uppercase tracking-[0.24em] text-[#E8CDBA]">
-                Receitas por foto, audio e texto
+                Receitas por foto, áudio e texto
               </p>
             </div>
             <Link
@@ -210,20 +210,25 @@ export default function MarketingPage() {
                 Chega de abrir a geladeira sem ideia
               </p>
               <h1 className="mt-4 max-w-3xl font-display text-5xl leading-[0.96] sm:text-6xl lg:text-7xl">
-                Nunca mais diga que nao tem nada em casa
+                Nunca mais diga que não tem nada em casa
               </h1>
               <p className="mt-5 max-w-xl text-lg leading-7 text-[#F4E4D8] sm:text-xl">
-                Crie receitas de chef com ingredientes que estao sobrando na geladeira.
+                Crie receitas de chef com ingredientes que estão sobrando na geladeira.
               </p>
               <p className="mt-2 max-w-xl text-base leading-7 text-[#E9D6CA] sm:text-lg">
-                Descubra formas criativas de combinar ingredientes e transforme duvida, pressa e falta de repertorio em refeicoes que realmente valem a pena.
+                Descubra formas criativas de combinar ingredientes e transforme dúvida, pressa e falta de repertório em refeições que realmente valem a pena.
               </p>
 
-              <div className="mt-8 flex flex-wrap gap-3 text-sm text-[#FFF2EA]">
-                <span className="rounded-full border border-white/15 bg-white/10 px-4 py-2">Foto</span>
-                <span className="rounded-full border border-white/15 bg-white/10 px-4 py-2">Audio</span>
-                <span className="rounded-full border border-white/15 bg-white/10 px-4 py-2">Texto</span>
-                <span className="rounded-full border border-white/15 bg-white/10 px-4 py-2">Biblioteca compartilhada</span>
+              <div className="mt-8 max-w-xl rounded-[1.4rem] border border-white/12 bg-black/18 p-4 backdrop-blur">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#EDC3A7]">
+                  Recursos do app
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2 text-sm text-[#FFF2EA]">
+                  <span className="rounded-full border border-[#EDC3A7]/35 bg-white/10 px-4 py-2">IA por foto</span>
+                  <span className="rounded-full border border-[#EDC3A7]/35 bg-white/10 px-4 py-2">IA por áudio</span>
+                  <span className="rounded-full border border-[#EDC3A7]/35 bg-white/10 px-4 py-2">IA por texto</span>
+                  <span className="rounded-full border border-[#EDC3A7]/35 bg-white/10 px-4 py-2">Biblioteca compartilhada</span>
+                </div>
               </div>
 
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -244,15 +249,15 @@ export default function MarketingPage() {
               <div className="mt-10 grid max-w-xl grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="rounded-[1.4rem] border border-white/10 bg-white/7 px-4 py-4 backdrop-blur">
                   <p className="text-3xl font-semibold">3x</p>
-                  <p className="mt-2 text-sm text-[#E8D6C9]">mais caminhos para criar receitas com o que ja existe na sua casa</p>
+                  <p className="mt-2 text-sm text-[#E8D6C9]">mais caminhos para criar receitas com o que já existe na sua casa</p>
                 </div>
                 <div className="rounded-[1.4rem] border border-white/10 bg-white/7 px-4 py-4 backdrop-blur">
                   <p className="text-3xl font-semibold">1 foto</p>
-                  <p className="mt-2 text-sm text-[#E8D6C9]">pode virar ideia, receita final e menos desperdicio na semana</p>
+                  <p className="mt-2 text-sm text-[#E8D6C9]">pode virar ideia, receita final e menos desperdício na semana</p>
                 </div>
                 <div className="rounded-[1.4rem] border border-white/10 bg-white/7 px-4 py-4 backdrop-blur">
-                  <p className="text-3xl font-semibold">0 trava</p>
-                  <p className="mt-2 text-sm text-[#E8D6C9]">quando bate aquela duvida do que fazer para comer hoje</p>
+                  <p className="text-3xl font-semibold">+ clareza</p>
+                  <p className="mt-2 text-sm text-[#E8D6C9]">para decidir o que cozinhar sem perder tempo pensando</p>
                 </div>
               </div>
             </div>
@@ -271,7 +276,7 @@ export default function MarketingPage() {
                 <div className="absolute bottom-0 left-0 right-0 p-5">
                   <p className="text-xs uppercase tracking-[0.25em] text-[#EDC7AE]">Resultado</p>
                   <p className="mt-2 max-w-xs text-xl font-semibold">
-                    Ideias bonitas, possiveis e com cara de refeicao de verdade
+                    Ideias bonitas, possíveis e com cara de refeição de verdade
                   </p>
                 </div>
               </div>
@@ -315,10 +320,10 @@ export default function MarketingPage() {
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-[#A46544]">Como funciona</p>
             <h2 className="mt-4 max-w-lg font-display text-4xl leading-tight text-[#241914] sm:text-5xl">
-              O app que pensa junto com voce quando falta repertorio
+              O app que pensa junto com você quando falta repertório
             </h2>
             <p className="mt-4 max-w-lg text-lg leading-8 text-[#61534A]">
-              O TemAi foi desenhado para quem quer cozinhar melhor sem depender de inspiracao espontanea. Voce mostra o que tem. O app organiza, sugere, estrutura e te ajuda a chegar em um prato que faz sentido.
+              O TemAi foi desenhado para quem quer cozinhar melhor sem depender de inspiração espontânea. Você mostra o que tem. O app organiza, sugere, estrutura e te ajuda a chegar em um prato que faz sentido.
             </p>
           </div>
 
@@ -342,10 +347,10 @@ export default function MarketingPage() {
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-[#E0B899]">Por que converte tanto na rotina</p>
             <h2 className="mt-4 font-display text-4xl leading-tight sm:text-5xl">
-              O beneficio principal nao e receita. E decisao.
+              O benefício principal não é receita. É decisão.
             </h2>
             <p className="mt-5 max-w-xl text-lg leading-8 text-[#E5D3C7]">
-              Quando a pessoa nao sabe o que fazer, ela pede delivery, improvisa mal ou deixa ingrediente estragar. O TemAi entra exatamente nesse momento de indecisao e devolve clareza, economia e confianca.
+              Quando a pessoa não sabe o que fazer, ela pede delivery, improvisa mal ou deixa ingrediente estragar. O TemAi entra exatamente nesse momento de indecisão e devolve clareza, economia e confiança.
             </p>
           </div>
 
@@ -353,19 +358,19 @@ export default function MarketingPage() {
             <div className="rounded-[1.8rem] border border-white/10 bg-white/6 p-6">
               <p className="text-sm font-semibold text-[#E7BC9F]">Para iniciantes</p>
               <p className="mt-3 text-sm leading-7 text-[#F1E3DA]">
-                Tira o peso de inventar do zero e ajuda a cozinhar melhor mesmo sem experiencia.
+                Tira o peso de inventar do zero e ajuda a cozinhar melhor mesmo sem experiência.
               </p>
             </div>
             <div className="rounded-[1.8rem] border border-white/10 bg-white/6 p-6">
-              <p className="text-sm font-semibold text-[#E7BC9F]">Para quem ja cozinha</p>
+              <p className="text-sm font-semibold text-[#E7BC9F]">Para quem já cozinha</p>
               <p className="mt-3 text-sm leading-7 text-[#F1E3DA]">
-                Abre novas combinacoes e salva tempo nos dias corridos em que falta imaginacao.
+                Abre novas combinações e salva tempo nos dias corridos em que falta imaginação.
               </p>
             </div>
             <div className="rounded-[1.8rem] border border-white/10 bg-white/6 p-6">
               <p className="text-sm font-semibold text-[#E7BC9F]">Para o bolso</p>
               <p className="mt-3 text-sm leading-7 text-[#F1E3DA]">
-                Aproveita melhor o que ja esta em casa e reduz desperdicio ao longo da semana.
+                Aproveita melhor o que já está em casa e reduz desperdício ao longo da semana.
               </p>
             </div>
             <div className="rounded-[1.8rem] border border-white/10 bg-white/6 p-6">
@@ -383,7 +388,7 @@ export default function MarketingPage() {
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-[#A46544]">Prova social</p>
             <h2 className="mt-4 font-display text-4xl leading-tight text-[#241914] sm:text-5xl">
-              O tipo de reacao que queremos provocar
+              O tipo de reação que queremos provocar
             </h2>
           </div>
         </div>
@@ -422,16 +427,16 @@ export default function MarketingPage() {
                 Entre no TemAi do jeito certo para o seu aparelho
               </h2>
               <p className="mt-4 max-w-lg text-lg leading-8 text-[#61534A]">
-                Android vai para o app. iPhone entra pela experiencia PWA com passo a passo claro, sem cair por engano numa pagina errada quando o objetivo for cozinhar.
+                Android vai para o app. iPhone entra pela experiência PWA com passo a passo claro, sem cair por engano numa página errada quando o objetivo for cozinhar.
               </p>
             </div>
 
             <div className="grid gap-4">
               <DownloadButton
-                href={androidAppUrl}
+                href={appUrl}
                 eyebrow="Android"
-                title="Google Play Store"
-                description="Botao pronto para receber o APK agora e o link oficial da Play Store depois."
+                title="Abrir TemAi agora"
+                description="Entre no app pelo navegador e comece a criar receitas com o que você tem em casa."
                 leftIcon={<PlayStoreIcon />}
                 rightIcon={<AndroidIcon />}
               />
@@ -439,7 +444,7 @@ export default function MarketingPage() {
                 href={iosPwaGuideUrl}
                 eyebrow="Apple"
                 title="Apple Store"
-                description="Abra o guia do iPhone, instale como app pelo Safari e use o TemAi como PWA enquanto a versao da App Store chega."
+                description="Abra o guia do iPhone, instale como app pelo Safari e use o TemAi como PWA enquanto a versão da App Store chega."
                 leftIcon={<AppStoreIcon />}
                 rightIcon={<AppleIcon />}
                 subtle
@@ -447,14 +452,6 @@ export default function MarketingPage() {
             </div>
           </div>
 
-          <div className="mt-8 rounded-[1.8rem] border border-[#DDCFBF] bg-white px-6 py-5 text-sm leading-7 text-[#67594F]">
-            Recomendacao de experiencia:
-            <span className="font-semibold text-[#241914]"> www.temai.com.br para landing </span>
-            e
-            <span className="font-semibold text-[#241914]"> app.temai.com.br para o produto/PWA </span>
-            .
-            Assim quem ja usa o app entra direto na experiencia certa, sem voltar por acidente para a pagina de venda.
-          </div>
         </div>
       </section>
     </main>

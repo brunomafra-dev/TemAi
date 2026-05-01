@@ -21,7 +21,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
 
-async function buildAuthHeaders(): Promise<Record<string, string>> {
+export async function buildAuthHeaders(): Promise<Record<string, string>> {
   const client = getSupabaseBrowserClient();
   if (!client) return {};
   const session = await client.auth.getSession();
@@ -34,13 +34,24 @@ export async function fetchAiSuggestions(
   body: SuggestionRequestBody,
 ): Promise<SuggestionsResponse> {
   const authHeaders = await buildAuthHeaders();
+  const hasFile = Boolean(body.file);
+  const requestBody = hasFile ? new FormData() : JSON.stringify(body);
+  const headers: Record<string, string> = {
+    ...authHeaders,
+  };
+
+  if (hasFile && requestBody instanceof FormData) {
+    requestBody.append("ingredientsText", body.ingredientsText);
+    requestBody.append("inputMode", body.inputMode);
+    if (body.file) requestBody.append("file", body.file);
+  } else {
+    headers["Content-Type"] = "application/json";
+  }
+
   const response = await fetch("/api/ai/suggestions", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders,
-    },
-    body: JSON.stringify(body),
+    headers,
+    body: requestBody,
   });
 
   return parseResponse<SuggestionsResponse>(response);

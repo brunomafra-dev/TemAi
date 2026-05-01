@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { parseIngredientsText } from "@/features/recipes/helpers";
+import { buildAuthHeaders } from "@/features/recipes/api-client";
 import { getMyRecipes, removeMyRecipe, upsertMyRecipe } from "@/features/recipes/local-storage";
 import { getSubscriptionState, syncSubscriptionFromCloud, type SubscriptionState } from "@/features/profile/subscription-storage";
 import type { Recipe } from "@/features/recipes/types";
@@ -90,6 +91,7 @@ export default function CreatePage() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isSaveChoiceOpen, setIsSaveChoiceOpen] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isPolishing, setIsPolishing] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState("");
   const [voiceTarget, setVoiceTarget] = useState<"ingredients" | "steps" | null>(null);
   const [voiceMessage, setVoiceMessage] = useState("");
@@ -139,6 +141,47 @@ export default function CreatePage() {
       sourceLabel: "Criada por voce",
       origin: "manual",
     };
+  }
+
+  async function polishRecipeWithAi() {
+    if (!title.trim() || !ingredientsText.trim() || !stepsText.trim()) {
+      setSaveFeedback("Preencha titulo, ingredientes e preparo antes de organizar com IA.");
+      return;
+    }
+
+    setIsPolishing(true);
+    setSaveFeedback("");
+    try {
+      const authHeaders = await buildAuthHeaders();
+      const response = await fetch("/api/ai/author-recipe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify({
+          title,
+          description,
+          ingredientsText,
+          stepsText,
+        }),
+      });
+      const data = (await response.json()) as {
+        message?: string;
+        description?: string;
+        ingredientsText?: string;
+        stepsText?: string;
+      };
+      if (!response.ok) {
+        setSaveFeedback(data.message || "Nao foi possivel organizar com IA.");
+        return;
+      }
+      setDescription(data.description || description);
+      setIngredientsText(data.ingredientsText || ingredientsText);
+      setStepsText(data.stepsText || stepsText);
+      setSaveFeedback("Receita organizada com IA. Revise antes de salvar.");
+    } catch {
+      setSaveFeedback("Nao foi possivel organizar com IA.");
+    } finally {
+      setIsPolishing(false);
+    }
   }
 
   function handleCreateRecipe() {
@@ -417,6 +460,15 @@ export default function CreatePage() {
                 {voiceMessage ? (
                   <p className="text-xs font-medium text-[#7A6D60]">{voiceMessage}</p>
                 ) : null}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10 w-full border-[#C66A3D] bg-[#FFF8EF] text-xs"
+                  onClick={() => void polishRecipeWithAi()}
+                  disabled={isPolishing}
+                >
+                  {isPolishing ? "Organizando com IA..." : "Organizar receita com IA"}
+                </Button>
               </div>
             )}
           </div>

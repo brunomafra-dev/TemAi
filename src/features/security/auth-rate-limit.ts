@@ -4,6 +4,18 @@ import { getSupabaseServiceRoleClient } from "@/lib/supabase-admin";
 export const AUTH_RATE_LIMIT_MAX_ATTEMPTS = 5;
 export const AUTH_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
 
+const RATE_LIMIT_CONFIG = {
+  login: { maxAttempts: 5, windowSeconds: 15 * 60 },
+  register: { maxAttempts: 5, windowSeconds: 15 * 60 },
+  "forgot-password": { maxAttempts: 5, windowSeconds: 15 * 60 },
+  "ai-suggestions": { maxAttempts: 20, windowSeconds: 60 * 60 },
+  "ai-recipe": { maxAttempts: 30, windowSeconds: 60 * 60 },
+  "ai-author-recipe": { maxAttempts: 20, windowSeconds: 60 * 60 },
+  "support-agent": { maxAttempts: 30, windowSeconds: 60 * 60 },
+} as const;
+
+export type RateLimitedRoute = keyof typeof RATE_LIMIT_CONFIG;
+
 interface ConsumeRateLimitResult {
   allowed: boolean;
   remaining: number;
@@ -39,16 +51,17 @@ function buildRateLimitKey(route: string, request: Request, identifier?: string)
 }
 
 export async function consumeAuthRateLimit(params: {
-  route: "login" | "register" | "forgot-password";
+  route: RateLimitedRoute;
   request: Request;
   identifier?: string;
 }): Promise<ConsumeRateLimitResult> {
   const key = buildRateLimitKey(params.route, params.request, params.identifier);
+  const config = RATE_LIMIT_CONFIG[params.route];
   const client = getSupabaseServiceRoleClient();
   const { data, error } = await client.rpc("consume_auth_rate_limit", {
     p_key: key,
-    p_max_attempts: AUTH_RATE_LIMIT_MAX_ATTEMPTS,
-    p_window_seconds: AUTH_RATE_LIMIT_WINDOW_SECONDS,
+    p_max_attempts: config.maxAttempts,
+    p_window_seconds: config.windowSeconds,
   });
 
   if (error || !Array.isArray(data) || data.length === 0) {

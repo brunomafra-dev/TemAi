@@ -11,13 +11,13 @@ const steps = [
     step: "02",
     title: "Toque em Compartilhar",
     detail:
-      "No menu inferior do Safari, toque no icone de compartilhamento para abrir as acoes disponiveis da pagina.",
+      "No menu inferior do Safari, toque no ícone de compartilhamento para abrir as ações disponíveis da página.",
   },
   {
     step: "03",
-    title: "Escolha Tela de Inicio",
+    title: "Escolha Tela de Início",
     detail:
-      "Role as opcoes ate encontrar Adicionar a Tela de Inicio. Confirme o nome e pronto: o TemAi vira um app no seu iPhone.",
+      "Role as opções até encontrar Adicionar à Tela de Início. Confirme o nome e pronto: o TemAi vira um app no seu iPhone.",
   },
 ];
 
@@ -45,7 +45,7 @@ function PhoneMock({ title, active }: { title: string; active?: boolean }) {
         <div className="space-y-3 px-4 py-4">
           <div className="rounded-2xl bg-[#F2E7D6] p-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[#5B4A40]">temai.com.br</span>
+              <span className="text-xs font-semibold text-[#5B4A40]">temaiapp.vercel.app</span>
               <span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-[#8A7366]">Seguro</span>
             </div>
             <div className="mt-3 h-20 rounded-[1.3rem] bg-[linear-gradient(135deg,#D87143,#F4BE85)]" />
@@ -60,10 +60,10 @@ function PhoneMock({ title, active }: { title: string; active?: boolean }) {
               </div>
               <div>
                 <p className="text-sm font-semibold text-[#241914]">
-                  {active ? "Adicionar a Tela de Inicio" : "Compartilhar"}
+                  {active ? "Adicionar à Tela de Início" : "Compartilhar"}
                 </p>
                 <p className="text-xs text-[#7B695D]">
-                  {active ? "Fixe o TemAi como app no iPhone" : "Abra o menu de acoes do Safari"}
+                  {active ? "Fixe o TemAi como app no iPhone" : "Abra o menu de ações do Safari"}
                 </p>
               </div>
             </div>
@@ -95,7 +95,7 @@ export default function IosInstallGuidePage() {
               Instale o TemAi no iPhone em menos de um minuto
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-8 text-[#61534A]">
-              Enquanto a versao da Apple Store nao chega, voce pode usar o TemAi como app no iPhone. O atalho fica na tela inicial e abre como experiencia dedicada.
+              Enquanto a versão da Apple Store não chega, você pode usar o TemAi como app no iPhone. O atalho fica na tela inicial e abre como experiência dedicada.
             </p>
 
             <div className="mt-8 grid gap-4">
@@ -113,13 +113,13 @@ export default function IosInstallGuidePage() {
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
-                href="https://app.temai.com.br/auth"
+                href="https://temaiapp.vercel.app/"
                 className="inline-flex items-center justify-center rounded-full bg-[#241914] px-6 py-3 text-sm font-semibold text-white transition hover:brightness-95"
               >
-                Abrir TemAi no Safari
+                Abrir TemAi agora
               </Link>
               <div className="inline-flex items-center justify-center rounded-full border border-[#D8CBBB] bg-white px-6 py-3 text-sm font-semibold text-[#6B584E]">
-                Apple Store em breve
+                Instalar como app
               </div>
             </div>
           </div>
@@ -128,7 +128,7 @@ export default function IosInstallGuidePage() {
             <PhoneMock title="Abra o TemAi no Safari" />
             <PhoneMock title="Toque em Compartilhar" />
             <div className="sm:col-span-2">
-              <PhoneMock title="Adicionar a Tela de Inicio" active />
+              <PhoneMock title="Adicionar à Tela de Início" active />
             </div>
           </div>
         </div>

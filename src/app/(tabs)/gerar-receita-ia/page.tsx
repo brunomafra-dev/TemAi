@@ -42,6 +42,8 @@ function CreateRecipePageContent() {
   const [isPhotoPickerOpen, setIsPhotoPickerOpen] = useState(false);
   const [selectedAudioName, setSelectedAudioName] = useState("");
   const [selectedPhotoName, setSelectedPhotoName] = useState("");
+  const [selectedAudioFile, setSelectedAudioFile] = useState<File | null>(null);
+  const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
   const [includeNutritionEstimate, setIncludeNutritionEstimate] = useState(false);
   const [subscription, setSubscription] = useState<SubscriptionState>(() => getSubscriptionState());
 
@@ -102,6 +104,7 @@ function CreateRecipePageContent() {
       const data = await fetchAiSuggestions({
         ingredientsText,
         inputMode: mode,
+        file: mode === "audio" ? selectedAudioFile || undefined : mode === "photo" ? selectedPhotoFile || undefined : undefined,
       });
 
       setResponse(data);
@@ -118,7 +121,8 @@ function CreateRecipePageContent() {
   const openRecipe = useCallback((suggestion: RecipeSuggestion) => {
     const ingredientsQuery = response?.normalizedIngredients.join(",") ?? "";
     const nutritionFlag = includeNutritionEstimate ? "&nutrition=1" : "";
-    router.push(`/receita/${suggestion.id}?origin=ai&ingredients=${encodeURIComponent(ingredientsQuery)}${nutritionFlag}`);
+    const titleQuery = encodeURIComponent(suggestion.title);
+    router.push(`/receita/${suggestion.id}?origin=ai&ingredients=${encodeURIComponent(ingredientsQuery)}&title=${titleQuery}${nutritionFlag}`);
   }, [includeNutritionEstimate, response?.normalizedIngredients, router]);
 
   const pickFromCamera = useCallback(() => {
@@ -135,6 +139,7 @@ function CreateRecipePageContent() {
     const file = event.target.files?.[0];
     if (file) {
       setSelectedPhotoName(file.name);
+      setSelectedPhotoFile(file);
     }
   }
 
@@ -142,6 +147,7 @@ function CreateRecipePageContent() {
     const file = event.target.files?.[0];
     if (file) {
       setSelectedAudioName(file.name);
+      setSelectedAudioFile(file);
     }
   }
 

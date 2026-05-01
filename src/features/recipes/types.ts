@@ -51,10 +51,12 @@ export interface SuggestionsResponse {
 export interface SuggestionRequestBody {
   ingredientsText: string;
   inputMode: InputMode;
+  file?: File;
 }
 
 export interface FullRecipeRequestBody {
   suggestionId: string;
+  suggestionTitle?: string;
   ingredients: string[];
   includeNutrition?: boolean;
 }
