@@ -333,8 +333,13 @@ function CreateRecipePageContent() {
 
       {isPhotoPickerOpen ? (
         <div className="fixed inset-0 z-50 flex items-end bg-black/45 p-4 sm:items-center sm:justify-center">
-          <div className="w-full rounded-[1.8rem] bg-[#FFFCF7] p-5 shadow-2xl sm:max-w-sm">
-            <h3 className="text-xl font-semibold text-[#2A1E17]">Selecionar foto</h3>
+          <div className="max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-[1.8rem] bg-[#FFFCF7] p-5 shadow-2xl sm:max-w-sm">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-xl font-semibold text-[#2A1E17]">Selecionar foto</h3>
+              <button onClick={() => setIsPhotoPickerOpen(false)} className="text-xs font-semibold text-[#7A6D60]">
+                ← Voltar
+              </button>
+            </div>
             <p className="mt-1 text-sm text-[#7E7366]">Como você quer enviar a imagem?</p>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <button
@@ -356,7 +361,7 @@ function CreateRecipePageContent() {
               onClick={() => setIsPhotoPickerOpen(false)}
               className="mt-4 w-full rounded-full border border-[#E0D2BA] py-2 text-sm font-semibold text-[#6E6154]"
             >
-              Fechar
+              Voltar
             </button>
           </div>
         </div>

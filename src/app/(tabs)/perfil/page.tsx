@@ -1040,22 +1040,24 @@ export default function ProfilePage() {
 
       {activeModal ? (
         <div
-          className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-colors duration-200 ${
+          className={`fixed inset-0 z-50 flex items-end p-4 transition-colors duration-200 sm:items-center sm:justify-center ${
             modalStage === "open" ? "bg-black/50" : "bg-black/0"
           }`}
           onClick={closeModal}
         >
           <div
-            className={`w-full max-w-md rounded-2xl bg-[#FFFCF7] p-5 shadow-2xl transition-all duration-200 ${
+            className={`flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col rounded-2xl bg-[#FFFCF7] shadow-2xl transition-all duration-200 ${
               modalStage === "open" ? "translate-y-0 scale-100 opacity-100" : "translate-y-3 scale-95 opacity-0"
             }`}
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="mb-3 flex items-center justify-between">
+            <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between rounded-t-2xl border-b border-[#E5D7BF] bg-[#FFFCF7] px-5 py-4">
               <p className="text-sm font-semibold text-[#5D5248]">{activeModalTitle}</p>
-              <button className="text-xs font-semibold text-[#7A6D60]" onClick={closeModal}>Fechar</button>
+              <button className="text-xs font-semibold text-[#7A6D60]" onClick={closeModal}>← Voltar</button>
             </div>
-            {renderModalBody()}
+            <div className="overflow-y-auto px-5 py-4">
+              {renderModalBody()}
+            </div>
           </div>
         </div>
       ) : null}

@@ -771,15 +771,20 @@ export default function RecipeDetailsPage() {
           style={{ transition: "background-color 180ms ease" }}
         >
           <div
-            className={`w-full rounded-[1.6rem] border border-[#E5D7BF] bg-[#FFFCF7] p-4 shadow-2xl sm:max-w-lg ${
+            className={`flex max-h-[calc(100dvh-2rem)] w-full flex-col rounded-[1.6rem] border border-[#E5D7BF] bg-[#FFFCF7] shadow-2xl sm:max-w-lg ${
               isTouchClosing ? "translate-y-2 opacity-0" : "translate-y-0 opacity-100"
             }`}
             style={{ transition: "opacity 180ms ease, transform 180ms ease" }}
           >
-            <p className="text-sm font-semibold text-[#5D5248]">
-              Transforme em receita autoral (validacao real)
-            </p>
-            <div className="mt-3 space-y-2">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[#E5D7BF] px-4 py-3">
+              <p className="text-sm font-semibold text-[#5D5248]">
+                Transforme em receita autoral
+              </p>
+              <button className="text-xs font-semibold text-[#7A6D60]" onClick={closeTouchEditor}>
+                ← Voltar
+              </button>
+            </div>
+            <div className="space-y-2 overflow-y-auto px-4 py-3">
               <input
                 value={touchTitle}
                 onChange={(event) => setTouchTitle(event.target.value)}
@@ -804,16 +809,15 @@ export default function RecipeDetailsPage() {
                 placeholder="Modo de preparo (um passo por linha)"
                 className="min-h-[120px] w-full rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm"
               />
-            </div>
 
-            <div className="mt-3 grid gap-1 rounded-xl border border-[#E5D7BF] bg-[#FAF4EA] p-2 text-xs">
+              <div className="mt-3 grid gap-1 rounded-xl border border-[#E5D7BF] bg-[#FAF4EA] p-2 text-xs">
               <p>{touchValidation.hasNewTitle ? "✅" : "❌"} Novo titulo relevante</p>
               <p>{touchValidation.hasNewImage ? "✅" : "❌"} Nova imagem obrigatoria</p>
               <p>{touchValidation.ingredientsChanged ? "✅" : "❌"} Ingredientes mudaram de forma valida</p>
               <p>{touchValidation.stepsChanged ? "✅" : "❌"} Preparo mudou de forma valida</p>
-            </div>
+              </div>
 
-            <div className="mt-3 flex gap-2">
+              <div className="mt-3 flex gap-2">
               <Button
                 className="flex-1"
                 disabled={!touchValidation.canCreate}
@@ -828,10 +832,11 @@ export default function RecipeDetailsPage() {
               >
                 Cancelar
               </Button>
+              </div>
+              {touchError ? (
+                <p className="mt-2 text-xs font-semibold text-red-700">{touchError}</p>
+              ) : null}
             </div>
-            {touchError ? (
-              <p className="mt-2 text-xs font-semibold text-red-700">{touchError}</p>
-            ) : null}
           </div>
         </div>
       ) : null}
