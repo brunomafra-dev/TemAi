@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TemAi</string>
+    <string name="title_activity_main">TemAi</string>
+    <string name="package_name">com.mafralabs.temai</string>
+    <string name="custom_url_scheme">com.mafralabs.temai</string>
+</resources>

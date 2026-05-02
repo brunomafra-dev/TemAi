@@ -66,7 +66,7 @@ const benefits = [
   "Entrega ideias por foto, áudio ou texto no formato mais fácil para cada pessoa",
 ];
 
-const appUrl = "https://temaiapp.vercel.app/";
+const androidApkUrl = "/downloads/temai.apk";
 const iosPwaGuideUrl = "/site/ios";
 
 function PlayStoreIcon() {
@@ -433,9 +433,9 @@ export default function MarketingPage() {
 
             <div className="grid gap-4">
               <DownloadButton
-                href={appUrl}
+                href={androidApkUrl}
                 eyebrow="Android"
-                title="Abrir TemAi agora"
+                title="Baixar APK do TemAi"
                 description="Entre no app pelo navegador e comece a criar receitas com o que você tem em casa."
                 leftIcon={<PlayStoreIcon />}
                 rightIcon={<AndroidIcon />}
