@@ -3,10 +3,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RatingStars } from "@/components/recipes/rating-stars";
 import { BADGE_CATALOG } from "@/features/profile/badges";
-import { getUserProfile } from "@/features/profile/storage";
+import { getUserProfile, saveUserProfile, saveUserProfileToCloud } from "@/features/profile/storage";
 import { LIBRARY_RECIPES } from "@/features/recipes/library-recipes";
 import { getPendingShoppingCount } from "@/features/recipes/shopping-storage";
 import type { Recipe } from "@/features/recipes/types";
@@ -64,6 +64,7 @@ const categories = [
 
 const popularCategories = ["principais", "veggie", "massas", "kids", "sobremesas", "lanches", "bebidas"] as const;
 const POPULAR_CACHE_KEY = "temai:home:popular:v1";
+const MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024;
 type Category = (typeof categories)[number];
 
 const libraryMetaById: Record<
@@ -214,7 +215,9 @@ PopularRecipeCard.displayName = "PopularRecipeCard";
 
 export default function HomePage() {
   const router = useRouter();
+  const profilePhotoInputRef = useRef<HTMLInputElement | null>(null);
   const [profile, setProfile] = useState(() => getUserProfile());
+  const [profilePhotoMessage, setProfilePhotoMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("principais");
   const [isGeneratorMenuOpen, setIsGeneratorMenuOpen] = useState(false);
@@ -329,6 +332,46 @@ export default function HomePage() {
     router.push(`/biblioteca?category=${encodeURIComponent(categoryId)}`);
   }, [router]);
 
+  const openProfilePhotoPicker = useCallback(() => {
+    setProfilePhotoMessage("");
+    profilePhotoInputRef.current?.click();
+  }, []);
+
+  const handleProfilePhotoChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setProfilePhotoMessage("Escolha uma imagem válida.");
+      return;
+    }
+
+    if (file.size > MAX_PROFILE_PHOTO_BYTES) {
+      setProfilePhotoMessage("Use uma imagem de até 2 MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== "string") {
+        setProfilePhotoMessage("Não foi possível carregar a imagem.");
+        return;
+      }
+
+      const nextProfile = { ...getUserProfile(), photoDataUrl: result };
+      saveUserProfile(nextProfile);
+      setProfile(nextProfile);
+      setProfilePhotoMessage("Foto atualizada.");
+      void saveUserProfileToCloud(nextProfile);
+    };
+    reader.onerror = () => {
+      setProfilePhotoMessage("Não foi possível carregar a imagem.");
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
   const fallbackPopularRecipes = useMemo(() => {
     return LIBRARY_RECIPES.map((recipe) => {
       const metadata = libraryMetaById[recipe.id] ?? {
@@ -388,6 +431,13 @@ export default function HomePage() {
 
   return (
     <section className="space-y-6 pb-2">
+      <input
+        ref={profilePhotoInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleProfilePhotoChange}
+      />
       <header className="relative overflow-hidden rounded-[2rem] shadow-[0_20px_45px_-25px_rgba(42,30,23,0.55)]">
         <div
           className="absolute inset-0 bg-cover bg-center"
@@ -400,25 +450,37 @@ export default function HomePage() {
         <div className="relative z-10 px-5 pb-5 pt-6 text-[#FDF7EC]">
           <div className="mb-5 flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
-              {profile.photoDataUrl ? (
-                <Image
-                  src={profile.photoDataUrl}
-                  alt="Foto do usuário"
-                  width={48}
-                  height={48}
-                  sizes="48px"
-                  unoptimized
-                  className="h-12 w-12 rounded-full border border-white/35 object-cover"
-                />
-              ) : (
-                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/35 bg-white/15 text-sm font-semibold text-[#FDF7EC]">
-                  {profile.firstName.slice(0, 1).toUpperCase()}
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={openProfilePhotoPicker}
+                className="group relative h-12 w-12 shrink-0 overflow-hidden rounded-full border border-white/35 bg-white/15 text-sm font-semibold text-[#FDF7EC] outline-none transition hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-white/70"
+                aria-label="Trocar foto de perfil"
+              >
+                {profile.photoDataUrl ? (
+                  <Image
+                    src={profile.photoDataUrl}
+                    alt="Foto do usuário"
+                    fill
+                    sizes="48px"
+                    unoptimized
+                    className="object-cover"
+                  />
+                ) : (
+                  <span className="flex h-full w-full items-center justify-center">
+                    {profile.firstName.slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+                <span className="absolute inset-x-0 bottom-0 bg-black/45 py-0.5 text-[9px] font-bold opacity-0 transition group-hover:opacity-100">
+                  trocar
+                </span>
+              </button>
               <div>
                 <p className="font-display text-2xl leading-none">Ola, {profile.firstName} 👋</p>
                 <p className="mt-1 text-xs text-[#E9DCC6]">{usernameHandle}</p>
                 <p className="mt-1 text-xs font-semibold text-[#E9DCC6]">{currentBadgeLabel}</p>
+                {profilePhotoMessage ? (
+                  <p className="mt-1 text-[11px] font-semibold text-[#F5D7C3]">{profilePhotoMessage}</p>
+                ) : null}
               </div>
             </div>
             <div className="flex items-center gap-2">
