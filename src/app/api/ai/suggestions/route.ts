@@ -11,6 +11,7 @@ import {
   aiUsageErrorResponse,
   consumeAiUsage,
   getAiEntitlement,
+  refundAiUsageEvent,
 } from "@/features/security/ai-usage";
 import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse, requireAuthUserId } from "@/features/security/auth-user";
@@ -94,22 +95,32 @@ async function persistSuggestionLog(params: {
   ingredientsText: string;
   normalizedIngredients: string[];
   suggestions: unknown[];
-}): Promise<void> {
+}): Promise<string | undefined> {
   try {
     const supabase = getSupabaseServiceRoleClient();
-    await supabase.from("ai_generation_logs").insert({
-      user_id: params.userId,
-      input_mode: params.inputMode,
-      ingredients_text: params.ingredientsText,
-      normalized_ingredients: params.normalizedIngredients,
-      suggestions: params.suggestions,
-    });
+    const { data } = await supabase
+      .from("ai_generation_logs")
+      .insert({
+        user_id: params.userId,
+        input_mode: params.inputMode,
+        ingredients_text: params.ingredientsText,
+        normalized_ingredients: params.normalizedIngredients,
+        suggestions: params.suggestions,
+      })
+      .select("id")
+      .single();
+
+    return typeof data?.id === "string" ? data.id : undefined;
   } catch {
     // non-blocking log persistence
+    return undefined;
   }
 }
 
 export async function POST(request: Request) {
+  let userIdForRefund: string | undefined;
+  let usageEventId: string | undefined;
+
   try {
     const payload = await readSuggestionsInput(request);
     const inputModeRaw = readRequiredString(payload as Record<string, unknown>, "inputMode", {
@@ -124,6 +135,8 @@ export async function POST(request: Request) {
     if (!userId) {
       return NextResponse.json({ message: "Sessão obrigatória para usar IA." }, { status: 401 });
     }
+
+    userIdForRefund = userId;
 
     const endpointRateLimit = await consumeAuthRateLimit({
       route: "ai-suggestions",
@@ -151,7 +164,8 @@ export async function POST(request: Request) {
       }
       const uploadError = validateUpload(payload.file, inputMode);
       if (uploadError) return uploadError;
-      await consumeAiUsage({ userId, bucket: "recipe_ai", feature: "suggestions", inputMode });
+      const usage = await consumeAiUsage({ userId, bucket: "recipe_ai", feature: "suggestions", inputMode });
+      usageEventId = usage.eventId;
       ingredientsText = await transcribeAudioWithOpenAi(payload.file);
       ingredients = parseIngredientsText(ingredientsText);
     } else if (inputMode === "photo") {
@@ -160,7 +174,8 @@ export async function POST(request: Request) {
       }
       const uploadError = validateUpload(payload.file, inputMode);
       if (uploadError) return uploadError;
-      await consumeAiUsage({ userId, bucket: "recipe_ai", feature: "suggestions", inputMode });
+      const usage = await consumeAiUsage({ userId, bucket: "recipe_ai", feature: "suggestions", inputMode });
+      usageEventId = usage.eventId;
       const photoIngredients = await identifyIngredientsFromPhotoWithOpenAi(payload.file);
       ingredients = uniqueIngredients([...photoIngredients, ...parseIngredientsText(ingredientsText)]);
       ingredientsText = ingredients.join(", ");
@@ -174,24 +189,29 @@ export async function POST(request: Request) {
       if (!ingredients.length) {
         return NextResponse.json({ message: "Não foi possível identificar ingredientes válidos." }, { status: 400 });
       }
-      await consumeAiUsage({ userId, bucket: "recipe_ai", feature: "suggestions", inputMode });
+      const usage = await consumeAiUsage({ userId, bucket: "recipe_ai", feature: "suggestions", inputMode });
+      usageEventId = usage.eventId;
     }
 
     if (!ingredients.length) {
+      await refundAiUsageEvent(userId, usageEventId).catch(() => undefined);
       return NextResponse.json({ message: "Não foi possível identificar ingredientes válidos." }, { status: 400 });
     }
 
     const response = await generateRecipeSuggestionsWithOpenAi(ingredients);
-    await persistSuggestionLog({
+    const generationId = await persistSuggestionLog({
       userId,
       inputMode,
       ingredientsText,
       normalizedIngredients: response.normalizedIngredients,
-      suggestions: response.suggestions,
+      suggestions: [...response.suggestions, ...response.alsoCanMake],
     });
 
-    return NextResponse.json(response);
+    return NextResponse.json({ ...response, generationId });
   } catch (error) {
+    if (userIdForRefund && usageEventId && isOpenAiGenerationError(error)) {
+      await refundAiUsageEvent(userIdForRefund, usageEventId).catch(() => undefined);
+    }
     const usageResponse = aiUsageErrorResponse(error);
     if (usageResponse) return usageResponse;
     const validationResponse = validationErrorResponse(error);

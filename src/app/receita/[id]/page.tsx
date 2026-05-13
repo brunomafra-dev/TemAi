@@ -24,6 +24,14 @@ import { parseIngredientsText } from "@/features/recipes/helpers";
 import { slugify } from "@/lib/utils";
 
 type RecipeOriginQuery = "ai" | "library" | "saved" | "manual";
+type PortionMultiplier = 0.5 | 1 | 2 | 3;
+
+const PORTION_MULTIPLIERS: Array<{ value: PortionMultiplier; label: string }> = [
+  { value: 0.5, label: "1/2x" },
+  { value: 1, label: "1x" },
+  { value: 2, label: "2x" },
+  { value: 3, label: "3x" },
+];
 
 function parseIngredientsQuery(rawIngredients: string | null): string[] {
   if (!rawIngredients) {
@@ -247,6 +255,7 @@ export default function RecipeDetailsPage() {
   );
   const suggestionTitle = searchParams.get("title") || undefined;
   const shouldIncludeNutrition = searchParams.get("nutrition") === "1";
+  const generationId = searchParams.get("generationId") || undefined;
   const backHref =
     origin === "ai"
       ? "/gerar-receita-ia?restore=1"
@@ -270,7 +279,7 @@ export default function RecipeDetailsPage() {
   const [touchStepsText, setTouchStepsText] = useState("");
   const [touchError, setTouchError] = useState("");
   const [isTouchClosing, setIsTouchClosing] = useState(false);
-  const [portionMultiplier, setPortionMultiplier] = useState<1 | 2 | 3>(1);
+  const [portionMultiplier, setPortionMultiplier] = useState<PortionMultiplier>(1);
   const scaledIngredients = useMemo(() => {
     if (!recipe) return [];
     return recipe.ingredients.map((ingredient) => scaleIngredientLine(ingredient, portionMultiplier));
@@ -280,6 +289,7 @@ export default function RecipeDetailsPage() {
     if (!recipe) return 0;
     return Math.max(1, recipe.servings * portionMultiplier);
   }, [portionMultiplier, recipe]);
+  const scaledServingsLabel = useMemo(() => formatScaledValue(scaledServings), [scaledServings]);
 
   useEffect(() => {
     let isMounted = true;
@@ -343,10 +353,11 @@ export default function RecipeDetailsPage() {
           }
 
           const rebuilt = await fetchFullRecipe({
-            suggestionId: recipeId,
+            suggestionId: savedRef.sourceSuggestionId || recipeId,
             suggestionTitle,
             ingredients: savedRef.ingredientsSnapshot || ingredientList,
             includeNutrition: shouldIncludeNutrition,
+            generationId: savedRef.generationId,
           });
           if (isMounted) {
             setRecipe(rebuilt);
@@ -385,6 +396,7 @@ export default function RecipeDetailsPage() {
           suggestionTitle,
           ingredients: ingredientList,
           includeNutrition: shouldIncludeNutrition,
+          generationId,
         });
 
         if (isMounted) {
@@ -410,7 +422,7 @@ export default function RecipeDetailsPage() {
     return () => {
       isMounted = false;
     };
-  }, [ingredientList, origin, recipeId, shouldIncludeNutrition, suggestionTitle]);
+  }, [generationId, ingredientList, origin, recipeId, shouldIncludeNutrition, suggestionTitle]);
 
   useEffect(() => {
     if (!isShoppingOpen) return;
@@ -434,6 +446,8 @@ export default function RecipeDetailsPage() {
       sourceOrigin: origin === "library" ? "library" : "ai",
       savedAt: new Date().toISOString(),
       ingredientsSnapshot: ingredientList,
+      generationId,
+      sourceSuggestionId: origin === "ai" ? recipeId : undefined,
     });
     setIsSaved(true);
   }
@@ -618,8 +632,8 @@ export default function RecipeDetailsPage() {
             <CardContent className="space-y-4">
               <div className="flex flex-wrap gap-2">
                 <Badge>{recipe.prepMinutes} min</Badge>
-                <Badge>{scaledServings} porcoes</Badge>
-                <Badge>Serve ~{scaledServings} pessoa(s)</Badge>
+                <Badge>{scaledServingsLabel} porcoes</Badge>
+                <Badge>Serve ~{scaledServingsLabel} pessoa(s)</Badge>
                 <Badge>{recipe.sourceLabel}</Badge>
               </div>
               {recipe.nutrition ? (
@@ -641,15 +655,15 @@ export default function RecipeDetailsPage() {
                   Multiplicador de porcoes
                 </p>
                 <div className="flex gap-2">
-                  {[1, 2, 3].map((value) => (
+                  {PORTION_MULTIPLIERS.map(({ value, label }) => (
                     <Button
                       key={`portion-${value}`}
                       type="button"
                       variant={portionMultiplier === value ? "default" : "secondary"}
                       className="flex-1"
-                      onClick={() => setPortionMultiplier(value as 1 | 2 | 3)}
+                      onClick={() => setPortionMultiplier(value)}
                     >
-                      {value}x
+                      {label}
                     </Button>
                   ))}
                 </div>

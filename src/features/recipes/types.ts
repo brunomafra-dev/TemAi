@@ -46,6 +46,7 @@ export interface SuggestionsResponse {
   suggestions: RecipeSuggestion[];
   alsoCanMake: RecipeSuggestion[];
   normalizedIngredients: string[];
+  generationId?: string;
 }
 
 export interface SuggestionRequestBody {
@@ -59,4 +60,5 @@ export interface FullRecipeRequestBody {
   suggestionTitle?: string;
   ingredients: string[];
   includeNutrition?: boolean;
+  generationId?: string;
 }

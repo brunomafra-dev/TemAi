@@ -25,10 +25,13 @@ const modes: Array<{ value: InputMode; label: string; emoji: string }> = [
 
 const AI_SUGGESTIONS_CACHE_KEY = "temai:ai-suggestions:last";
 
+type GeneratedSuggestion = RecipeSuggestion & { generationId?: string };
+
 type CachedSuggestionsState = {
   mode: InputMode;
   ingredientsText: string;
   response: SuggestionsResponse;
+  extraSuggestions: GeneratedSuggestion[];
   includeNutritionEstimate: boolean;
   selectedAudioName: string;
   selectedPhotoName: string;
@@ -37,6 +40,50 @@ type CachedSuggestionsState = {
 
 function isValidMode(value: string | null): value is InputMode {
   return value === "text" || value === "audio" || value === "photo";
+}
+
+function isRecipeSuggestion(value: unknown): value is RecipeSuggestion {
+  if (!value || typeof value !== "object") return false;
+  const suggestion = value as Partial<RecipeSuggestion>;
+  return (
+    typeof suggestion.id === "string" &&
+    typeof suggestion.title === "string" &&
+    typeof suggestion.description === "string" &&
+    Array.isArray(suggestion.matchedIngredients) &&
+    Array.isArray(suggestion.missingIngredients)
+  );
+}
+
+function readGeneratedSuggestions(value: unknown): GeneratedSuggestion[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isRecipeSuggestion).map((suggestion) => {
+    const generationId = (suggestion as RecipeSuggestion & { generationId?: unknown }).generationId;
+    return {
+      ...suggestion,
+      generationId: typeof generationId === "string" ? generationId : undefined,
+    };
+  });
+}
+
+function attachGenerationId(
+  suggestions: RecipeSuggestion[],
+  generationId: string | undefined,
+): GeneratedSuggestion[] {
+  return suggestions.map((suggestion) => ({ ...suggestion, generationId }));
+}
+
+function appendUniqueSuggestions(params: {
+  current: GeneratedSuggestion[];
+  next: GeneratedSuggestion[];
+  blocked: RecipeSuggestion[];
+}): GeneratedSuggestion[] {
+  const seen = new Set([...params.blocked, ...params.current].map((suggestion) => suggestion.id));
+  const additions = params.next.filter((suggestion) => {
+    if (seen.has(suggestion.id)) return false;
+    seen.add(suggestion.id);
+    return true;
+  });
+  return [...params.current, ...additions];
 }
 
 function readCachedSuggestions(): CachedSuggestionsState | null {
@@ -55,10 +102,12 @@ function readCachedSuggestions(): CachedSuggestionsState | null {
     ) {
       return null;
     }
+
     return {
       mode: parsedMode,
       ingredientsText: parsed.ingredientsText || "",
       response: parsed.response,
+      extraSuggestions: readGeneratedSuggestions(parsed.extraSuggestions),
       includeNutritionEstimate: Boolean(parsed.includeNutritionEstimate),
       selectedAudioName: parsed.selectedAudioName || "",
       selectedPhotoName: parsed.selectedPhotoName || "",
@@ -87,7 +136,9 @@ function CreateRecipePageContent() {
   const [mode, setMode] = useState<InputMode>("text");
   const [ingredientsText, setIngredientsText] = useState("");
   const [response, setResponse] = useState<SuggestionsResponse | null>(null);
+  const [extraSuggestions, setExtraSuggestions] = useState<GeneratedSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isPhotoPickerOpen, setIsPhotoPickerOpen] = useState(false);
   const [selectedAudioName, setSelectedAudioName] = useState("");
@@ -106,6 +157,7 @@ function CreateRecipePageContent() {
         setMode(cached.mode);
         setIngredientsText(cached.ingredientsText);
         setResponse(cached.response);
+        setExtraSuggestions(cached.extraSuggestions);
         setIncludeNutritionEstimate(cached.includeNutritionEstimate);
         setSelectedAudioName(cached.selectedAudioName);
         setSelectedPhotoName(cached.selectedPhotoName);
@@ -172,10 +224,12 @@ function CreateRecipePageContent() {
       });
 
       setResponse(data);
+      setExtraSuggestions([]);
       writeCachedSuggestions({
         mode,
         ingredientsText,
         response: data,
+        extraSuggestions: [],
         includeNutritionEstimate,
         selectedAudioName,
         selectedPhotoName,
@@ -191,11 +245,65 @@ function CreateRecipePageContent() {
     }
   }
 
-  const openRecipe = useCallback((suggestion: RecipeSuggestion) => {
+  async function handleSuggestMoreRecipes() {
+    if (!response) return;
+
+    if (!isPremium && subscription.aiGenerationsUsedThisMonth >= subscription.aiGenerationsLimitThisMonth) {
+      setErrorMessage("Plano free atingiu o limite de 3 gerações de IA neste mês.");
+      return;
+    }
+
+    const normalizedText = response.normalizedIngredients.join(", ");
+    const nextIngredientsText = normalizedText || ingredientsText;
+    if (!nextIngredientsText.trim()) {
+      setErrorMessage("Informe ingredientes para sugerir mais receitas.");
+      return;
+    }
+
+    setIsLoadingMore(true);
+    setErrorMessage("");
+
+    try {
+      const data = await fetchAiSuggestions({
+        ingredientsText: nextIngredientsText,
+        inputMode: "text",
+      });
+      const nextSuggestions = attachGenerationId(data.suggestions, data.generationId);
+
+      setExtraSuggestions((current) => {
+        const merged = appendUniqueSuggestions({
+          current,
+          next: nextSuggestions,
+          blocked: [...response.suggestions, ...response.alsoCanMake],
+        });
+        writeCachedSuggestions({
+          mode,
+          ingredientsText,
+          response,
+          extraSuggestions: merged,
+          includeNutritionEstimate,
+          selectedAudioName,
+          selectedPhotoName,
+        });
+        return merged;
+      });
+
+      if (!isPremium) {
+        setSubscription(consumeAiGenerationAttempt());
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Erro ao buscar mais sugestões.");
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }
+
+  const openRecipe = useCallback((suggestion: RecipeSuggestion, generationId?: string) => {
     const ingredientsQuery = response?.normalizedIngredients.join(",") ?? "";
     const nutritionFlag = includeNutritionEstimate ? "&nutrition=1" : "";
+    const generationFlag = generationId ? `&generationId=${encodeURIComponent(generationId)}` : "";
     const titleQuery = encodeURIComponent(suggestion.title);
-    router.push(`/receita/${suggestion.id}?origin=ai&ingredients=${encodeURIComponent(ingredientsQuery)}&title=${titleQuery}${nutritionFlag}`);
+    router.push(`/receita/${suggestion.id}?origin=ai&ingredients=${encodeURIComponent(ingredientsQuery)}&title=${titleQuery}${nutritionFlag}${generationFlag}`);
   }, [includeNutritionEstimate, response?.normalizedIngredients, router]);
 
   const pickFromCamera = useCallback(() => {
@@ -369,10 +477,34 @@ function CreateRecipePageContent() {
                 key={suggestion.id}
                 suggestion={suggestion}
                 buttonLabel="Ver receita completa"
-                onOpenRecipe={openRecipe}
+                onOpenRecipe={(selected) => openRecipe(selected, response.generationId)}
               />
             ))}
           </div>
+
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleSuggestMoreRecipes}
+            disabled={isLoading || isLoadingMore}
+            className="h-11 w-full rounded-2xl"
+          >
+            {isLoadingMore ? "Buscando mais receitas..." : "Sugerir mais receitas"}
+          </Button>
+
+          {extraSuggestions.length > 0 ? (
+            <div className="space-y-3">
+              <h3 className="text-lg font-semibold">Mais sugestões</h3>
+              {extraSuggestions.map((suggestion) => (
+                <SuggestionCard
+                  key={`extra-${suggestion.generationId || "local"}-${suggestion.id}`}
+                  suggestion={suggestion}
+                  buttonLabel="Ver receita completa"
+                  onOpenRecipe={(selected) => openRecipe(selected, suggestion.generationId)}
+                />
+              ))}
+            </div>
+          ) : null}
 
           <Card className="border-[#E5D7C1] bg-[#FFFCF7]">
             <CardHeader>
@@ -387,7 +519,7 @@ function CreateRecipePageContent() {
                   <button
                     key={`also-${suggestion.id}`}
                     className="w-full rounded-2xl border border-[#E6D8C2] bg-[#F7F0E2] px-4 py-3 text-left transition hover:bg-[#EFE3CD]"
-                    onClick={() => openRecipe(suggestion)}
+                    onClick={() => openRecipe(suggestion, response.generationId)}
                   >
                     <p className="text-sm font-semibold">{suggestion.title}</p>
                     <p className="text-xs text-[#7A6D60]">Precisa de: {suggestion.missingIngredients.join(", ")}</p>

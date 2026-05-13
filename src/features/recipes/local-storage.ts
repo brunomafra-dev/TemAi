@@ -12,6 +12,8 @@ export interface SavedRecipeRef {
   sourceOrigin: Exclude<RecipeOrigin, "manual">;
   savedAt: string;
   ingredientsSnapshot?: string[];
+  generationId?: string;
+  sourceSuggestionId?: string;
 }
 
 function hasWindow(): boolean {
