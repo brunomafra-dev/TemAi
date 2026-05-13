@@ -247,6 +247,13 @@ export default function RecipeDetailsPage() {
   );
   const suggestionTitle = searchParams.get("title") || undefined;
   const shouldIncludeNutrition = searchParams.get("nutrition") === "1";
+  const backHref =
+    origin === "ai"
+      ? "/gerar-receita-ia?restore=1"
+      : origin === "library"
+        ? "/biblioteca"
+        : "/minhas-receitas";
+  const backLabel = origin === "ai" ? "Voltar para sugestões" : "Voltar";
 
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [isLoading, setIsLoading] = useState(origin === "ai");
@@ -572,8 +579,8 @@ export default function RecipeDetailsPage() {
   return (
     <div className="native-page mx-auto w-full max-w-md px-4">
       <div className="mb-4">
-        <Link href="/" className="text-sm font-semibold text-primary">
-          ← Voltar
+        <Link href={backHref} className="text-sm font-semibold text-primary">
+          ← {backLabel}
         </Link>
       </div>
 

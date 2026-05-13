@@ -23,8 +23,58 @@ const modes: Array<{ value: InputMode; label: string; emoji: string }> = [
   { value: "text", label: "Texto", emoji: "📝" },
 ];
 
+const AI_SUGGESTIONS_CACHE_KEY = "temai:ai-suggestions:last";
+
+type CachedSuggestionsState = {
+  mode: InputMode;
+  ingredientsText: string;
+  response: SuggestionsResponse;
+  includeNutritionEstimate: boolean;
+  selectedAudioName: string;
+  selectedPhotoName: string;
+  savedAt: number;
+};
+
 function isValidMode(value: string | null): value is InputMode {
   return value === "text" || value === "audio" || value === "photo";
+}
+
+function readCachedSuggestions(): CachedSuggestionsState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(AI_SUGGESTIONS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<CachedSuggestionsState>;
+    const parsedMode = parsed.mode || null;
+    if (
+      !isValidMode(parsedMode) ||
+      !parsed.response ||
+      !Array.isArray(parsed.response.suggestions) ||
+      !Array.isArray(parsed.response.alsoCanMake) ||
+      !Array.isArray(parsed.response.normalizedIngredients)
+    ) {
+      return null;
+    }
+    return {
+      mode: parsedMode,
+      ingredientsText: parsed.ingredientsText || "",
+      response: parsed.response,
+      includeNutritionEstimate: Boolean(parsed.includeNutritionEstimate),
+      selectedAudioName: parsed.selectedAudioName || "",
+      selectedPhotoName: parsed.selectedPhotoName || "",
+      savedAt: typeof parsed.savedAt === "number" ? parsed.savedAt : Date.now(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedSuggestions(state: Omit<CachedSuggestionsState, "savedAt">): void {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(
+    AI_SUGGESTIONS_CACHE_KEY,
+    JSON.stringify({ ...state, savedAt: Date.now() }),
+  );
 }
 
 function CreateRecipePageContent() {
@@ -50,6 +100,20 @@ function CreateRecipePageContent() {
   const isPremium = subscription.plan === "premium" && subscription.status === "active";
 
   useEffect(() => {
+    if (searchParams.get("restore") === "1") {
+      const cached = readCachedSuggestions();
+      if (cached) {
+        setMode(cached.mode);
+        setIngredientsText(cached.ingredientsText);
+        setResponse(cached.response);
+        setIncludeNutritionEstimate(cached.includeNutritionEstimate);
+        setSelectedAudioName(cached.selectedAudioName);
+        setSelectedPhotoName(cached.selectedPhotoName);
+        setErrorMessage("");
+      }
+      return;
+    }
+
     const requestedMode = searchParams.get("mode");
     if (!isValidMode(requestedMode)) {
       return;
@@ -108,6 +172,15 @@ function CreateRecipePageContent() {
       });
 
       setResponse(data);
+      writeCachedSuggestions({
+        mode,
+        ingredientsText,
+        response: data,
+        includeNutritionEstimate,
+        selectedAudioName,
+        selectedPhotoName,
+      });
+      router.replace("/gerar-receita-ia?restore=1", { scroll: false });
       if (!isPremium) {
         setSubscription(consumeAiGenerationAttempt());
       }
