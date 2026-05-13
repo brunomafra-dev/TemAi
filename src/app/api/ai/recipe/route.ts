@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { generateFullRecipeWithOpenAi, isOpenAiGenerationError } from "@/features/recipes/openai-generator";
+import { aiUsageErrorResponse, consumeAiUsage } from "@/features/security/ai-usage";
 import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse, requireAuthUserId } from "@/features/security/auth-user";
 import {
@@ -59,6 +60,13 @@ export async function POST(request: Request) {
           });
     const includeNutrition = readOptionalBoolean(payload, "includeNutrition", false);
 
+    await consumeAiUsage({
+      userId,
+      bucket: "recipe_ai",
+      feature: "recipe",
+      inputMode: "text",
+    });
+
     const recipe = await generateFullRecipeWithOpenAi({
       suggestionTitle,
       ingredients,
@@ -66,6 +74,8 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(recipe);
   } catch (error) {
+    const usageResponse = aiUsageErrorResponse(error);
+    if (usageResponse) return usageResponse;
     const validationResponse = validationErrorResponse(error);
     if (validationResponse) return validationResponse;
     if (isOpenAiGenerationError(error)) {

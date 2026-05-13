@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isOpenAiGenerationError, polishAuthorRecipeWithOpenAi } from "@/features/recipes/openai-generator";
+import { aiUsageErrorResponse, consumeAiUsage } from "@/features/security/ai-usage";
 import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse, requireAuthUserId } from "@/features/security/auth-user";
 import {
@@ -48,6 +49,13 @@ export async function POST(request: Request) {
         ? payload.description.trim().slice(0, 500)
         : "";
 
+    await consumeAiUsage({
+      userId,
+      bucket: "recipe_ai",
+      feature: "author_recipe",
+      inputMode: "text",
+    });
+
     const polished = await polishAuthorRecipeWithOpenAi({
       title,
       description,
@@ -57,6 +65,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(polished);
   } catch (error) {
+    const usageResponse = aiUsageErrorResponse(error);
+    if (usageResponse) return usageResponse;
     const validationResponse = validationErrorResponse(error);
     if (validationResponse) return validationResponse;
     if (isOpenAiGenerationError(error)) {

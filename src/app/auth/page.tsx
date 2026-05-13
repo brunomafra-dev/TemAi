@@ -239,7 +239,10 @@ export default function AuthPage() {
       }
       return;
     }
-    setMessage(data.message || "Enviamos um link para redefinir sua senha no seu email.");
+    setMessage(
+      data.message ||
+        "Enviamos um link para redefinir sua senha. Confira também Spam/Lixo eletrônico.",
+    );
   }
 
   return (

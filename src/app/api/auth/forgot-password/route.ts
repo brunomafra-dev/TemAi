@@ -62,7 +62,8 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({
-      message: "Se o email existir, você receberá um link para redefinir a senha.",
+      message:
+        "Se o email existir, você receberá um link para redefinir a senha. Confira também Spam/Lixo eletrônico.",
     });
   } catch (error) {
     const validationResponse = validationErrorResponse(error);

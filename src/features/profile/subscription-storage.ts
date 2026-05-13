@@ -31,6 +31,10 @@ function currentUsageCycleKey(date = new Date()): string {
   return `${year}-${month}`;
 }
 
+function startOfCurrentMonthIso(date = new Date()): string {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1, 0, 0, 0, 0)).toISOString();
+}
+
 function isIsoDate(value: unknown): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value);
 }
@@ -99,23 +103,43 @@ export async function syncSubscriptionFromCloud(): Promise<SubscriptionState | n
   if (error) return null;
 
   if (!data) {
-    const fallback = { ...DEFAULT_SUBSCRIPTION, usageCycleKey: currentUsageCycleKey() };
+    const usageRes = await client
+      .from("ai_usage_events")
+      .select("id", { count: "exact", head: true })
+      .eq("bucket", "recipe_ai")
+      .gte("created_at", startOfCurrentMonthIso());
+    const fallback = {
+      ...DEFAULT_SUBSCRIPTION,
+      usageCycleKey: currentUsageCycleKey(),
+      aiGenerationsUsedThisMonth: usageRes.count || 0,
+    };
     saveSubscriptionState(fallback);
     return fallback;
   }
 
+  const status: SubscriptionStatus =
+    data.status === "canceled" || data.status === "past_due" || data.status === "expired"
+      ? data.status
+      : "active";
+  const periodEnd = data.current_period_end ? new Date(data.current_period_end) : null;
+  const hasActivePeriod = !periodEnd || periodEnd.getTime() >= Date.now();
+  const plan: SubscriptionPlan =
+    data.plan === "premium" && status === "active" && hasActivePeriod ? "premium" : "free";
+  const usageRes = await client
+    .from("ai_usage_events")
+    .select("id", { count: "exact", head: true })
+    .eq("bucket", "recipe_ai")
+    .gte("created_at", startOfCurrentMonthIso());
+
   const next: SubscriptionState = {
-    plan: data.plan === "premium" ? "premium" : "free",
-    status:
-      data.status === "canceled" || data.status === "past_due" || data.status === "expired"
-        ? data.status
-        : "active",
+    plan,
+    status,
     billingCycle: data.billing_cycle === "yearly" ? "yearly" : "monthly",
     premiumUntil: toIsoDate(data.current_period_end),
     renewsAt: toIsoDate(data.next_renewal_at),
     usageCycleKey: currentUsageCycleKey(),
-    aiGenerationsUsedThisMonth: 0,
-    aiGenerationsLimitThisMonth: data.plan === "premium" ? 9999 : 3,
+    aiGenerationsUsedThisMonth: usageRes.count || 0,
+    aiGenerationsLimitThisMonth: plan === "premium" ? 9999 : 3,
   };
 
   saveSubscriptionState(next);

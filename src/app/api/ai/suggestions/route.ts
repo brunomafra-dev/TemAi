@@ -7,6 +7,11 @@ import {
   transcribeAudioWithOpenAi,
 } from "@/features/recipes/openai-generator";
 import type { InputMode } from "@/features/recipes/types";
+import {
+  aiUsageErrorResponse,
+  consumeAiUsage,
+  getAiEntitlement,
+} from "@/features/security/ai-usage";
 import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse, requireAuthUserId } from "@/features/security/auth-user";
 import { getSupabaseServiceRoleClient } from "@/lib/supabase-admin";
@@ -43,6 +48,7 @@ async function readSuggestionsInput(request: Request): Promise<SuggestionsPayloa
       throw new InputValidationError(`Campo inesperado: ${key}.`);
     }
   }
+
   const file = form.get("file");
   const rawIngredientsText = String(form.get("ingredientsText") || "").trim();
   const rawInputMode = String(form.get("inputMode") || "").trim();
@@ -52,6 +58,7 @@ async function readSuggestionsInput(request: Request): Promise<SuggestionsPayloa
   if (!/^(text|audio|photo)$/i.test(rawInputMode)) {
     throw new InputValidationError("Modo de entrada malformado.");
   }
+
   return {
     ingredientsText: rawIngredientsText,
     inputMode: rawInputMode as InputMode,
@@ -81,42 +88,24 @@ function validateUpload(file: File, inputMode: InputMode): NextResponse | null {
   return null;
 }
 
-function startOfCurrentMonthIso(): string {
-  const now = new Date();
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
-  return start.toISOString();
-}
-
-async function resolveUserAndPlan(authorizationHeader: string | null): Promise<{
-  userId: string | null;
-  isPremium: boolean;
-}> {
-  if (!authorizationHeader?.startsWith("Bearer ")) {
-    return { userId: null, isPremium: false };
-  }
-
-  const token = authorizationHeader.slice(7).trim();
-  if (!token) return { userId: null, isPremium: false };
-
+async function persistSuggestionLog(params: {
+  userId: string;
+  inputMode: InputMode;
+  ingredientsText: string;
+  normalizedIngredients: string[];
+  suggestions: unknown[];
+}): Promise<void> {
   try {
     const supabase = getSupabaseServiceRoleClient();
-    const userRes = await supabase.auth.getUser(token);
-    const userId = userRes.data.user?.id || null;
-    if (!userId) return { userId: null, isPremium: false };
-
-    const subRes = await supabase
-      .from("user_subscriptions")
-      .select("plan,status")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    const isPremium = Boolean(
-      subRes.data && subRes.data.plan === "premium" && subRes.data.status === "active",
-    );
-
-    return { userId, isPremium };
+    await supabase.from("ai_generation_logs").insert({
+      user_id: params.userId,
+      input_mode: params.inputMode,
+      ingredients_text: params.ingredientsText,
+      normalized_ingredients: params.normalizedIngredients,
+      suggestions: params.suggestions,
+    });
   } catch {
-    return { userId: null, isPremium: false };
+    // non-blocking log persistence
   }
 }
 
@@ -131,45 +120,26 @@ export async function POST(request: Request) {
     }).toLowerCase();
     const inputMode = inputModeRaw as InputMode;
 
-    const authenticatedUserId = await requireAuthUserId(request);
-    if (!authenticatedUserId) {
+    const userId = await requireAuthUserId(request);
+    if (!userId) {
       return NextResponse.json({ message: "Sessão obrigatória para usar IA." }, { status: 401 });
     }
 
     const endpointRateLimit = await consumeAuthRateLimit({
       route: "ai-suggestions",
       request,
-      identifier: authenticatedUserId,
+      identifier: userId,
     });
     if (!endpointRateLimit.allowed) {
       return rateLimitResponse(endpointRateLimit.retryAfterSeconds);
     }
 
-    const { userId, isPremium } = await resolveUserAndPlan(request.headers.get("authorization"));
-
-    if (!isPremium && inputMode !== "text") {
+    const entitlement = await getAiEntitlement(userId);
+    if (!entitlement.isPremium && inputMode !== "text") {
       return NextResponse.json(
         { message: "Plano free permite IA apenas por texto." },
         { status: 403 },
       );
-    }
-
-    if (!isPremium && userId) {
-      const supabase = getSupabaseServiceRoleClient();
-      const monthStartIso = startOfCurrentMonthIso();
-      const countRes = await supabase
-        .from("ai_generation_logs")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .gte("created_at", monthStartIso);
-
-      const count = countRes.count || 0;
-      if (count >= 3) {
-        return NextResponse.json(
-          { message: "Plano free atingiu o limite de 3 gerações de IA neste mês." },
-          { status: 429 },
-        );
-      }
     }
 
     let ingredientsText = payload.ingredientsText || "";
@@ -181,6 +151,7 @@ export async function POST(request: Request) {
       }
       const uploadError = validateUpload(payload.file, inputMode);
       if (uploadError) return uploadError;
+      await consumeAiUsage({ userId, bucket: "recipe_ai", feature: "suggestions", inputMode });
       ingredientsText = await transcribeAudioWithOpenAi(payload.file);
       ingredients = parseIngredientsText(ingredientsText);
     } else if (inputMode === "photo") {
@@ -189,6 +160,7 @@ export async function POST(request: Request) {
       }
       const uploadError = validateUpload(payload.file, inputMode);
       if (uploadError) return uploadError;
+      await consumeAiUsage({ userId, bucket: "recipe_ai", feature: "suggestions", inputMode });
       const photoIngredients = await identifyIngredientsFromPhotoWithOpenAi(payload.file);
       ingredients = uniqueIngredients([...photoIngredients, ...parseIngredientsText(ingredientsText)]);
       ingredientsText = ingredients.join(", ");
@@ -199,6 +171,10 @@ export async function POST(request: Request) {
         maxLength: 4000,
       });
       ingredients = parseIngredientsText(ingredientsText);
+      if (!ingredients.length) {
+        return NextResponse.json({ message: "Não foi possível identificar ingredientes válidos." }, { status: 400 });
+      }
+      await consumeAiUsage({ userId, bucket: "recipe_ai", feature: "suggestions", inputMode });
     }
 
     if (!ingredients.length) {
@@ -206,24 +182,18 @@ export async function POST(request: Request) {
     }
 
     const response = await generateRecipeSuggestionsWithOpenAi(ingredients);
-
-    if (userId) {
-      try {
-        const supabase = getSupabaseServiceRoleClient();
-        await supabase.from("ai_generation_logs").insert({
-          user_id: userId,
-          input_mode: inputMode,
-          ingredients_text: ingredientsText,
-          normalized_ingredients: response.normalizedIngredients,
-          suggestions: response.suggestions,
-        });
-      } catch {
-        // non-blocking log persistence
-      }
-    }
+    await persistSuggestionLog({
+      userId,
+      inputMode,
+      ingredientsText,
+      normalizedIngredients: response.normalizedIngredients,
+      suggestions: response.suggestions,
+    });
 
     return NextResponse.json(response);
   } catch (error) {
+    const usageResponse = aiUsageErrorResponse(error);
+    if (usageResponse) return usageResponse;
     const validationResponse = validationErrorResponse(error);
     if (validationResponse) return validationResponse;
     if (isOpenAiGenerationError(error)) {

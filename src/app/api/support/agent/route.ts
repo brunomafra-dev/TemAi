@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { answerSupportWithOpenAi, isOpenAiGenerationError } from "@/features/recipes/openai-generator";
+import { aiUsageErrorResponse, consumeAiUsage } from "@/features/security/ai-usage";
 import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse, requireAuthUserId } from "@/features/security/auth-user";
 import {
@@ -34,9 +35,18 @@ export async function POST(request: Request) {
       maxLength: 2000,
     });
 
+    await consumeAiUsage({
+      userId,
+      bucket: "support_ai",
+      feature: "support_agent",
+      inputMode: "none",
+    });
+
     const answer = await answerSupportWithOpenAi(message);
     return NextResponse.json({ message: answer });
   } catch (error) {
+    const usageResponse = aiUsageErrorResponse(error);
+    if (usageResponse) return usageResponse;
     const validationResponse = validationErrorResponse(error);
     if (validationResponse) return validationResponse;
     if (isOpenAiGenerationError(error)) {
