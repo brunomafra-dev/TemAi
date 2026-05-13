@@ -61,6 +61,7 @@ export async function POST(request: Request) {
       description,
       ingredientsText,
       stepsText,
+      userId,
     });
 
     return NextResponse.json(polished);

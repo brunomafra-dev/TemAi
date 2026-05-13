@@ -1,5 +1,6 @@
 export type InputMode = "text" | "audio" | "photo";
 export type RecipeSuggestionFilter = "all" | "meal" | "vegetarian" | "dessert" | "drink";
+export type CookingEquipment = "stove" | "oven" | "air_fryer" | "microwave" | "blender";
 export type LibraryCategory =
   | "principais"
   | "veggie"
@@ -56,6 +57,7 @@ export interface SuggestionRequestBody {
   inputMode: InputMode;
   file?: File;
   recipeFilter?: RecipeSuggestionFilter;
+  cookingEquipment?: CookingEquipment[];
   excludedSuggestionTitles?: string[];
 }
 
@@ -64,5 +66,6 @@ export interface FullRecipeRequestBody {
   suggestionTitle?: string;
   ingredients: string[];
   includeNutrition?: boolean;
+  cookingEquipment?: CookingEquipment[];
   generationId?: string;
 }

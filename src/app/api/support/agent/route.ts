@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       inputMode: "none",
     });
 
-    const answer = await answerSupportWithOpenAi(message);
+    const answer = await answerSupportWithOpenAi(message, userId);
     return NextResponse.json({ message: answer });
   } catch (error) {
     const usageResponse = aiUsageErrorResponse(error);

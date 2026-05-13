@@ -5,7 +5,7 @@ import {
   SAVED_RECIPE_REFS_KEY,
   SAVED_RECIPES_KEY,
 } from "@/features/recipes/constants";
-import type { Recipe, RecipeOrigin } from "@/features/recipes/types";
+import type { CookingEquipment, Recipe, RecipeOrigin } from "@/features/recipes/types";
 
 export interface SavedRecipeRef {
   recipeId: string;
@@ -14,6 +14,7 @@ export interface SavedRecipeRef {
   ingredientsSnapshot?: string[];
   generationId?: string;
   sourceSuggestionId?: string;
+  cookingEquipment?: CookingEquipment[];
 }
 
 function hasWindow(): boolean {

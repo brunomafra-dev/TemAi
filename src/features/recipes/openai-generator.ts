@@ -1,10 +1,23 @@
 import { serverEnv } from "@/lib/env-server";
+import {
+  formatCookingEquipmentForPrompt,
+  normalizeCookingEquipment,
+} from "@/features/recipes/cooking-equipment";
 import type {
+  CookingEquipment,
   Recipe,
   RecipeSuggestion,
   RecipeSuggestionFilter,
   SuggestionsResponse,
 } from "@/features/recipes/types";
+import {
+  type AiTelemetryContext,
+  extractOpenAiUsage,
+  logOpenAiTelemetry,
+} from "@/features/security/ai-telemetry";
+
+export const SUGGESTIONS_PROMPT_VERSION = "suggestions-v3-equipment";
+export const FULL_RECIPE_PROMPT_VERSION = "full-recipe-v3-equipment";
 
 class OpenAiGenerationError extends Error {
   status: number;
@@ -24,7 +37,7 @@ function extractJsonObject(text: string): unknown {
     return JSON.parse(trimmed);
   } catch {
     const match = trimmed.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error("JSON não encontrado.");
+    if (!match) throw new Error("JSON nao encontrado.");
     return JSON.parse(match[0]);
   }
 }
@@ -50,10 +63,11 @@ async function callOpenAiJson(params: {
   model: string;
   prompt: string | Array<unknown>;
   maxOutputTokens?: number;
+  telemetry?: AiTelemetryContext;
 }): Promise<unknown> {
   const apiKey = serverEnv.openaiApiKey();
   if (!apiKey) {
-    throw new OpenAiGenerationError("IA real ainda não configurada. Adicione OPENAI_API_KEY e faça redeploy.", 503);
+    throw new OpenAiGenerationError("IA real ainda nao configurada. Adicione OPENAI_API_KEY e faca redeploy.", 503);
   }
 
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -89,6 +103,12 @@ async function callOpenAiJson(params: {
     throw new OpenAiGenerationError(message, response.status);
   }
 
+  await logOpenAiTelemetry({
+    model: params.model,
+    usage: extractOpenAiUsage(payload),
+    context: params.telemetry,
+  });
+
   return extractJsonObject(readOutputText(payload));
 }
 
@@ -96,10 +116,11 @@ async function callOpenAiText(params: {
   model: string;
   prompt: string;
   maxOutputTokens?: number;
+  telemetry?: AiTelemetryContext;
 }): Promise<string> {
   const apiKey = serverEnv.openaiApiKey();
   if (!apiKey) {
-    throw new OpenAiGenerationError("IA real ainda não configurada. Adicione OPENAI_API_KEY e faça redeploy.", 503);
+    throw new OpenAiGenerationError("IA real ainda nao configurada. Adicione OPENAI_API_KEY e faca redeploy.", 503);
   }
 
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -120,6 +141,12 @@ async function callOpenAiText(params: {
     const message = (payload as { error?: { message?: string } }).error?.message || "Falha ao chamar IA.";
     throw new OpenAiGenerationError(message, response.status);
   }
+
+  await logOpenAiTelemetry({
+    model: params.model,
+    usage: extractOpenAiUsage(payload),
+    context: params.telemetry,
+  });
 
   return readOutputText(payload);
 }
@@ -159,32 +186,60 @@ function recipeFilterInstruction(recipeFilter: RecipeSuggestionFilter): string {
   }
 }
 
+function cookingEquipmentInstruction(cookingEquipment: CookingEquipment[]): string {
+  const normalized = normalizeCookingEquipment(cookingEquipment);
+  const hasOven = normalized.includes("oven");
+  const hasAirFryer = normalized.includes("air_fryer");
+  const hasMicrowave = normalized.includes("microwave");
+  const hasBlender = normalized.includes("blender");
+
+  return [
+    `Equipamentos disponiveis: ${formatCookingEquipmentForPrompt(normalized)}.`,
+    hasOven
+      ? "Forno disponivel: receitas assadas podem aparecer quando fizer sentido."
+      : "Forno NAO disponivel: nao sugira nem escreva preparo que dependa de forno.",
+    hasAirFryer
+      ? "Air fryer disponivel: pode adaptar receitas com temperatura e tempo quando fizer sentido."
+      : "Air fryer nao disponivel: nao dependa dela.",
+    hasMicrowave ? "Micro-ondas disponivel para preparos rapidos." : "Micro-ondas nao disponivel.",
+    hasBlender ? "Liquidificador disponivel para massas, cremes e bebidas." : "Liquidificador nao disponivel.",
+    "Fritura comum pode ser feita no fogao em panela ou frigideira quando fizer sentido; nao cite fritadeira industrial.",
+  ].join("\n");
+}
+
 export async function generateRecipeSuggestionsWithOpenAi(
   normalizedIngredients: string[],
   options?: {
     recipeFilter?: RecipeSuggestionFilter;
     excludedSuggestionTitles?: string[];
+    cookingEquipment?: CookingEquipment[];
+    userId?: string;
+    inputMode?: string;
   },
 ): Promise<SuggestionsResponse> {
   const recipeFilter = options?.recipeFilter || "all";
   const excludedSuggestionTitles = (options?.excludedSuggestionTitles || []).slice(0, 30);
+  const cookingEquipment = normalizeCookingEquipment(options?.cookingEquipment);
   const prompt = `
-Você é o chef do app TemAi. Gere sugestões em português brasileiro usando SOMENTE os ingredientes informados como base.
+Voce e o chef do app TemAi. Gere sugestoes em portugues brasileiro usando os ingredientes informados como base.
 
 Ingredientes disponiveis:
 ${normalizedIngredients.map((item) => `- ${item}`).join("\n")}
 
 ${recipeFilterInstruction(recipeFilter)}
 
+${cookingEquipmentInstruction(cookingEquipment)}
+
 Receitas ja exibidas que NAO podem ser repetidas nem por variacao parecida:
 ${excludedSuggestionTitles.length ? excludedSuggestionTitles.map((item) => `- ${item}`).join("\n") : "- nenhuma"}
 
 Regras:
 - Priorize receitas que usem exatamente os ingredientes disponiveis.
-- Não marque como faltante um ingrediente que aparece na lista.
+- Nao marque como faltante um ingrediente que aparece na lista.
 - Se precisar sugerir ingrediente faltante, limite a no maximo 2 itens por receita.
 - Nao repita nome, ideia central ou variacao obvia das receitas ja exibidas.
 - Se nao houver 3 receitas novas e boas, retorne apenas 1 ou 2 em suggestions. Nao preencha com repeticao.
+- Nao sugira receita que dependa de equipamento nao disponivel.
 - Retorne apenas JSON valido, sem markdown.
 - Formato:
 {
@@ -205,7 +260,20 @@ Regras:
   const parsed = (await callOpenAiJson({
     model: serverEnv.openaiSuggestionsModel(),
     prompt,
-    maxOutputTokens: 1400,
+    maxOutputTokens: 1000,
+    telemetry: {
+      userId: options?.userId,
+      route: "ai-suggestions",
+      operation: "recipe_suggestions",
+      feature: "suggestions",
+      inputMode: options?.inputMode || "text",
+      metadata: {
+        promptVersion: SUGGESTIONS_PROMPT_VERSION,
+        recipeFilter,
+        cookingEquipment,
+        excludedCount: excludedSuggestionTitles.length,
+      },
+    },
   })) as Partial<SuggestionsResponse>;
 
   return {
@@ -219,10 +287,13 @@ Regras:
   };
 }
 
-export async function transcribeAudioWithOpenAi(file: File): Promise<string> {
+export async function transcribeAudioWithOpenAi(
+  file: File,
+  options?: { userId?: string; inputMode?: string },
+): Promise<string> {
   const apiKey = serverEnv.openaiApiKey();
   if (!apiKey) {
-    throw new OpenAiGenerationError("IA real ainda não configurada. Adicione OPENAI_API_KEY e faça redeploy.", 503);
+    throw new OpenAiGenerationError("IA real ainda nao configurada. Adicione OPENAI_API_KEY e faca redeploy.", 503);
   }
 
   const formData = new FormData();
@@ -239,7 +310,7 @@ export async function transcribeAudioWithOpenAi(file: File): Promise<string> {
 
   const payload = (await response.json().catch(() => ({}))) as { text?: string; error?: { message?: string } };
   if (!response.ok) {
-    const message = payload.error?.message || "Falha ao transcrever áudio.";
+    const message = payload.error?.message || "Falha ao transcrever audio.";
     const normalized = message.toLowerCase();
     if (response.status === 402 || response.status === 429 || normalized.includes("quota") || normalized.includes("billing")) {
       throw new OpenAiGenerationError("IA indisponivel: verifique creditos/billing da OpenAI.", 402);
@@ -247,12 +318,29 @@ export async function transcribeAudioWithOpenAi(file: File): Promise<string> {
     throw new OpenAiGenerationError(message, response.status);
   }
 
+  await logOpenAiTelemetry({
+    model: serverEnv.openaiAudioModel(),
+    usage: null,
+    context: {
+      userId: options?.userId,
+      route: "ai-suggestions",
+      operation: "audio_transcription",
+      feature: "suggestions",
+      inputMode: options?.inputMode || "audio",
+      metadata: { fileSize: file.size, fileType: file.type || "" },
+    },
+  });
+
   return payload.text?.trim() || "";
 }
 
-export async function identifyIngredientsFromPhotoWithOpenAi(file: File): Promise<string[]> {
+export async function identifyIngredientsFromPhotoWithOpenAi(
+  file: File,
+  options?: { userId?: string; detail?: "low" | "high" },
+): Promise<string[]> {
   const bytes = Buffer.from(await file.arrayBuffer());
   const dataUrl = `data:${file.type || "image/jpeg"};base64,${bytes.toString("base64")}`;
+  const detail = options?.detail || "low";
   const parsed = (await callOpenAiJson({
     model: serverEnv.openaiSuggestionsModel(),
     prompt: [
@@ -262,13 +350,21 @@ export async function identifyIngredientsFromPhotoWithOpenAi(file: File): Promis
           {
             type: "input_text",
             text:
-              "Identifique ingredientes visíveis nesta foto para gerar receitas. Retorne apenas JSON válido no formato {\"ingredients\":[\"ingrediente\"]}. Use nomes simples em português brasileiro.",
+              "Identifique ingredientes visiveis nesta foto para gerar receitas. Retorne apenas JSON valido no formato {\"ingredients\":[\"ingrediente\"]}. Use nomes simples em portugues brasileiro.",
           },
-          { type: "input_image", image_url: dataUrl },
+          { type: "input_image", image_url: dataUrl, detail },
         ],
       },
     ],
-    maxOutputTokens: 500,
+    maxOutputTokens: 220,
+    telemetry: {
+      userId: options?.userId,
+      route: "ai-suggestions",
+      operation: "photo_ingredient_detection",
+      feature: "suggestions",
+      inputMode: "photo",
+      metadata: { detail, fileSize: file.size, fileType: file.type || "" },
+    },
   })) as { ingredients?: unknown };
 
   return Array.isArray(parsed.ingredients)
@@ -280,7 +376,10 @@ export async function generateFullRecipeWithOpenAi(params: {
   suggestionTitle: string;
   ingredients: string[];
   includeNutrition: boolean;
+  cookingEquipment?: CookingEquipment[];
+  userId?: string;
 }): Promise<Recipe> {
+  const cookingEquipment = normalizeCookingEquipment(params.cookingEquipment);
   const prompt = `
 Crie uma receita completa em portugues brasileiro.
 
@@ -288,11 +387,17 @@ Receita escolhida: ${params.suggestionTitle}
 Ingredientes disponiveis:
 ${params.ingredients.map((item) => `- ${item}`).join("\n")}
 
+${cookingEquipmentInstruction(cookingEquipment)}
+
 Regras:
 - Use os ingredientes disponiveis como base.
 - Escreva de forma didatica para cozinheiros iniciantes.
 - Inclua quantidades aproximadas nos ingredientes sempre que fizer sentido.
-- Os passos devem conter fogo baixo/médio/alto, tempo de cada etapa, ponto visual esperado e temperatura de forno quando houver forno.
+- Os passos devem respeitar os equipamentos disponiveis.
+- Se usar fogao, inclua fogo baixo/medio/alto, tempo de cada etapa e ponto visual esperado.
+- Se usar air fryer, inclua temperatura e tempo.
+- Se forno nao estiver disponivel, nao escreva "leve ao forno" nem dependa dele.
+- Se forno estiver disponivel e for usado, inclua temperatura e tempo.
 - Se incluir ingrediente extra indispensavel, deixe claro na lista.
 - prepMinutes deve representar o tempo medio total.
 - Retorne apenas JSON valido, sem markdown.
@@ -313,7 +418,19 @@ Regras:
   const parsed = (await callOpenAiJson({
     model: serverEnv.openaiRecipeModel(),
     prompt,
-    maxOutputTokens: 1800,
+    maxOutputTokens: 1600,
+    telemetry: {
+      userId: params.userId,
+      route: "ai-recipe",
+      operation: "full_recipe",
+      feature: "recipe",
+      inputMode: "text",
+      metadata: {
+        promptVersion: FULL_RECIPE_PROMPT_VERSION,
+        includeNutrition: params.includeNutrition,
+        cookingEquipment,
+      },
+    },
   })) as Partial<Recipe>;
 
   return {
@@ -325,7 +442,7 @@ Regras:
       : params.ingredients,
     steps: Array.isArray(parsed.steps)
       ? parsed.steps.filter((entry): entry is string => typeof entry === "string")
-      : ["Prepare os ingredientes, cozinhe até o ponto desejado e ajuste o tempero."],
+      : ["Prepare os ingredientes, cozinhe ate o ponto desejado e ajuste o tempero."],
     prepMinutes: typeof parsed.prepMinutes === "number" ? parsed.prepMinutes : 25,
     servings: typeof parsed.servings === "number" ? parsed.servings : 2,
     sourceLabel: "TemAi IA",
@@ -338,11 +455,12 @@ export async function polishAuthorRecipeWithOpenAi(params: {
   description: string;
   ingredientsText: string;
   stepsText: string;
+  userId?: string;
 }): Promise<{ description: string; ingredientsText: string; stepsText: string; prepMinutes: number; servings: number }> {
   const parsed = (await callOpenAiJson({
     model: serverEnv.openaiAuthorRecipeModel(),
     prompt: `
-Organize uma receita autoral em português brasileiro, mantendo a ideia do usuário.
+Organize uma receita autoral em portugues brasileiro, mantendo a ideia do usuario.
 
 Titulo: ${params.title}
 Descricao atual: ${params.description}
@@ -351,14 +469,21 @@ Preparo/transcricao: ${params.stepsText}
 
 Retorne apenas JSON valido:
 {
-  "description": "descrição curta bonita",
-  "ingredientsText": "um ingrediente por linha, com quantidade quando possível",
-  "stepsText": "um passo didático por linha, com tempos, ponto visual, fogo/forno e temperatura quando aplicável",
+  "description": "descricao curta bonita",
+  "ingredientsText": "um ingrediente por linha, com quantidade quando possivel",
+  "stepsText": "um passo didatico por linha, com tempos, ponto visual, fogo/forno e temperatura quando aplicavel",
   "prepMinutes": 30,
   "servings": 2
 }
 `,
     maxOutputTokens: 1400,
+    telemetry: {
+      userId: params.userId,
+      route: "ai-author-recipe",
+      operation: "author_recipe_polish",
+      feature: "author_recipe",
+      inputMode: "text",
+    },
   })) as Partial<{ description: string; ingredientsText: string; stepsText: string; prepMinutes: number; servings: number }>;
 
   return {
@@ -370,17 +495,24 @@ Retorne apenas JSON valido:
   };
 }
 
-export async function answerSupportWithOpenAi(message: string): Promise<string> {
+export async function answerSupportWithOpenAi(message: string, userId?: string): Promise<string> {
   return callOpenAiText({
     model: serverEnv.openaiSupportModel(),
     prompt: `
-Você é o agente de suporte do app TemAi. Responda em português brasileiro, com clareza e gentileza.
-Ajude com login, cadastro, exclusão de conta, assinatura, limites de IA, foto/áudio/texto, receitas e privacidade.
-Se for problema sensível de conta/cobrança, oriente a abrir ticket e enviar email da conta, print e descrição.
-Não invente políticas legais ou promessas de reembolso.
+Voce e o agente de suporte do app TemAi. Responda em portugues brasileiro, com clareza e gentileza.
+Ajude com login, cadastro, exclusao de conta, assinatura, limites de IA, foto/audio/texto, receitas e privacidade.
+Se for problema sensivel de conta/cobranca, oriente a abrir ticket e enviar email da conta, print e descricao.
+Nao invente politicas legais ou promessas de reembolso.
 
 Usuario: ${message}
 `,
     maxOutputTokens: 500,
+    telemetry: {
+      userId,
+      route: "support-agent",
+      operation: "support_answer",
+      feature: "support_agent",
+      inputMode: "none",
+    },
   });
 }

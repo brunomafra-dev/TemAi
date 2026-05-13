@@ -14,7 +14,19 @@ import {
   syncSubscriptionFromCloud,
   type SubscriptionState,
 } from "@/features/profile/subscription-storage";
+import {
+  getUserProfile,
+  saveUserProfile,
+  saveUserProfileToCloud,
+  syncUserProfileFromCloud,
+} from "@/features/profile/storage";
+import {
+  COOKING_EQUIPMENT_LABELS,
+  COOKING_EQUIPMENT_VALUES,
+  normalizeCookingEquipment,
+} from "@/features/recipes/cooking-equipment";
 import type {
+  CookingEquipment,
   InputMode,
   RecipeSuggestion,
   RecipeSuggestionFilter,
@@ -35,6 +47,11 @@ const recipeFilters: Array<{ value: RecipeSuggestionFilter; label: string }> = [
   { value: "dessert", label: "Sobremesa" },
   { value: "drink", label: "Bebidas" },
 ];
+
+const cookingEquipmentOptions = COOKING_EQUIPMENT_VALUES.map((value) => ({
+  value,
+  label: COOKING_EQUIPMENT_LABELS[value],
+}));
 
 const AI_SUGGESTIONS_CACHE_KEY = "temai:ai-suggestions:last";
 
@@ -75,6 +92,7 @@ type CachedSuggestionsState = {
   mode: InputMode;
   ingredientsText: string;
   recipeFilter: RecipeSuggestionFilter;
+  cookingEquipment: CookingEquipment[];
   response: SuggestionsResponse;
   extraSuggestions: GeneratedSuggestion[];
   suggestionsNotice: string;
@@ -215,6 +233,7 @@ function readCachedSuggestions(): CachedSuggestionsState | null {
       mode: parsedMode,
       ingredientsText: parsed.ingredientsText || "",
       recipeFilter: isValidRecipeFilter(parsed.recipeFilter) ? parsed.recipeFilter : "all",
+      cookingEquipment: normalizeCookingEquipment(parsed.cookingEquipment),
       response: parsed.response,
       extraSuggestions: readGeneratedSuggestions(parsed.extraSuggestions),
       suggestionsNotice: parsed.suggestionsNotice || parsed.response.dedupeNotice || "",
@@ -248,6 +267,9 @@ function CreateRecipePageContent() {
   const [mode, setMode] = useState<InputMode>("text");
   const [ingredientsText, setIngredientsText] = useState("");
   const [recipeFilter, setRecipeFilter] = useState<RecipeSuggestionFilter>("all");
+  const [cookingEquipment, setCookingEquipment] = useState<CookingEquipment[]>(
+    () => getUserProfile().cookingEquipment,
+  );
   const [response, setResponse] = useState<SuggestionsResponse | null>(null);
   const [extraSuggestions, setExtraSuggestions] = useState<GeneratedSuggestion[]>([]);
   const [suggestionsNotice, setSuggestionsNotice] = useState("");
@@ -274,6 +296,7 @@ function CreateRecipePageContent() {
         setMode(cached.mode);
         setIngredientsText(cached.ingredientsText);
         setRecipeFilter(cached.recipeFilter);
+        setCookingEquipment(cached.cookingEquipment);
         setResponse(cached.response);
         setExtraSuggestions(cached.extraSuggestions);
         setSuggestionsNotice(cached.suggestionsNotice);
@@ -326,6 +349,21 @@ function CreateRecipePageContent() {
     };
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+    setCookingEquipment(normalizeCookingEquipment(getUserProfile().cookingEquipment));
+    syncUserProfileFromCloud()
+      .then((profile) => {
+        if (!mounted || !profile) return;
+        setCookingEquipment(normalizeCookingEquipment(profile.cookingEquipment));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const isAudioCaptureActive = isListening || isRecordingAudio;
 
   const canGenerate = useMemo(() => {
@@ -342,6 +380,19 @@ function CreateRecipePageContent() {
       : mode === "photo"
         ? "Opcional: adicione algo que a foto não mostra..."
         : "Ex: ovo, arroz, alho, cebola...";
+
+  const toggleCookingEquipment = useCallback((equipment: CookingEquipment) => {
+    setCookingEquipment((current) => {
+      const next = current.includes(equipment)
+        ? current.filter((item) => item !== equipment)
+        : [...current, equipment];
+      const normalized = normalizeCookingEquipment(next);
+      const nextProfile = { ...getUserProfile(), cookingEquipment: normalized };
+      saveUserProfile(nextProfile);
+      void saveUserProfileToCloud(nextProfile);
+      return normalized;
+    });
+  }, []);
 
   const stopVoiceCapture = useCallback(() => {
     recognitionRef.current?.stop();
@@ -503,6 +554,7 @@ function CreateRecipePageContent() {
         ingredientsText,
         inputMode: mode,
         recipeFilter,
+        cookingEquipment,
         file:
           mode === "photo"
             ? selectedPhotoFile || undefined
@@ -518,6 +570,7 @@ function CreateRecipePageContent() {
         mode,
         ingredientsText,
         recipeFilter,
+        cookingEquipment,
         response: data,
         extraSuggestions: [],
         suggestionsNotice: data.dedupeNotice || "",
@@ -560,6 +613,7 @@ function CreateRecipePageContent() {
         ingredientsText: nextIngredientsText,
         inputMode: "text",
         recipeFilter,
+        cookingEquipment,
         excludedSuggestionTitles,
       });
       const nextSuggestions = attachGenerationId(data.suggestions, data.generationId);
@@ -578,6 +632,7 @@ function CreateRecipePageContent() {
           mode,
           ingredientsText,
           recipeFilter,
+          cookingEquipment,
           response,
           extraSuggestions: merged,
           suggestionsNotice: nextNotice,
@@ -601,9 +656,10 @@ function CreateRecipePageContent() {
     const ingredientsQuery = response?.normalizedIngredients.join(",") ?? "";
     const nutritionFlag = includeNutritionEstimate ? "&nutrition=1" : "";
     const generationFlag = generationId ? `&generationId=${encodeURIComponent(generationId)}` : "";
+    const equipmentFlag = `&equipment=${encodeURIComponent(cookingEquipment.join(","))}`;
     const titleQuery = encodeURIComponent(suggestion.title);
-    router.push(`/receita/${suggestion.id}?origin=ai&ingredients=${encodeURIComponent(ingredientsQuery)}&title=${titleQuery}${nutritionFlag}${generationFlag}`);
-  }, [includeNutritionEstimate, response?.normalizedIngredients, router]);
+    router.push(`/receita/${suggestion.id}?origin=ai&ingredients=${encodeURIComponent(ingredientsQuery)}&title=${titleQuery}${nutritionFlag}${generationFlag}${equipmentFlag}`);
+  }, [cookingEquipment, includeNutritionEstimate, response?.normalizedIngredients, router]);
 
   const pickFromCamera = useCallback(() => {
     cameraInputRef.current?.click();
@@ -697,6 +753,31 @@ function CreateRecipePageContent() {
                   {filter.label}
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#8C775A]">Minha cozinha</p>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {cookingEquipmentOptions.map((equipment) => {
+                const isSelected = cookingEquipment.includes(equipment.value);
+                return (
+                  <button
+                    key={equipment.value}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => toggleCookingEquipment(equipment.value)}
+                    className={cn(
+                      "shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition",
+                      isSelected
+                        ? "border-[#3F7D58] bg-[#E5F4E9] text-[#28573A]"
+                        : "border-[#E5D7C1] bg-[#FAF5EC] text-[#6E6258]",
+                    )}
+                  >
+                    {equipment.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

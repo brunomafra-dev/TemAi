@@ -1,12 +1,18 @@
 "use client";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase-client";
+import {
+  DEFAULT_COOKING_EQUIPMENT,
+  normalizeCookingEquipment,
+} from "@/features/recipes/cooking-equipment";
+import type { CookingEquipment } from "@/features/recipes/types";
 
 export interface UserProfile {
   firstName: string;
   lastName: string;
   username: string;
   photoDataUrl: string;
+  cookingEquipment: CookingEquipment[];
   selectedBadge: string;
   unlockedBadges: string[];
   acceptedTermsAt: string | null;
@@ -20,6 +26,7 @@ const defaultProfile: UserProfile = {
   lastName: "Mafra",
   username: "",
   photoDataUrl: "",
+  cookingEquipment: DEFAULT_COOKING_EQUIPMENT,
   selectedBadge: "estagiario",
   unlockedBadges: ["estagiario"],
   acceptedTermsAt: null,
@@ -43,6 +50,7 @@ export function getUserProfile(): UserProfile {
       lastName: parsed.lastName?.trim() || defaultProfile.lastName,
       username: parsed.username?.trim() || "",
       photoDataUrl: parsed.photoDataUrl?.trim() || "",
+      cookingEquipment: normalizeCookingEquipment(parsed.cookingEquipment),
       selectedBadge:
         parsed.selectedBadge?.trim() || defaultProfile.selectedBadge,
       unlockedBadges:
@@ -73,6 +81,7 @@ function normalizeProfile(partial?: Partial<UserProfile> | null): UserProfile {
     lastName: partial.lastName?.trim() || defaultProfile.lastName,
     username: partial.username?.trim() || "",
     photoDataUrl: partial.photoDataUrl?.trim() || "",
+    cookingEquipment: normalizeCookingEquipment(partial.cookingEquipment),
     selectedBadge: partial.selectedBadge?.trim() || defaultProfile.selectedBadge,
     unlockedBadges:
       Array.isArray(partial.unlockedBadges) && partial.unlockedBadges.length > 0
@@ -93,7 +102,7 @@ export async function syncUserProfileFromCloud(): Promise<UserProfile | null> {
 
   const { data, error } = await client
     .from("profiles")
-    .select("first_name,last_name,username,avatar_url,selected_badge,unlocked_badges,accepted_terms_at,accepted_privacy_at")
+    .select("first_name,last_name,username,avatar_url,cooking_equipment,selected_badge,unlocked_badges,accepted_terms_at,accepted_privacy_at")
     .eq("id", userId)
     .single();
 
@@ -108,6 +117,7 @@ export async function syncUserProfileFromCloud(): Promise<UserProfile | null> {
     lastName: data.last_name || "",
     username: data.username || "",
     photoDataUrl: data.avatar_url || "",
+    cookingEquipment: normalizeCookingEquipment(data.cooking_equipment),
     selectedBadge: data.selected_badge || "estagiario",
     unlockedBadges: Array.isArray(data.unlocked_badges) ? data.unlocked_badges : ["estagiario"],
     acceptedTermsAt: data.accepted_terms_at || null,
@@ -134,6 +144,7 @@ export async function saveUserProfileToCloud(profile: UserProfile): Promise<bool
       last_name: normalized.lastName,
       username: normalized.username || null,
       avatar_url: normalized.photoDataUrl || null,
+      cooking_equipment: normalized.cookingEquipment,
       selected_badge: normalized.selectedBadge,
       unlocked_badges: normalized.unlockedBadges,
       accepted_terms_at: normalized.acceptedTermsAt,

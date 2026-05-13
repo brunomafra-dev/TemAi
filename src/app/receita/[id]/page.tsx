@@ -20,6 +20,8 @@ import {
 } from "@/features/recipes/local-storage";
 import { getUserRecipeRating, setUserRecipeRating } from "@/features/recipes/ratings-storage";
 import type { Recipe } from "@/features/recipes/types";
+import type { CookingEquipment } from "@/features/recipes/types";
+import { normalizeCookingEquipment } from "@/features/recipes/cooking-equipment";
 import { parseIngredientsText } from "@/features/recipes/helpers";
 import { slugify } from "@/lib/utils";
 
@@ -42,6 +44,11 @@ function parseIngredientsQuery(rawIngredients: string | null): string[] {
     .split(",")
     .map((ingredient) => ingredient.trim())
     .filter(Boolean);
+}
+
+function parseCookingEquipmentQuery(rawEquipment: string | null): CookingEquipment[] {
+  if (!rawEquipment) return normalizeCookingEquipment(undefined);
+  return normalizeCookingEquipment(rawEquipment.split(",").map((item) => item.trim()));
 }
 
 function normalizeList(values: string[]): string[] {
@@ -253,6 +260,10 @@ export default function RecipeDetailsPage() {
     () => parseIngredientsQuery(searchParams.get("ingredients")),
     [searchParams],
   );
+  const cookingEquipment = useMemo(
+    () => parseCookingEquipmentQuery(searchParams.get("equipment")),
+    [searchParams],
+  );
   const suggestionTitle = searchParams.get("title") || undefined;
   const shouldIncludeNutrition = searchParams.get("nutrition") === "1";
   const generationId = searchParams.get("generationId") || undefined;
@@ -356,6 +367,7 @@ export default function RecipeDetailsPage() {
             suggestionId: savedRef.sourceSuggestionId || recipeId,
             suggestionTitle,
             ingredients: savedRef.ingredientsSnapshot || ingredientList,
+            cookingEquipment: savedRef.cookingEquipment || cookingEquipment,
             includeNutrition: shouldIncludeNutrition,
             generationId: savedRef.generationId,
           });
@@ -395,6 +407,7 @@ export default function RecipeDetailsPage() {
           suggestionId: recipeId,
           suggestionTitle,
           ingredients: ingredientList,
+          cookingEquipment,
           includeNutrition: shouldIncludeNutrition,
           generationId,
         });
@@ -422,7 +435,7 @@ export default function RecipeDetailsPage() {
     return () => {
       isMounted = false;
     };
-  }, [generationId, ingredientList, origin, recipeId, shouldIncludeNutrition, suggestionTitle]);
+  }, [cookingEquipment, generationId, ingredientList, origin, recipeId, shouldIncludeNutrition, suggestionTitle]);
 
   useEffect(() => {
     if (!isShoppingOpen) return;
@@ -447,6 +460,7 @@ export default function RecipeDetailsPage() {
       savedAt: new Date().toISOString(),
       ingredientsSnapshot: ingredientList,
       generationId,
+      cookingEquipment,
       sourceSuggestionId: origin === "ai" ? recipeId : undefined,
     });
     setIsSaved(true);

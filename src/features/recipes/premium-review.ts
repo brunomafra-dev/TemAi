@@ -1,4 +1,5 @@
 import type { ImportedRecipeDraft } from "@/features/recipes/import-from-url";
+import { extractOpenAiUsage, logOpenAiTelemetry } from "@/features/security/ai-telemetry";
 import { serverEnv } from "@/lib/env-server";
 
 interface PremiumRecipeShape {
@@ -86,6 +87,16 @@ async function requestPremiumReview(input: PremiumRecipeShape): Promise<PremiumR
   const payload = (await response.json()) as {
     output_text?: string;
   };
+  await logOpenAiTelemetry({
+    model,
+    usage: extractOpenAiUsage(payload),
+    context: {
+      route: "library-import",
+      operation: "premium_recipe_review",
+      feature: "import_review",
+      inputMode: "none",
+    },
+  });
 
   if (!payload.output_text) return null;
   return safeParseJsonObject(payload.output_text);

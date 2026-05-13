@@ -7,6 +7,12 @@ import {
   transcribeAudioWithOpenAi,
 } from "@/features/recipes/openai-generator";
 import type { InputMode, RecipeSuggestion, RecipeSuggestionFilter, SuggestionsResponse } from "@/features/recipes/types";
+import type { CookingEquipment } from "@/features/recipes/types";
+import {
+  COOKING_EQUIPMENT_VALUES,
+  DEFAULT_COOKING_EQUIPMENT,
+  normalizeCookingEquipment,
+} from "@/features/recipes/cooking-equipment";
 import {
   aiUsageErrorResponse,
   consumeAiUsage,
@@ -29,6 +35,7 @@ interface SuggestionsPayload {
   ingredientsText?: string;
   inputMode?: InputMode;
   recipeFilter?: RecipeSuggestionFilter;
+  cookingEquipment?: unknown;
   excludedSuggestionTitles?: unknown;
 }
 
@@ -63,14 +70,14 @@ async function readSuggestionsInput(request: Request): Promise<SuggestionsPayloa
   if (!contentType.includes("multipart/form-data")) {
     return (await parseJsonObjectBody(request, {
       maxBytes: 16 * 1024,
-      allowedKeys: ["ingredientsText", "inputMode", "recipeFilter", "excludedSuggestionTitles"],
+      allowedKeys: ["ingredientsText", "inputMode", "recipeFilter", "cookingEquipment", "excludedSuggestionTitles"],
     })) as SuggestionsPayload;
   }
 
   assertRequestContentLength(request, MAX_MULTIPART_BYTES);
   const form = await request.formData();
   for (const key of form.keys()) {
-    if (!["ingredientsText", "inputMode", "recipeFilter", "excludedSuggestionTitles", "file"].includes(key)) {
+    if (!["ingredientsText", "inputMode", "recipeFilter", "cookingEquipment", "excludedSuggestionTitles", "file"].includes(key)) {
       throw new InputValidationError(`Campo inesperado: ${key}.`);
     }
   }
@@ -79,6 +86,7 @@ async function readSuggestionsInput(request: Request): Promise<SuggestionsPayloa
   const rawIngredientsText = String(form.get("ingredientsText") || "").trim();
   const rawInputMode = String(form.get("inputMode") || "").trim();
   const rawRecipeFilter = String(form.get("recipeFilter") || "").trim();
+  const rawCookingEquipment = String(form.get("cookingEquipment") || "").trim();
   const rawExcludedSuggestionTitles = String(form.get("excludedSuggestionTitles") || "").trim();
   if (rawIngredientsText.length > 4000) {
     throw new InputValidationError("Ingredientes muito grande.", 413);
@@ -91,6 +99,7 @@ async function readSuggestionsInput(request: Request): Promise<SuggestionsPayloa
     ingredientsText: rawIngredientsText,
     inputMode: rawInputMode as InputMode,
     recipeFilter: rawRecipeFilter as RecipeSuggestionFilter,
+    cookingEquipment: rawCookingEquipment,
     excludedSuggestionTitles: rawExcludedSuggestionTitles,
     file: file instanceof File ? file : undefined,
   };
@@ -141,6 +150,17 @@ function normalizeExcludedTitlesValue(raw: unknown): unknown {
   }
 }
 
+function normalizeJsonArrayString(raw: unknown, fieldName: string): unknown {
+  if (typeof raw !== "string") return raw;
+  const value = raw.trim();
+  if (!value) return undefined;
+  try {
+    return JSON.parse(value);
+  } catch {
+    throw new InputValidationError(`${fieldName} malformado.`);
+  }
+}
+
 function readExcludedSuggestionTitles(payload: Record<string, unknown>): string[] {
   const raw = normalizeExcludedTitlesValue(payload.excludedSuggestionTitles);
   if (raw === undefined || raw === null) return [];
@@ -150,6 +170,25 @@ function readExcludedSuggestionTitles(payload: Record<string, unknown>): string[
     itemMaxLength: 120,
     minItems: 0,
   });
+}
+
+function readCookingEquipment(payload: Record<string, unknown>): CookingEquipment[] {
+  const raw = normalizeJsonArrayString(payload.cookingEquipment, "Equipamentos");
+  if (raw === undefined || raw === null) return [...DEFAULT_COOKING_EQUIPMENT];
+
+  const values = readStringArray({ cookingEquipment: raw }, "cookingEquipment", {
+    fieldName: "Equipamentos",
+    maxItems: COOKING_EQUIPMENT_VALUES.length,
+    itemMaxLength: 32,
+    minItems: 0,
+  });
+  const normalized = normalizeCookingEquipment(values);
+
+  if (values.some((value) => !COOKING_EQUIPMENT_VALUES.includes(value as CookingEquipment))) {
+    throw new InputValidationError("Equipamentos invalidos.");
+  }
+
+  return normalized;
 }
 
 function normalizeTitleKey(value: string): string {
@@ -223,25 +262,58 @@ async function persistSuggestionLog(params: {
   inputMode: InputMode;
   ingredientsText: string;
   normalizedIngredients: string[];
+  cookingEquipment: CookingEquipment[];
   suggestions: unknown[];
 }): Promise<string | undefined> {
+  const insertPayload = {
+    user_id: params.userId,
+    input_mode: params.inputMode,
+    ingredients_text: params.ingredientsText,
+    normalized_ingredients: params.normalizedIngredients,
+    cooking_equipment: params.cookingEquipment,
+    suggestions: params.suggestions,
+  };
+
   try {
     const supabase = getSupabaseServiceRoleClient();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("ai_generation_logs")
-      .insert({
-        user_id: params.userId,
-        input_mode: params.inputMode,
-        ingredients_text: params.ingredientsText,
-        normalized_ingredients: params.normalizedIngredients,
-        suggestions: params.suggestions,
-      })
+      .insert(insertPayload)
       .select("id")
       .single();
 
+    if (error) throw error;
+    return typeof data?.id === "string" ? data.id : undefined;
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message.toLowerCase()
+        : typeof (error as { message?: unknown })?.message === "string"
+          ? ((error as { message: string }).message).toLowerCase()
+          : "";
+    if (!message.includes("cooking_equipment")) {
+      return undefined;
+    }
+  }
+
+  try {
+    const supabase = getSupabaseServiceRoleClient();
+    const fallbackPayload: Omit<typeof insertPayload, "cooking_equipment"> = {
+      user_id: insertPayload.user_id,
+      input_mode: insertPayload.input_mode,
+      ingredients_text: insertPayload.ingredients_text,
+      normalized_ingredients: insertPayload.normalized_ingredients,
+      suggestions: insertPayload.suggestions,
+    };
+    const { data, error } = await supabase
+      .from("ai_generation_logs")
+      .insert(fallbackPayload)
+      .select("id")
+      .single();
+
+    if (error) return undefined;
     return typeof data?.id === "string" ? data.id : undefined;
   } catch {
-    // non-blocking log persistence
     return undefined;
   }
 }
@@ -260,6 +332,7 @@ export async function POST(request: Request) {
     }).toLowerCase();
     const inputMode = inputModeRaw as InputMode;
     const recipeFilter = readRecipeFilter(payload.recipeFilter);
+    const cookingEquipment = readCookingEquipment(payload as Record<string, unknown>);
     const excludedSuggestionTitles = readExcludedSuggestionTitles(payload as Record<string, unknown>);
 
     const userId = await requireAuthUserId(request);
@@ -296,7 +369,10 @@ export async function POST(request: Request) {
         const usage = await consumeAiUsage({ userId, bucket: "recipe_ai", feature: "suggestions", inputMode });
         usageEventId = usage.eventId;
         const typedIngredientsText = ingredientsText.trim();
-        const transcribedIngredientsText = await transcribeAudioWithOpenAi(payload.file);
+        const transcribedIngredientsText = await transcribeAudioWithOpenAi(payload.file, {
+          userId,
+          inputMode,
+        });
         ingredientsText = [transcribedIngredientsText, typedIngredientsText].filter(Boolean).join(", ");
         ingredients = parseIngredientsText(ingredientsText);
       } else {
@@ -320,7 +396,16 @@ export async function POST(request: Request) {
       if (uploadError) return uploadError;
       const usage = await consumeAiUsage({ userId, bucket: "recipe_ai", feature: "suggestions", inputMode });
       usageEventId = usage.eventId;
-      const photoIngredients = await identifyIngredientsFromPhotoWithOpenAi(payload.file);
+      let photoIngredients = await identifyIngredientsFromPhotoWithOpenAi(payload.file, {
+        userId,
+        detail: "low",
+      });
+      if (photoIngredients.length < 2) {
+        photoIngredients = await identifyIngredientsFromPhotoWithOpenAi(payload.file, {
+          userId,
+          detail: "high",
+        });
+      }
       ingredients = uniqueIngredients([...photoIngredients, ...parseIngredientsText(ingredientsText)]);
       ingredientsText = ingredients.join(", ");
     } else {
@@ -345,6 +430,9 @@ export async function POST(request: Request) {
     const rawResponse = await generateRecipeSuggestionsWithOpenAi(ingredients, {
       recipeFilter,
       excludedSuggestionTitles,
+      cookingEquipment,
+      userId,
+      inputMode,
     });
     const { response, removedCount } = filterDuplicateSuggestions({
       response: rawResponse,
@@ -360,6 +448,7 @@ export async function POST(request: Request) {
       inputMode,
       ingredientsText,
       normalizedIngredients: response.normalizedIngredients,
+      cookingEquipment,
       suggestions: [...response.suggestions, ...response.alsoCanMake],
     });
 

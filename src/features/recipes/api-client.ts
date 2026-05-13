@@ -44,6 +44,9 @@ export async function fetchAiSuggestions(
     requestBody.append("ingredientsText", body.ingredientsText);
     requestBody.append("inputMode", body.inputMode);
     requestBody.append("recipeFilter", body.recipeFilter || "all");
+    if (body.cookingEquipment?.length) {
+      requestBody.append("cookingEquipment", JSON.stringify(body.cookingEquipment));
+    }
     if (body.excludedSuggestionTitles?.length) {
       requestBody.append("excludedSuggestionTitles", JSON.stringify(body.excludedSuggestionTitles));
     }

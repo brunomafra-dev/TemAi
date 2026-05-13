@@ -1,11 +1,23 @@
+import { createHash } from "crypto";
 import { NextResponse } from "next/server";
-import { generateFullRecipeWithOpenAi, isOpenAiGenerationError } from "@/features/recipes/openai-generator";
-import type { Recipe } from "@/features/recipes/types";
+import {
+  FULL_RECIPE_PROMPT_VERSION,
+  generateFullRecipeWithOpenAi,
+  isOpenAiGenerationError,
+} from "@/features/recipes/openai-generator";
+import type { CookingEquipment, Recipe } from "@/features/recipes/types";
+import {
+  COOKING_EQUIPMENT_VALUES,
+  DEFAULT_COOKING_EQUIPMENT,
+  normalizeCookingEquipment,
+} from "@/features/recipes/cooking-equipment";
 import { aiUsageErrorResponse, consumeAiUsage } from "@/features/security/ai-usage";
 import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse, requireAuthUserId } from "@/features/security/auth-user";
+import { serverEnv } from "@/lib/env-server";
 import { getSupabaseServiceRoleClient } from "@/lib/supabase-admin";
 import {
+  InputValidationError,
   parseJsonObjectBody,
   readOptionalBoolean,
   readOptionalString,
@@ -19,8 +31,11 @@ interface RecipePayload {
   suggestionTitle?: string;
   ingredients?: string[];
   includeNutrition?: boolean;
+  cookingEquipment?: unknown;
   generationId?: string;
 }
+
+const inFlightRecipeRequests = new Map<string, Promise<Recipe>>();
 
 function isRecipe(value: unknown): value is Recipe {
   if (!value || typeof value !== "object") return false;
@@ -46,6 +61,53 @@ function generationHasSuggestion(suggestions: unknown, suggestionId: string): bo
   });
 }
 
+function readCookingEquipment(payload: Record<string, unknown>): CookingEquipment[] {
+  if (payload.cookingEquipment === undefined || payload.cookingEquipment === null) {
+    return [...DEFAULT_COOKING_EQUIPMENT];
+  }
+
+  const values = readStringArray(payload, "cookingEquipment", {
+    fieldName: "Equipamentos",
+    maxItems: COOKING_EQUIPMENT_VALUES.length,
+    itemMaxLength: 32,
+    minItems: 0,
+  });
+
+  if (values.some((value) => !COOKING_EQUIPMENT_VALUES.includes(value as CookingEquipment))) {
+    throw new InputValidationError("Equipamentos invalidos.");
+  }
+
+  return normalizeCookingEquipment(values);
+}
+
+function normalizeCacheText(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildRecipeCacheKey(params: {
+  model: string;
+  suggestionTitle: string;
+  ingredients: string[];
+  cookingEquipment: CookingEquipment[];
+}): string {
+  const payload = {
+    promptVersion: FULL_RECIPE_PROMPT_VERSION,
+    model: params.model,
+    title: normalizeCacheText(params.suggestionTitle),
+    ingredients: Array.from(new Set(params.ingredients.map(normalizeCacheText).filter(Boolean))).sort(),
+    cookingEquipment: normalizeCookingEquipment(params.cookingEquipment).slice().sort(),
+  };
+
+  return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+}
+
 async function verifyGeneratedSuggestion(params: {
   userId: string;
   generationId: string;
@@ -67,7 +129,6 @@ async function readGeneratedRecipeCache(params: {
   userId: string;
   generationId: string;
   suggestionId: string;
-  includeNutrition: boolean;
 }): Promise<Recipe | null> {
   const supabase = getSupabaseServiceRoleClient();
   const { data, error } = await supabase
@@ -76,11 +137,29 @@ async function readGeneratedRecipeCache(params: {
     .eq("user_id", params.userId)
     .eq("generation_log_id", params.generationId)
     .eq("suggestion_id", params.suggestionId)
-    .eq("include_nutrition", params.includeNutrition)
-    .maybeSingle();
+    .order("created_at", { ascending: false })
+    .limit(1);
 
-  if (error || !data) return null;
-  const recipe = (data as { recipe?: unknown }).recipe;
+  if (error || !Array.isArray(data) || data.length === 0) return null;
+  const recipe = (data[0] as { recipe?: unknown }).recipe;
+  return isRecipe(recipe) ? recipe : null;
+}
+
+async function readGeneratedRecipeCacheByKey(params: {
+  userId: string;
+  cacheKey: string;
+}): Promise<Recipe | null> {
+  const supabase = getSupabaseServiceRoleClient();
+  const { data, error } = await supabase
+    .from("ai_generated_recipes")
+    .select("recipe")
+    .eq("user_id", params.userId)
+    .eq("cache_key", params.cacheKey)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (error || !Array.isArray(data) || data.length === 0) return null;
+  const recipe = (data[0] as { recipe?: unknown }).recipe;
   return isRecipe(recipe) ? recipe : null;
 }
 
@@ -88,40 +167,68 @@ async function persistGeneratedRecipeCache(params: {
   userId: string;
   generationId: string;
   suggestionId: string;
-  includeNutrition: boolean;
   recipe: Recipe;
+  cacheKey: string;
+  model: string;
+  cookingEquipment: CookingEquipment[];
 }): Promise<void> {
-  try {
-    const supabase = getSupabaseServiceRoleClient();
+  const supabase = getSupabaseServiceRoleClient();
+  const insertPayload = {
+    user_id: params.userId,
+    generation_log_id: params.generationId,
+    suggestion_id: params.suggestionId,
+    include_nutrition: false,
+    cooking_equipment: normalizeCookingEquipment(params.cookingEquipment),
+    prompt_version: FULL_RECIPE_PROMPT_VERSION,
+    model: params.model,
+    cache_key: params.cacheKey,
+    recipe: params.recipe,
+  };
+
+  const { error } = await supabase.from("ai_generated_recipes").upsert(
+    insertPayload,
+    { onConflict: "user_id,generation_log_id,suggestion_id,include_nutrition" },
+  );
+
+  if (error) {
     await supabase.from("ai_generated_recipes").upsert(
       {
         user_id: params.userId,
         generation_log_id: params.generationId,
         suggestion_id: params.suggestionId,
-        include_nutrition: params.includeNutrition,
+        include_nutrition: false,
         recipe: params.recipe,
       },
       { onConflict: "user_id,generation_log_id,suggestion_id,include_nutrition" },
     );
-
-    await supabase
-      .from("ai_generation_logs")
-      .update({
-        selected_suggestion_id: params.suggestionId,
-        generated_recipe: params.recipe,
-      })
-      .eq("id", params.generationId)
-      .eq("user_id", params.userId);
-  } catch {
-    // Cache persistence cannot block the recipe response.
   }
+
+  await supabase
+    .from("ai_generation_logs")
+    .update({
+      selected_suggestion_id: params.suggestionId,
+      generated_recipe: params.recipe,
+    })
+    .eq("id", params.generationId)
+    .eq("user_id", params.userId);
+}
+
+async function generateWithInFlight(cacheKey: string, factory: () => Promise<Recipe>): Promise<Recipe> {
+  const existing = inFlightRecipeRequests.get(cacheKey);
+  if (existing) return existing;
+
+  const next = factory().finally(() => {
+    inFlightRecipeRequests.delete(cacheKey);
+  });
+  inFlightRecipeRequests.set(cacheKey, next);
+  return next;
 }
 
 export async function POST(request: Request) {
   try {
     const userId = await requireAuthUserId(request);
     if (!userId) {
-      return NextResponse.json({ message: "Sessão obrigatória para usar IA." }, { status: 401 });
+      return NextResponse.json({ message: "Sessao obrigatoria para usar IA." }, { status: 401 });
     }
 
     const endpointRateLimit = await consumeAuthRateLimit({
@@ -135,11 +242,11 @@ export async function POST(request: Request) {
 
     const payload = (await parseJsonObjectBody(request, {
       maxBytes: 12 * 1024,
-      allowedKeys: ["suggestionId", "suggestionTitle", "ingredients", "includeNutrition", "generationId"],
+      allowedKeys: ["suggestionId", "suggestionTitle", "ingredients", "includeNutrition", "cookingEquipment", "generationId"],
     })) as RecipePayload &
       Record<string, unknown>;
     const suggestionId = readRequiredString(payload, "suggestionId", {
-      fieldName: "ID de sugestão",
+      fieldName: "ID de sugestao",
       minLength: 3,
       maxLength: 120,
       pattern: /^[a-z0-9._-]+$/i,
@@ -158,11 +265,19 @@ export async function POST(request: Request) {
             minItems: 0,
           });
     const includeNutrition = readOptionalBoolean(payload, "includeNutrition", false);
+    const cookingEquipment = readCookingEquipment(payload);
     const generationId = readOptionalString(payload, "generationId", {
       fieldName: "ID da geracao",
       minLength: 36,
       maxLength: 36,
       pattern: /^[0-9a-f-]{36}$/i,
+    });
+    const recipeModel = serverEnv.openaiRecipeModel();
+    const cacheKey = buildRecipeCacheKey({
+      model: recipeModel,
+      suggestionTitle,
+      ingredients,
+      cookingEquipment,
     });
 
     if (generationId) {
@@ -179,25 +294,49 @@ export async function POST(request: Request) {
         userId,
         generationId,
         suggestionId,
-        includeNutrition,
       });
       if (cachedRecipe) {
         return NextResponse.json(cachedRecipe);
       }
 
-      const recipe = await generateFullRecipeWithOpenAi({
-        suggestionTitle,
-        ingredients,
-        includeNutrition,
-      });
+      const normalizedCachedRecipe = await readGeneratedRecipeCacheByKey({ userId, cacheKey });
+      if (normalizedCachedRecipe) {
+        await persistGeneratedRecipeCache({
+          userId,
+          generationId,
+          suggestionId,
+          recipe: normalizedCachedRecipe,
+          cacheKey,
+          model: recipeModel,
+          cookingEquipment,
+        }).catch(() => undefined);
+        return NextResponse.json(normalizedCachedRecipe);
+      }
+
+      const recipe = await generateWithInFlight(`${userId}:${cacheKey}`, () =>
+        generateFullRecipeWithOpenAi({
+          suggestionTitle,
+          ingredients,
+          includeNutrition,
+          cookingEquipment,
+          userId,
+        }),
+      );
       await persistGeneratedRecipeCache({
         userId,
         generationId,
         suggestionId,
-        includeNutrition,
         recipe,
-      });
+        cacheKey,
+        model: recipeModel,
+        cookingEquipment,
+      }).catch(() => undefined);
       return NextResponse.json(recipe);
+    }
+
+    const normalizedCachedRecipe = await readGeneratedRecipeCacheByKey({ userId, cacheKey });
+    if (normalizedCachedRecipe) {
+      return NextResponse.json(normalizedCachedRecipe);
     }
 
     await consumeAiUsage({
@@ -207,11 +346,15 @@ export async function POST(request: Request) {
       inputMode: "text",
     });
 
-    const recipe = await generateFullRecipeWithOpenAi({
-      suggestionTitle,
-      ingredients,
-      includeNutrition,
-    });
+    const recipe = await generateWithInFlight(`${userId}:${cacheKey}`, () =>
+      generateFullRecipeWithOpenAi({
+        suggestionTitle,
+        ingredients,
+        includeNutrition,
+        cookingEquipment,
+        userId,
+      }),
+    );
     return NextResponse.json(recipe);
   } catch (error) {
     const usageResponse = aiUsageErrorResponse(error);

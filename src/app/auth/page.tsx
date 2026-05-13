@@ -181,6 +181,7 @@ export default function AuthPage() {
       lastName,
       username: sanitizeUsername(username),
       photoDataUrl: "",
+      cookingEquipment: ["stove"],
       selectedBadge: "estagiario",
       unlockedBadges: ["estagiario"],
       acceptedTermsAt: nowIso,
