@@ -159,15 +159,28 @@ export async function POST(request: Request) {
     let ingredients: string[] = [];
 
     if (inputMode === "audio") {
-      if (!payload.file) {
-        return NextResponse.json({ message: "Envie um arquivo de áudio." }, { status: 400 });
+      if (payload.file) {
+        const uploadError = validateUpload(payload.file, inputMode);
+        if (uploadError) return uploadError;
+        const usage = await consumeAiUsage({ userId, bucket: "recipe_ai", feature: "suggestions", inputMode });
+        usageEventId = usage.eventId;
+        const typedIngredientsText = ingredientsText.trim();
+        const transcribedIngredientsText = await transcribeAudioWithOpenAi(payload.file);
+        ingredientsText = [transcribedIngredientsText, typedIngredientsText].filter(Boolean).join(", ");
+        ingredients = parseIngredientsText(ingredientsText);
+      } else {
+        ingredientsText = readRequiredString(payload as Record<string, unknown>, "ingredientsText", {
+          fieldName: "Ingredientes por áudio",
+          minLength: 1,
+          maxLength: 4000,
+        });
+        ingredients = parseIngredientsText(ingredientsText);
+        if (!ingredients.length) {
+          return NextResponse.json({ message: "Não foi possível identificar ingredientes válidos." }, { status: 400 });
+        }
+        const usage = await consumeAiUsage({ userId, bucket: "recipe_ai", feature: "suggestions", inputMode });
+        usageEventId = usage.eventId;
       }
-      const uploadError = validateUpload(payload.file, inputMode);
-      if (uploadError) return uploadError;
-      const usage = await consumeAiUsage({ userId, bucket: "recipe_ai", feature: "suggestions", inputMode });
-      usageEventId = usage.eventId;
-      ingredientsText = await transcribeAudioWithOpenAi(payload.file);
-      ingredients = parseIngredientsText(ingredientsText);
     } else if (inputMode === "photo") {
       if (!payload.file) {
         return NextResponse.json({ message: "Envie uma foto dos ingredientes." }, { status: 400 });

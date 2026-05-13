@@ -25,6 +25,37 @@ const modes: Array<{ value: InputMode; label: string; emoji: string }> = [
 
 const AI_SUGGESTIONS_CACHE_KEY = "temai:ai-suggestions:last";
 
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+interface SpeechRecognitionResultLike {
+  isFinal: boolean;
+  0?: { transcript?: string };
+}
+
+interface SpeechRecognitionEventLike extends Event {
+  resultIndex: number;
+  results: {
+    length: number;
+    [index: number]: SpeechRecognitionResultLike;
+  };
+}
+
+interface SpeechRecognitionErrorEventLike extends Event {
+  error?: string;
+}
+
+interface SpeechRecognitionLike {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+}
+
 type GeneratedSuggestion = RecipeSuggestion & { generationId?: string };
 
 type CachedSuggestionsState = {
@@ -33,10 +64,19 @@ type CachedSuggestionsState = {
   response: SuggestionsResponse;
   extraSuggestions: GeneratedSuggestion[];
   includeNutritionEstimate: boolean;
-  selectedAudioName: string;
   selectedPhotoName: string;
   savedAt: number;
 };
+
+function getSpeechRecognitionConstructor(): SpeechRecognitionConstructor | null {
+  if (typeof window === "undefined") return null;
+  const speechWindow = window as Window &
+    typeof globalThis & {
+      SpeechRecognition?: SpeechRecognitionConstructor;
+      webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    };
+  return speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition || null;
+}
 
 function isValidMode(value: string | null): value is InputMode {
   return value === "text" || value === "audio" || value === "photo";
@@ -109,7 +149,6 @@ function readCachedSuggestions(): CachedSuggestionsState | null {
       response: parsed.response,
       extraSuggestions: readGeneratedSuggestions(parsed.extraSuggestions),
       includeNutritionEstimate: Boolean(parsed.includeNutritionEstimate),
-      selectedAudioName: parsed.selectedAudioName || "",
       selectedPhotoName: parsed.selectedPhotoName || "",
       savedAt: typeof parsed.savedAt === "number" ? parsed.savedAt : Date.now(),
     };
@@ -132,6 +171,9 @@ function CreateRecipePageContent() {
 
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const [mode, setMode] = useState<InputMode>("text");
   const [ingredientsText, setIngredientsText] = useState("");
@@ -139,11 +181,14 @@ function CreateRecipePageContent() {
   const [extraSuggestions, setExtraSuggestions] = useState<GeneratedSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [liveTranscript, setLiveTranscript] = useState("");
+  const [speechSupported, setSpeechSupported] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isPhotoPickerOpen, setIsPhotoPickerOpen] = useState(false);
-  const [selectedAudioName, setSelectedAudioName] = useState("");
   const [selectedPhotoName, setSelectedPhotoName] = useState("");
-  const [selectedAudioFile, setSelectedAudioFile] = useState<File | null>(null);
+  const [recordedAudioFile, setRecordedAudioFile] = useState<File | null>(null);
   const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
   const [includeNutritionEstimate, setIncludeNutritionEstimate] = useState(false);
   const [subscription, setSubscription] = useState<SubscriptionState>(() => getSubscriptionState());
@@ -159,7 +204,6 @@ function CreateRecipePageContent() {
         setResponse(cached.response);
         setExtraSuggestions(cached.extraSuggestions);
         setIncludeNutritionEstimate(cached.includeNutritionEstimate);
-        setSelectedAudioName(cached.selectedAudioName);
         setSelectedPhotoName(cached.selectedPhotoName);
         setErrorMessage("");
       }
@@ -184,6 +228,17 @@ function CreateRecipePageContent() {
   }, [isPremium, searchParams]);
 
   useEffect(() => {
+    setSpeechSupported(Boolean(getSpeechRecognitionConstructor()));
+
+    return () => {
+      recognitionRef.current?.abort();
+      recognitionRef.current = null;
+      mediaRecorderRef.current?.stream.getTracks().forEach((track) => track.stop());
+      mediaRecorderRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
     let mounted = true;
     syncSubscriptionFromCloud()
       .then((remote) => {
@@ -197,10 +252,146 @@ function CreateRecipePageContent() {
     };
   }, []);
 
-  const canGenerate = useMemo(
-    () => ingredientsText.trim().length > 0 && !isLoading,
-    [ingredientsText, isLoading],
-  );
+  const isAudioCaptureActive = isListening || isRecordingAudio;
+
+  const canGenerate = useMemo(() => {
+    if (isLoading || isAudioCaptureActive) return false;
+    if (mode === "photo") return Boolean(selectedPhotoFile);
+    if (mode === "audio") return ingredientsText.trim().length > 0 || Boolean(recordedAudioFile);
+    return ingredientsText.trim().length > 0;
+  }, [ingredientsText, isAudioCaptureActive, isLoading, mode, recordedAudioFile, selectedPhotoFile]);
+
+  const ingredientsFieldLabel = mode === "photo" ? "Complemento opcional" : "Ingredientes";
+  const ingredientsPlaceholder =
+    mode === "audio"
+      ? "Toque no microfone e fale: ovo, arroz, alho, cebola..."
+      : mode === "photo"
+        ? "Opcional: adicione algo que a foto não mostra..."
+        : "Ex: ovo, arroz, alho, cebola...";
+
+  const stopVoiceCapture = useCallback(() => {
+    recognitionRef.current?.stop();
+    setIsListening(false);
+  }, []);
+
+  const stopAudioRecording = useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.stop();
+    }
+    setIsRecordingAudio(false);
+  }, []);
+
+  const startAudioRecording = useCallback(async () => {
+    if (!isPremium) {
+      setErrorMessage("Áudio é um recurso premium.");
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setErrorMessage("Microfone indisponível neste aparelho. Use o microfone do teclado no campo de ingredientes.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const preferredMimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+      const recorder = new MediaRecorder(stream, preferredMimeType ? { mimeType: preferredMimeType } : undefined);
+
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+      recorder.onstop = () => {
+        const mimeType = recorder.mimeType || "audio/webm";
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        if (audioBlob.size > 0) {
+          setRecordedAudioFile(new File([audioBlob], `temai-audio-${Date.now()}.webm`, { type: mimeType }));
+        }
+        stream.getTracks().forEach((track) => track.stop());
+        mediaRecorderRef.current = null;
+        setIsRecordingAudio(false);
+      };
+
+      mediaRecorderRef.current = recorder;
+      setRecordedAudioFile(null);
+      setErrorMessage("");
+      setIsRecordingAudio(true);
+      recorder.start();
+    } catch {
+      setIsRecordingAudio(false);
+      setErrorMessage("Não foi possível acessar o microfone. Verifique a permissão e tente novamente.");
+    }
+  }, [isPremium]);
+
+  const startVoiceCapture = useCallback(() => {
+    if (!isPremium) {
+      setErrorMessage("Áudio é um recurso premium.");
+      return;
+    }
+
+    const Recognition = getSpeechRecognitionConstructor();
+    if (!Recognition) {
+      void startAudioRecording();
+      return;
+    }
+
+    try {
+      recognitionRef.current?.abort();
+      const recognition = new Recognition();
+      const baseText = ingredientsText.trim();
+      let finalTranscript = "";
+
+      recognition.lang = "pt-BR";
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.onresult = (event) => {
+        const finalParts: string[] = [];
+        const interimParts: string[] = [];
+
+        for (let index = event.resultIndex; index < event.results.length; index += 1) {
+          const result = event.results[index];
+          const transcript = result?.[0]?.transcript?.trim();
+          if (!transcript) continue;
+          if (result.isFinal) {
+            finalParts.push(transcript);
+          } else {
+            interimParts.push(transcript);
+          }
+        }
+
+        if (finalParts.length > 0) {
+          finalTranscript = [finalTranscript, ...finalParts].filter(Boolean).join(", ");
+          setIngredientsText([baseText, finalTranscript].filter(Boolean).join(", "));
+        }
+        setLiveTranscript(interimParts.join(" "));
+      };
+      recognition.onerror = (event) => {
+        if (event.error && !["no-speech", "aborted"].includes(event.error)) {
+          setErrorMessage("Não consegui captar sua voz. Verifique a permissão do microfone e tente de novo.");
+        }
+      };
+      recognition.onend = () => {
+        setIsListening(false);
+        setLiveTranscript("");
+        recognitionRef.current = null;
+      };
+
+      recognitionRef.current = recognition;
+      setRecordedAudioFile(null);
+      setErrorMessage("");
+      setLiveTranscript("");
+      setIsListening(true);
+      recognition.start();
+    } catch {
+      setIsListening(false);
+      setLiveTranscript("");
+      recognitionRef.current = null;
+      setErrorMessage("Não foi possível abrir o microfone agora.");
+    }
+  }, [ingredientsText, isPremium, startAudioRecording]);
 
   async function handleGenerateSuggestions() {
     if (!isPremium && mode !== "text") {
@@ -208,9 +399,26 @@ function CreateRecipePageContent() {
       return;
     }
 
+    if (mode === "audio" && !ingredientsText.trim() && !recordedAudioFile) {
+      setErrorMessage("Fale, grave ou digite os ingredientes antes de gerar.");
+      return;
+    }
+
+    if (mode === "photo" && !selectedPhotoFile) {
+      setErrorMessage("Selecione ou tire uma foto dos ingredientes.");
+      return;
+    }
+
     if (!isPremium && subscription.aiGenerationsUsedThisMonth >= subscription.aiGenerationsLimitThisMonth) {
       setErrorMessage("Plano free atingiu o limite de 3 gerações de IA neste mês.");
       return;
+    }
+
+    if (isListening) {
+      stopVoiceCapture();
+    }
+    if (isRecordingAudio) {
+      stopAudioRecording();
     }
 
     setIsLoading(true);
@@ -220,7 +428,12 @@ function CreateRecipePageContent() {
       const data = await fetchAiSuggestions({
         ingredientsText,
         inputMode: mode,
-        file: mode === "audio" ? selectedAudioFile || undefined : mode === "photo" ? selectedPhotoFile || undefined : undefined,
+        file:
+          mode === "photo"
+            ? selectedPhotoFile || undefined
+            : mode === "audio"
+              ? recordedAudioFile || undefined
+              : undefined,
       });
 
       setResponse(data);
@@ -231,7 +444,6 @@ function CreateRecipePageContent() {
         response: data,
         extraSuggestions: [],
         includeNutritionEstimate,
-        selectedAudioName,
         selectedPhotoName,
       });
       router.replace("/gerar-receita-ia?restore=1", { scroll: false });
@@ -282,7 +494,6 @@ function CreateRecipePageContent() {
           response,
           extraSuggestions: merged,
           includeNutritionEstimate,
-          selectedAudioName,
           selectedPhotoName,
         });
         return merged;
@@ -324,14 +535,6 @@ function CreateRecipePageContent() {
     }
   }
 
-  function handleAudioChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedAudioName(file.name);
-      setSelectedAudioFile(file);
-    }
-  }
-
   return (
     <section className="space-y-5 pb-2">
       <header className="space-y-1">
@@ -364,6 +567,12 @@ function CreateRecipePageContent() {
                     setErrorMessage("Áudio e foto são recursos premium.");
                     return;
                   }
+                  if (entry.value !== "audio" && isListening) {
+                    stopVoiceCapture();
+                  }
+                  if (entry.value !== "audio" && isRecordingAudio) {
+                    stopAudioRecording();
+                  }
                   setMode(entry.value);
                   if (entry.value === "photo") {
                     setIsPhotoPickerOpen(true);
@@ -383,15 +592,71 @@ function CreateRecipePageContent() {
           </div>
 
           {mode === "audio" ? (
-            <div className="space-y-2">
-              <label className="block text-xs font-semibold uppercase tracking-wide text-[#8C775A]">Audio</label>
-              <input
-                type="file"
-                accept="audio/*"
-                onChange={handleAudioChange}
-                className="block w-full rounded-2xl border border-[#E5D7C1] bg-[#FAF5EC] px-3 py-3 text-sm"
-              />
-              {selectedAudioName ? <p className="text-xs text-[#7A6D60]">Arquivo: {selectedAudioName}</p> : null}
+            <div className="space-y-3 rounded-2xl border border-[#E5D7C1] bg-[#FAF5EC] p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-[#8C775A]">
+                    Microfone
+                  </label>
+                  <p className="mt-1 text-xs text-[#7A6D60]">
+                    Fale os ingredientes e confira o texto antes de gerar.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={
+                    isListening
+                      ? stopVoiceCapture
+                      : isRecordingAudio
+                        ? stopAudioRecording
+                        : startVoiceCapture
+                  }
+                  className={cn(
+                    "flex h-14 w-14 shrink-0 items-center justify-center rounded-full border text-2xl shadow-sm transition",
+                    isAudioCaptureActive
+                      ? "border-[#B94E3E] bg-[#C66A3D] text-white"
+                      : "border-[#E0D1B8] bg-white text-[#6A5B4C]",
+                  )}
+                  aria-label={isAudioCaptureActive ? "Parar microfone" : "Falar ingredientes"}
+                >
+                  🎙️
+                </button>
+              </div>
+              <Button
+                type="button"
+                variant={isAudioCaptureActive ? "default" : "secondary"}
+                onClick={
+                  isListening
+                    ? stopVoiceCapture
+                    : isRecordingAudio
+                      ? stopAudioRecording
+                      : startVoiceCapture
+                }
+                className="h-11 w-full rounded-2xl"
+              >
+                {isListening
+                  ? "Parar ditado"
+                  : isRecordingAudio
+                    ? "Parar gravação"
+                    : speechSupported
+                      ? "Falar ingredientes"
+                      : "Gravar áudio"}
+              </Button>
+              {liveTranscript ? (
+                <p className="rounded-xl border border-[#E4D6C0] bg-white px-3 py-2 text-sm text-[#5E5348]">
+                  Ouvindo: {liveTranscript}
+                </p>
+              ) : null}
+              {recordedAudioFile ? (
+                <p className="rounded-xl border border-[#E4D6C0] bg-white px-3 py-2 text-sm text-[#5E5348]">
+                  Áudio pronto. Toque em Gerar 3 sugestões.
+                </p>
+              ) : null}
+              {!speechSupported ? (
+                <p className="text-xs text-[#7A6D60]">
+                  Neste aparelho o app grava o áudio e a IA interpreta tudo direto, sem anexar arquivo.
+                </p>
+              ) : null}
             </div>
           ) : null}
 
@@ -403,9 +668,10 @@ function CreateRecipePageContent() {
                   onClick={() => setIsPhotoPickerOpen(true)}
                   className="flex-1 rounded-2xl border border-[#E5D7C1] bg-[#FAF5EC] px-3 py-3 text-sm font-semibold text-[#5D5348]"
                 >
-                  Abrir opcoes de foto
+                  Abrir opções de foto
                 </button>
               </div>
+              <p className="text-xs text-[#7A6D60]">A foto já basta; o texto abaixo é só complemento.</p>
               {selectedPhotoName ? <p className="text-xs text-[#7A6D60]">Imagem: {selectedPhotoName}</p> : null}
               <input
                 ref={cameraInputRef}
@@ -426,11 +692,11 @@ function CreateRecipePageContent() {
           ) : null}
 
           <div className="space-y-2">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-[#8C775A]">Ingredientes</label>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-[#8C775A]">{ingredientsFieldLabel}</label>
             <Textarea
               value={ingredientsText}
               onChange={(event) => setIngredientsText(event.target.value)}
-              placeholder="Ex: ovo, arroz, alho, cebola..."
+              placeholder={ingredientsPlaceholder}
               className="min-h-[120px] border-[#E5D7C1] bg-[#FAF5EC]"
             />
           </div>
