@@ -6,7 +6,12 @@ import { useRouter } from "next/navigation";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RatingStars } from "@/components/recipes/rating-stars";
 import { BADGE_CATALOG } from "@/features/profile/badges";
-import { getUserProfile, saveUserProfile, saveUserProfileToCloud } from "@/features/profile/storage";
+import {
+  getUserProfile,
+  saveUserProfile,
+  saveUserProfileToCloud,
+  syncUserProfileFromCloud,
+} from "@/features/profile/storage";
 import { LIBRARY_RECIPES } from "@/features/recipes/library-recipes";
 import { getPendingShoppingCount } from "@/features/recipes/shopping-storage";
 import type { Recipe } from "@/features/recipes/types";
@@ -289,6 +294,20 @@ export default function HomePage() {
     return () => {
       window.removeEventListener("temai:profile-updated", syncProfile as EventListener);
       window.removeEventListener("storage", syncProfile);
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    syncUserProfileFromCloud()
+      .then((remote) => {
+        if (!isMounted || !remote) return;
+        setProfile(remote);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      isMounted = false;
     };
   }, []);
 

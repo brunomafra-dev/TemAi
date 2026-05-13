@@ -137,21 +137,23 @@ export async function saveUserProfileToCloud(profile: UserProfile): Promise<bool
   if (!userId) return false;
 
   const normalized = normalizeProfile(profile);
-  const { error } = await client.from("profiles").upsert(
-    {
-      id: userId,
-      first_name: normalized.firstName,
-      last_name: normalized.lastName,
-      username: normalized.username || null,
-      avatar_url: normalized.photoDataUrl || null,
-      cooking_equipment: normalized.cookingEquipment,
-      selected_badge: normalized.selectedBadge,
-      unlocked_badges: normalized.unlockedBadges,
-      accepted_terms_at: normalized.acceptedTermsAt,
-      accepted_privacy_at: normalized.acceptedPrivacyAt,
-    },
-    { onConflict: "id" },
-  );
+  const payload: Record<string, unknown> = {
+    id: userId,
+    first_name: normalized.firstName,
+    last_name: normalized.lastName,
+    username: normalized.username || null,
+    cooking_equipment: normalized.cookingEquipment,
+    selected_badge: normalized.selectedBadge,
+    unlocked_badges: normalized.unlockedBadges,
+    accepted_terms_at: normalized.acceptedTermsAt,
+    accepted_privacy_at: normalized.acceptedPrivacyAt,
+  };
+
+  if (normalized.photoDataUrl) {
+    payload.avatar_url = normalized.photoDataUrl;
+  }
+
+  const { error } = await client.from("profiles").upsert(payload, { onConflict: "id" });
 
   return !error;
 }
