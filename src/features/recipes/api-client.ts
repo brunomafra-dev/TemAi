@@ -43,6 +43,10 @@ export async function fetchAiSuggestions(
   if (hasFile && requestBody instanceof FormData) {
     requestBody.append("ingredientsText", body.ingredientsText);
     requestBody.append("inputMode", body.inputMode);
+    requestBody.append("recipeFilter", body.recipeFilter || "all");
+    if (body.excludedSuggestionTitles?.length) {
+      requestBody.append("excludedSuggestionTitles", JSON.stringify(body.excludedSuggestionTitles));
+    }
     if (body.file) requestBody.append("file", body.file);
   } else {
     headers["Content-Type"] = "application/json";

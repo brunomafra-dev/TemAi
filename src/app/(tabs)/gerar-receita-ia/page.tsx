@@ -14,13 +14,26 @@ import {
   syncSubscriptionFromCloud,
   type SubscriptionState,
 } from "@/features/profile/subscription-storage";
-import type { InputMode, RecipeSuggestion, SuggestionsResponse } from "@/features/recipes/types";
+import type {
+  InputMode,
+  RecipeSuggestion,
+  RecipeSuggestionFilter,
+  SuggestionsResponse,
+} from "@/features/recipes/types";
 import { cn } from "@/lib/utils";
 
 const modes: Array<{ value: InputMode; label: string; emoji: string }> = [
   { value: "photo", label: "Foto", emoji: "📷" },
   { value: "audio", label: "Áudio", emoji: "🎤" },
   { value: "text", label: "Texto", emoji: "📝" },
+];
+
+const recipeFilters: Array<{ value: RecipeSuggestionFilter; label: string }> = [
+  { value: "all", label: "Sem filtro" },
+  { value: "meal", label: "Refeição" },
+  { value: "vegetarian", label: "Veggie" },
+  { value: "dessert", label: "Sobremesa" },
+  { value: "drink", label: "Bebidas" },
 ];
 
 const AI_SUGGESTIONS_CACHE_KEY = "temai:ai-suggestions:last";
@@ -61,8 +74,10 @@ type GeneratedSuggestion = RecipeSuggestion & { generationId?: string };
 type CachedSuggestionsState = {
   mode: InputMode;
   ingredientsText: string;
+  recipeFilter: RecipeSuggestionFilter;
   response: SuggestionsResponse;
   extraSuggestions: GeneratedSuggestion[];
+  suggestionsNotice: string;
   includeNutritionEstimate: boolean;
   selectedPhotoName: string;
   savedAt: number;
@@ -80,6 +95,45 @@ function getSpeechRecognitionConstructor(): SpeechRecognitionConstructor | null 
 
 function isValidMode(value: string | null): value is InputMode {
   return value === "text" || value === "audio" || value === "photo";
+}
+
+function isValidRecipeFilter(value: unknown): value is RecipeSuggestionFilter {
+  return value === "all" || value === "meal" || value === "vegetarian" || value === "dessert" || value === "drink";
+}
+
+function normalizeSuggestionKey(value: string): string {
+  const stopWords = new Set([
+    "a",
+    "as",
+    "ao",
+    "com",
+    "da",
+    "de",
+    "do",
+    "dos",
+    "e",
+    "em",
+    "na",
+    "no",
+    "para",
+    "rapida",
+    "rapido",
+    "simples",
+    "caseira",
+    "caseiro",
+  ]);
+
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/g)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 1 && !stopWords.has(token))
+    .map((token) => (token.length > 3 && token.endsWith("s") ? token.slice(0, -1) : token))
+    .sort()
+    .join(" ");
 }
 
 function isRecipeSuggestion(value: unknown): value is RecipeSuggestion {
@@ -117,13 +171,27 @@ function appendUniqueSuggestions(params: {
   next: GeneratedSuggestion[];
   blocked: RecipeSuggestion[];
 }): GeneratedSuggestion[] {
-  const seen = new Set([...params.blocked, ...params.current].map((suggestion) => suggestion.id));
+  const base = [...params.blocked, ...params.current];
+  const seenIds = new Set(base.map((suggestion) => suggestion.id));
+  const seenTitles = new Set(base.map((suggestion) => normalizeSuggestionKey(suggestion.title)).filter(Boolean));
   const additions = params.next.filter((suggestion) => {
-    if (seen.has(suggestion.id)) return false;
-    seen.add(suggestion.id);
+    const titleKey = normalizeSuggestionKey(suggestion.title);
+    if (seenIds.has(suggestion.id) || (titleKey && seenTitles.has(titleKey))) return false;
+    seenIds.add(suggestion.id);
+    if (titleKey) seenTitles.add(titleKey);
     return true;
   });
   return [...params.current, ...additions];
+}
+
+function collectVisibleSuggestionTitles(
+  response: SuggestionsResponse | null,
+  extraSuggestions: GeneratedSuggestion[],
+): string[] {
+  if (!response) return [];
+  return [...response.suggestions, ...response.alsoCanMake, ...extraSuggestions]
+    .map((suggestion) => suggestion.title.trim())
+    .filter(Boolean);
 }
 
 function readCachedSuggestions(): CachedSuggestionsState | null {
@@ -146,8 +214,10 @@ function readCachedSuggestions(): CachedSuggestionsState | null {
     return {
       mode: parsedMode,
       ingredientsText: parsed.ingredientsText || "",
+      recipeFilter: isValidRecipeFilter(parsed.recipeFilter) ? parsed.recipeFilter : "all",
       response: parsed.response,
       extraSuggestions: readGeneratedSuggestions(parsed.extraSuggestions),
+      suggestionsNotice: parsed.suggestionsNotice || parsed.response.dedupeNotice || "",
       includeNutritionEstimate: Boolean(parsed.includeNutritionEstimate),
       selectedPhotoName: parsed.selectedPhotoName || "",
       savedAt: typeof parsed.savedAt === "number" ? parsed.savedAt : Date.now(),
@@ -177,8 +247,10 @@ function CreateRecipePageContent() {
 
   const [mode, setMode] = useState<InputMode>("text");
   const [ingredientsText, setIngredientsText] = useState("");
+  const [recipeFilter, setRecipeFilter] = useState<RecipeSuggestionFilter>("all");
   const [response, setResponse] = useState<SuggestionsResponse | null>(null);
   const [extraSuggestions, setExtraSuggestions] = useState<GeneratedSuggestion[]>([]);
+  const [suggestionsNotice, setSuggestionsNotice] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -201,8 +273,10 @@ function CreateRecipePageContent() {
       if (cached) {
         setMode(cached.mode);
         setIngredientsText(cached.ingredientsText);
+        setRecipeFilter(cached.recipeFilter);
         setResponse(cached.response);
         setExtraSuggestions(cached.extraSuggestions);
+        setSuggestionsNotice(cached.suggestionsNotice);
         setIncludeNutritionEstimate(cached.includeNutritionEstimate);
         setSelectedPhotoName(cached.selectedPhotoName);
         setErrorMessage("");
@@ -428,6 +502,7 @@ function CreateRecipePageContent() {
       const data = await fetchAiSuggestions({
         ingredientsText,
         inputMode: mode,
+        recipeFilter,
         file:
           mode === "photo"
             ? selectedPhotoFile || undefined
@@ -438,11 +513,14 @@ function CreateRecipePageContent() {
 
       setResponse(data);
       setExtraSuggestions([]);
+      setSuggestionsNotice(data.dedupeNotice || "");
       writeCachedSuggestions({
         mode,
         ingredientsText,
+        recipeFilter,
         response: data,
         extraSuggestions: [],
+        suggestionsNotice: data.dedupeNotice || "",
         includeNutritionEstimate,
         selectedPhotoName,
       });
@@ -472,15 +550,23 @@ function CreateRecipePageContent() {
       return;
     }
 
+    const excludedSuggestionTitles = collectVisibleSuggestionTitles(response, extraSuggestions);
     setIsLoadingMore(true);
     setErrorMessage("");
+    setSuggestionsNotice("");
 
     try {
       const data = await fetchAiSuggestions({
         ingredientsText: nextIngredientsText,
         inputMode: "text",
+        recipeFilter,
+        excludedSuggestionTitles,
       });
       const nextSuggestions = attachGenerationId(data.suggestions, data.generationId);
+      const nextNotice =
+        data.dedupeNotice ||
+        (nextSuggestions.length < 3 ? "Mostrei só receitas novas para não repetir opções anteriores." : "");
+      setSuggestionsNotice(nextNotice);
 
       setExtraSuggestions((current) => {
         const merged = appendUniqueSuggestions({
@@ -491,8 +577,10 @@ function CreateRecipePageContent() {
         writeCachedSuggestions({
           mode,
           ingredientsText,
+          recipeFilter,
           response,
           extraSuggestions: merged,
+          suggestionsNotice: nextNotice,
           includeNutritionEstimate,
           selectedPhotoName,
         });
@@ -589,6 +677,27 @@ function CreateRecipePageContent() {
                 <p className="mt-1 text-xs font-semibold">{entry.label}</p>
               </button>
             ))}
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#8C775A]">Filtro opcional</p>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {recipeFilters.map((filter) => (
+                <button
+                  key={filter.value}
+                  type="button"
+                  onClick={() => setRecipeFilter(filter.value)}
+                  className={cn(
+                    "shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition",
+                    recipeFilter === filter.value
+                      ? "border-[#C66A3D] bg-[#F8E8E1] text-[#7A4733]"
+                      : "border-[#E5D7C1] bg-[#FAF5EC] text-[#6E6258]",
+                  )}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {mode === "audio" ? (
@@ -757,6 +866,12 @@ function CreateRecipePageContent() {
           >
             {isLoadingMore ? "Buscando mais receitas..." : "Sugerir mais receitas"}
           </Button>
+
+          {suggestionsNotice ? (
+            <p className="rounded-2xl border border-[#E5D7C1] bg-[#FFFCF7] px-3 py-2 text-xs text-[#7A6D60]">
+              {suggestionsNotice}
+            </p>
+          ) : null}
 
           {extraSuggestions.length > 0 ? (
             <div className="space-y-3">

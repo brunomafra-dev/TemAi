@@ -6,7 +6,7 @@ import {
   isOpenAiGenerationError,
   transcribeAudioWithOpenAi,
 } from "@/features/recipes/openai-generator";
-import type { InputMode } from "@/features/recipes/types";
+import type { InputMode, RecipeSuggestion, RecipeSuggestionFilter, SuggestionsResponse } from "@/features/recipes/types";
 import {
   aiUsageErrorResponse,
   consumeAiUsage,
@@ -21,31 +21,56 @@ import {
   InputValidationError,
   parseJsonObjectBody,
   readRequiredString,
+  readStringArray,
   validationErrorResponse,
 } from "@/lib/input-validation";
 
 interface SuggestionsPayload {
   ingredientsText?: string;
   inputMode?: InputMode;
+  recipeFilter?: RecipeSuggestionFilter;
+  excludedSuggestionTitles?: unknown;
 }
 
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 15 * 1024 * 1024;
 const MAX_MULTIPART_BYTES = 16 * 1024 * 1024;
+const RECIPE_FILTERS: readonly RecipeSuggestionFilter[] = ["all", "meal", "vegetarian", "dessert", "drink"];
+const TITLE_STOP_WORDS = new Set([
+  "a",
+  "as",
+  "ao",
+  "com",
+  "da",
+  "de",
+  "do",
+  "dos",
+  "e",
+  "em",
+  "na",
+  "no",
+  "para",
+  "rapida",
+  "rapido",
+  "simples",
+  "caseira",
+  "caseiro",
+]);
+const MEAT_TERMS = /\b(carne|frango|peixe|atum|sardinha|camarao|camar[aã]o|bacon|calabresa|linguica|lingui[cç]a|presunto|peru|porco|boi|costela|salmao|salm[aã]o|bacalhau|tilapia|til[aá]pia|lombo|picanha)\b/i;
 
 async function readSuggestionsInput(request: Request): Promise<SuggestionsPayload & { file?: File }> {
   const contentType = request.headers.get("content-type")?.toLowerCase() || "";
   if (!contentType.includes("multipart/form-data")) {
     return (await parseJsonObjectBody(request, {
-      maxBytes: 12 * 1024,
-      allowedKeys: ["ingredientsText", "inputMode"],
+      maxBytes: 16 * 1024,
+      allowedKeys: ["ingredientsText", "inputMode", "recipeFilter", "excludedSuggestionTitles"],
     })) as SuggestionsPayload;
   }
 
   assertRequestContentLength(request, MAX_MULTIPART_BYTES);
   const form = await request.formData();
   for (const key of form.keys()) {
-    if (!["ingredientsText", "inputMode", "file"].includes(key)) {
+    if (!["ingredientsText", "inputMode", "recipeFilter", "excludedSuggestionTitles", "file"].includes(key)) {
       throw new InputValidationError(`Campo inesperado: ${key}.`);
     }
   }
@@ -53,6 +78,8 @@ async function readSuggestionsInput(request: Request): Promise<SuggestionsPayloa
   const file = form.get("file");
   const rawIngredientsText = String(form.get("ingredientsText") || "").trim();
   const rawInputMode = String(form.get("inputMode") || "").trim();
+  const rawRecipeFilter = String(form.get("recipeFilter") || "").trim();
+  const rawExcludedSuggestionTitles = String(form.get("excludedSuggestionTitles") || "").trim();
   if (rawIngredientsText.length > 4000) {
     throw new InputValidationError("Ingredientes muito grande.", 413);
   }
@@ -63,6 +90,8 @@ async function readSuggestionsInput(request: Request): Promise<SuggestionsPayloa
   return {
     ingredientsText: rawIngredientsText,
     inputMode: rawInputMode as InputMode,
+    recipeFilter: rawRecipeFilter as RecipeSuggestionFilter,
+    excludedSuggestionTitles: rawExcludedSuggestionTitles,
     file: file instanceof File ? file : undefined,
   };
 }
@@ -87,6 +116,106 @@ function validateUpload(file: File, inputMode: InputMode): NextResponse | null {
   }
 
   return null;
+}
+
+function readRecipeFilter(raw: unknown): RecipeSuggestionFilter {
+  if (raw === undefined || raw === null || raw === "") return "all";
+  if (typeof raw !== "string") {
+    throw new InputValidationError("Filtro de receita malformado.");
+  }
+  const value = raw.trim() as RecipeSuggestionFilter;
+  if (!RECIPE_FILTERS.includes(value)) {
+    throw new InputValidationError("Filtro de receita invalido.");
+  }
+  return value;
+}
+
+function normalizeExcludedTitlesValue(raw: unknown): unknown {
+  if (typeof raw !== "string") return raw;
+  const value = raw.trim();
+  if (!value) return [];
+  try {
+    return JSON.parse(value);
+  } catch {
+    throw new InputValidationError("Receitas excluidas malformadas.");
+  }
+}
+
+function readExcludedSuggestionTitles(payload: Record<string, unknown>): string[] {
+  const raw = normalizeExcludedTitlesValue(payload.excludedSuggestionTitles);
+  if (raw === undefined || raw === null) return [];
+  return readStringArray({ excludedSuggestionTitles: raw }, "excludedSuggestionTitles", {
+    fieldName: "Receitas excluidas",
+    maxItems: 30,
+    itemMaxLength: 120,
+    minItems: 0,
+  });
+}
+
+function normalizeTitleKey(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/g)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 1 && !TITLE_STOP_WORDS.has(token))
+    .map((token) => (token.length > 3 && token.endsWith("s") ? token.slice(0, -1) : token))
+    .sort()
+    .join(" ");
+}
+
+function normalizeIdKey(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function suggestionMatchesFilter(suggestion: RecipeSuggestion, recipeFilter: RecipeSuggestionFilter): boolean {
+  if (recipeFilter !== "vegetarian") return true;
+  const searchable = [
+    suggestion.title,
+    suggestion.description,
+    ...suggestion.matchedIngredients,
+    ...suggestion.missingIngredients,
+  ].join(" ");
+  return !MEAT_TERMS.test(searchable);
+}
+
+function filterDuplicateSuggestions(params: {
+  response: SuggestionsResponse;
+  excludedSuggestionTitles: string[];
+  recipeFilter: RecipeSuggestionFilter;
+}): { response: SuggestionsResponse; removedCount: number } {
+  const seenTitleKeys = new Set(
+    params.excludedSuggestionTitles.map(normalizeTitleKey).filter(Boolean),
+  );
+  const seenIdKeys = new Set<string>();
+  let removedCount = 0;
+
+  function keepUnique(suggestion: RecipeSuggestion): boolean {
+    const titleKey = normalizeTitleKey(suggestion.title);
+    const idKey = normalizeIdKey(suggestion.id);
+    const isDuplicate = Boolean(titleKey && seenTitleKeys.has(titleKey)) || Boolean(idKey && seenIdKeys.has(idKey));
+    const matchesFilter = suggestionMatchesFilter(suggestion, params.recipeFilter);
+
+    if (isDuplicate || !matchesFilter) {
+      removedCount += 1;
+      return false;
+    }
+
+    if (titleKey) seenTitleKeys.add(titleKey);
+    if (idKey) seenIdKeys.add(idKey);
+    return true;
+  }
+
+  return {
+    removedCount,
+    response: {
+      ...params.response,
+      suggestions: params.response.suggestions.filter(keepUnique).slice(0, 3),
+      alsoCanMake: params.response.alsoCanMake.filter(keepUnique).slice(0, 3),
+    },
+  };
 }
 
 async function persistSuggestionLog(params: {
@@ -130,6 +259,8 @@ export async function POST(request: Request) {
       pattern: /^(text|audio|photo)$/i,
     }).toLowerCase();
     const inputMode = inputModeRaw as InputMode;
+    const recipeFilter = readRecipeFilter(payload.recipeFilter);
+    const excludedSuggestionTitles = readExcludedSuggestionTitles(payload as Record<string, unknown>);
 
     const userId = await requireAuthUserId(request);
     if (!userId) {
@@ -211,7 +342,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Não foi possível identificar ingredientes válidos." }, { status: 400 });
     }
 
-    const response = await generateRecipeSuggestionsWithOpenAi(ingredients);
+    const rawResponse = await generateRecipeSuggestionsWithOpenAi(ingredients, {
+      recipeFilter,
+      excludedSuggestionTitles,
+    });
+    const { response, removedCount } = filterDuplicateSuggestions({
+      response: rawResponse,
+      excludedSuggestionTitles,
+      recipeFilter,
+    });
+    const dedupeNotice =
+      excludedSuggestionTitles.length > 0 && (removedCount > 0 || response.suggestions.length < 3)
+        ? "Mostrei só receitas novas para não repetir opções anteriores."
+        : undefined;
     const generationId = await persistSuggestionLog({
       userId,
       inputMode,
@@ -220,7 +363,7 @@ export async function POST(request: Request) {
       suggestions: [...response.suggestions, ...response.alsoCanMake],
     });
 
-    return NextResponse.json({ ...response, generationId });
+    return NextResponse.json({ ...response, generationId, dedupeNotice });
   } catch (error) {
     if (userIdForRefund && usageEventId && isOpenAiGenerationError(error)) {
       await refundAiUsageEvent(userIdForRefund, usageEventId).catch(() => undefined);

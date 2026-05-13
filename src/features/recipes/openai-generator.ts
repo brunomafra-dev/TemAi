@@ -1,5 +1,10 @@
 import { serverEnv } from "@/lib/env-server";
-import type { Recipe, RecipeSuggestion, SuggestionsResponse } from "@/features/recipes/types";
+import type {
+  Recipe,
+  RecipeSuggestion,
+  RecipeSuggestionFilter,
+  SuggestionsResponse,
+} from "@/features/recipes/types";
 
 class OpenAiGenerationError extends Error {
   status: number;
@@ -138,19 +143,48 @@ export function isOpenAiGenerationError(error: unknown): error is OpenAiGenerati
   return error instanceof OpenAiGenerationError;
 }
 
+function recipeFilterInstruction(recipeFilter: RecipeSuggestionFilter): string {
+  switch (recipeFilter) {
+    case "meal":
+      return "Filtro escolhido: Refeicao. Gere pratos principais salgados para almoco ou jantar; evite bebidas e sobremesas.";
+    case "vegetarian":
+      return "Filtro escolhido: Vegano/Vegetariano. Nao use carne, frango, peixe, frutos do mar, bacon, presunto ou embutidos. Ovos, leite e queijo podem ser usados se estiverem nos ingredientes.";
+    case "dessert":
+      return "Filtro escolhido: Sobremesas. Gere receitas doces; evite pratos principais salgados e bebidas.";
+    case "drink":
+      return "Filtro escolhido: Bebidas/Drinks. Gere bebidas, sucos, vitaminas, smoothies ou drinks sem alcool; evite comida solida.";
+    case "all":
+    default:
+      return "Filtro escolhido: Sem filtro. Escolha as melhores receitas possiveis para os ingredientes.";
+  }
+}
+
 export async function generateRecipeSuggestionsWithOpenAi(
   normalizedIngredients: string[],
+  options?: {
+    recipeFilter?: RecipeSuggestionFilter;
+    excludedSuggestionTitles?: string[];
+  },
 ): Promise<SuggestionsResponse> {
+  const recipeFilter = options?.recipeFilter || "all";
+  const excludedSuggestionTitles = (options?.excludedSuggestionTitles || []).slice(0, 30);
   const prompt = `
 Você é o chef do app TemAi. Gere sugestões em português brasileiro usando SOMENTE os ingredientes informados como base.
 
 Ingredientes disponiveis:
 ${normalizedIngredients.map((item) => `- ${item}`).join("\n")}
 
+${recipeFilterInstruction(recipeFilter)}
+
+Receitas ja exibidas que NAO podem ser repetidas nem por variacao parecida:
+${excludedSuggestionTitles.length ? excludedSuggestionTitles.map((item) => `- ${item}`).join("\n") : "- nenhuma"}
+
 Regras:
 - Priorize receitas que usem exatamente os ingredientes disponiveis.
 - Não marque como faltante um ingrediente que aparece na lista.
 - Se precisar sugerir ingrediente faltante, limite a no maximo 2 itens por receita.
+- Nao repita nome, ideia central ou variacao obvia das receitas ja exibidas.
+- Se nao houver 3 receitas novas e boas, retorne apenas 1 ou 2 em suggestions. Nao preencha com repeticao.
 - Retorne apenas JSON valido, sem markdown.
 - Formato:
 {

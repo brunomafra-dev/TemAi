@@ -1,4 +1,5 @@
 export type InputMode = "text" | "audio" | "photo";
+export type RecipeSuggestionFilter = "all" | "meal" | "vegetarian" | "dessert" | "drink";
 export type LibraryCategory =
   | "principais"
   | "veggie"
@@ -47,12 +48,15 @@ export interface SuggestionsResponse {
   alsoCanMake: RecipeSuggestion[];
   normalizedIngredients: string[];
   generationId?: string;
+  dedupeNotice?: string;
 }
 
 export interface SuggestionRequestBody {
   ingredientsText: string;
   inputMode: InputMode;
   file?: File;
+  recipeFilter?: RecipeSuggestionFilter;
+  excludedSuggestionTitles?: string[];
 }
 
 export interface FullRecipeRequestBody {
