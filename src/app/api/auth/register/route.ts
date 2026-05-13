@@ -32,6 +32,49 @@ function splitName(name: string): { firstName: string; lastName: string } {
   };
 }
 
+function isDuplicateUsernameError(error: { code?: string; message?: string }): boolean {
+  const normalizedMessage = (error.message || "").toLowerCase();
+  return (
+    error.code === "23505" ||
+    normalizedMessage.includes("profiles_username_unique_idx") ||
+    normalizedMessage.includes("duplicate key")
+  );
+}
+
+function getCreateUserFailure(error?: { message?: string } | null): { message: string; status: number } {
+  const normalizedMessage = error?.message?.toLowerCase() || "";
+
+  if (
+    normalizedMessage.includes("already") ||
+    normalizedMessage.includes("registered") ||
+    normalizedMessage.includes("exists")
+  ) {
+    return {
+      message: "Este email já está cadastrado. Use Entrar ou Esqueci minha senha.",
+      status: 409,
+    };
+  }
+
+  if (normalizedMessage.includes("password")) {
+    return {
+      message: "A senha precisa ter pelo menos 6 caracteres.",
+      status: 400,
+    };
+  }
+
+  if (normalizedMessage.includes("email")) {
+    return {
+      message: "Digite um email válido.",
+      status: 400,
+    };
+  }
+
+  return {
+    message: "Não foi possível criar sua conta agora. Tente novamente.",
+    status: 400,
+  };
+}
+
 export async function POST(request: Request) {
   try {
     const payload = (await parseJsonObjectBody(request, {
@@ -95,7 +138,15 @@ export async function POST(request: Request) {
     const availability = await serviceClient.rpc("is_username_available", {
       p_username: username,
     });
-    if (availability.error || !availability.data) {
+    if (availability.error) {
+      console.error("[auth/register] Falha ao validar username", availability.error);
+      return NextResponse.json(
+        { message: "Não foi possível validar esse @ agora. Tente novamente em instantes." },
+        { status: 503 },
+      );
+    }
+
+    if (!availability.data) {
       return NextResponse.json({ message: "@ já em uso. Escolha outro." }, { status: 409 });
     }
 
@@ -111,22 +162,8 @@ export async function POST(request: Request) {
     });
 
     if (error || !data.user) {
-      const normalizedMessage = error?.message.toLowerCase() || "";
-      if (
-        normalizedMessage.includes("already") ||
-        normalizedMessage.includes("registered") ||
-        normalizedMessage.includes("exists")
-      ) {
-        return NextResponse.json(
-          { message: "Este email já está cadastrado. Use Entrar ou Esqueci minha senha." },
-          { status: 409 },
-        );
-      }
-
-      return NextResponse.json(
-        { message: error?.message || "Falha ao cadastrar." },
-        { status: 400 },
-      );
+      const failure = getCreateUserFailure(error);
+      return NextResponse.json({ message: failure.message }, { status: failure.status });
     }
 
     const { firstName, lastName } = splitName(fullName);
@@ -148,11 +185,12 @@ export async function POST(request: Request) {
     if (profileError) {
       await serviceClient.auth.admin.deleteUser(data.user.id);
 
-      if (profileError.message.toLowerCase().includes("profiles_username_unique_idx")) {
+      if (isDuplicateUsernameError(profileError)) {
         return NextResponse.json({ message: "@ já em uso. Escolha outro." }, { status: 409 });
       }
+      console.error("[auth/register] Falha ao salvar perfil", profileError);
       return NextResponse.json(
-        { message: "Conta criada, mas houve falha ao salvar o perfil." },
+        { message: "Não foi possível salvar seu perfil. Tente novamente." },
         { status: 500 },
       );
     }
@@ -180,6 +218,6 @@ export async function POST(request: Request) {
     const validationResponse = validationErrorResponse(error);
     if (validationResponse) return validationResponse;
     console.error("[auth/register] Falha ao processar cadastro", error);
-    return NextResponse.json({ message: "Falha ao processar cadastro." }, { status: 500 });
+    return NextResponse.json({ message: "Não foi possível processar o cadastro agora." }, { status: 500 });
   }
 }

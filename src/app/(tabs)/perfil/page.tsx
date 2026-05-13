@@ -15,6 +15,7 @@ import {
   getUserProfile,
   saveUserProfile,
   saveUserProfileToCloud,
+  saveUserProfileToCloudDetailed,
   syncUserProfileFromCloud,
   type UserProfile,
 } from "@/features/profile/storage";
@@ -294,8 +295,17 @@ export default function ProfilePage() {
     }
 
     const currentUsername = sanitizeUsername(profile.username || "");
+    if (nextUsername !== currentUsername && checkingUsername) {
+      setProfileMessage("Aguarde a verificação do @.");
+      return;
+    }
+
     if (nextUsername !== currentUsername && usernameAvailable !== true) {
-      setProfileMessage("Esse @ ja esta em uso. Escolha outro.");
+      setProfileMessage(
+        usernameAvailable === false
+          ? "Esse @ já está em uso. Escolha outro."
+          : "Verifique se esse @ está disponível antes de salvar.",
+      );
       return;
     }
 
@@ -304,14 +314,23 @@ export default function ProfilePage() {
       : unlockedBadges[0] || "estagiario";
 
     const next = { ...workingProfile, username: nextUsername, selectedBadge: selected, unlockedBadges };
+    const syncResult = await saveUserProfileToCloudDetailed(next);
+
+    if (!syncResult.ok && syncResult.code === "username_taken") {
+      setUsernameAvailable(false);
+      setProfileMessage(syncResult.message);
+      return;
+    }
+
     saveUserProfile(next);
     setProfile(next);
     setWorkingProfile(next);
-    const synced = await saveUserProfileToCloud(next);
     setProfileMessage(
-      synced
+      syncResult.ok
         ? "Perfil atualizado com sucesso."
-        : "Perfil salvo localmente. Faca login para sincronizar.",
+        : syncResult.code === "not_authenticated"
+          ? "Perfil salvo localmente. Faça login para sincronizar."
+          : `${syncResult.message} Perfil salvo localmente neste aparelho.`,
     );
   }
 

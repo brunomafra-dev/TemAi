@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,8 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-client";
 import { saveUserProfile, type UserProfile } from "@/features/profile/storage";
 
 type Mode = "login" | "register" | "forgot";
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function sanitizeUsername(value: string): string {
   return value
@@ -33,17 +35,6 @@ export default function AuthPage() {
   const [usernameSuggestion, setUsernameSuggestion] = useState("");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const canRegister = useMemo(() => {
-    return (
-      name.trim().length >= 3 &&
-      sanitizeUsername(username).length >= 3 &&
-      email.trim().length >= 6 &&
-      password.length >= 6 &&
-      acceptedTerms &&
-      usernameAvailable === true
-    );
-  }, [acceptedTerms, email, name, password, username, usernameAvailable]);
 
   async function checkUsernameAvailability(raw: string) {
     const next = sanitizeUsername(raw);
@@ -85,18 +76,46 @@ export default function AuthPage() {
     return "";
   }
 
+  function getLoginValidationMessage(): string {
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) return "Informe seu email.";
+    if (!EMAIL_PATTERN.test(normalizedEmail)) return "Digite um email válido.";
+    if (!password) return "Informe sua senha.";
+    if (password.length < 6) return "A senha precisa ter pelo menos 6 caracteres.";
+    return "";
+  }
+
+  function getRegisterValidationMessage(): string {
+    if (name.trim().length < 3) return "Informe seu nome completo.";
+    if (sanitizeUsername(username).length < 3) return "Escolha um @ com pelo menos 3 caracteres.";
+    if (checkingUsername) return "Aguarde a verificação do @.";
+    if (usernameAvailable === false) return "Esse @ já está em uso. Escolha outro.";
+    if (usernameAvailable !== true) return "Escolha um @ disponível.";
+    if (!EMAIL_PATTERN.test(email.trim())) return "Digite um email válido.";
+    if (password.length < 6) return "A senha precisa ter pelo menos 6 caracteres.";
+    if (!acceptedTerms) return "Aceite os Termos de Uso e a Política de Privacidade.";
+    return "";
+  }
+
   async function handleLogin() {
     if (!client) {
       setMessage("Supabase não configurado.");
       return;
     }
+
+    const validationMessage = getLoginValidationMessage();
+    if (validationMessage) {
+      setMessage(validationMessage);
+      return;
+    }
+
     setIsSubmitting(true);
     setMessage("");
     const response = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         password,
       }),
     });
@@ -139,8 +158,10 @@ export default function AuthPage() {
       setMessage("Supabase não configurado.");
       return;
     }
-    if (!canRegister) {
-      setMessage("Preencha os campos corretamente.");
+
+    const validationMessage = getRegisterValidationMessage();
+    if (validationMessage) {
+      setMessage(validationMessage);
       return;
     }
 
@@ -154,7 +175,7 @@ export default function AuthPage() {
       body: JSON.stringify({
         name: name.trim(),
         username: sanitizeUsername(username),
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         password,
         acceptedTerms,
         redirectTo,
@@ -379,7 +400,7 @@ export default function AuthPage() {
 
           <Button
             className="w-full"
-            disabled={isSubmitting || (mode === "register" && !canRegister)}
+            disabled={isSubmitting}
             onClick={() =>
               void (
                 mode === "login"

@@ -19,6 +19,14 @@ export interface UserProfile {
   acceptedPrivacyAt: string | null;
 }
 
+export type SaveUserProfileToCloudResult =
+  | { ok: true }
+  | {
+      ok: false;
+      code: "not_authenticated" | "username_taken" | "sync_failed";
+      message: string;
+    };
+
 const PROFILE_STORAGE_KEY = "temai_user_profile";
 
 const defaultProfile: UserProfile = {
@@ -128,13 +136,46 @@ export async function syncUserProfileFromCloud(): Promise<UserProfile | null> {
   return normalized;
 }
 
-export async function saveUserProfileToCloud(profile: UserProfile): Promise<boolean> {
+function mapProfileSaveError(error: { code?: string; message?: string }): SaveUserProfileToCloudResult {
+  const message = (error.message || "").toLowerCase();
+  if (
+    error.code === "23505" ||
+    message.includes("profiles_username_unique_idx") ||
+    message.includes("duplicate key")
+  ) {
+    return {
+      ok: false,
+      code: "username_taken",
+      message: "Esse @ já está em uso. Escolha outro.",
+    };
+  }
+
+  return {
+    ok: false,
+    code: "sync_failed",
+    message: "Não foi possível sincronizar seu perfil agora. Tente novamente.",
+  };
+}
+
+export async function saveUserProfileToCloudDetailed(profile: UserProfile): Promise<SaveUserProfileToCloudResult> {
   const client = getSupabaseBrowserClient();
-  if (!client) return false;
+  if (!client) {
+    return {
+      ok: false,
+      code: "sync_failed",
+      message: "Supabase não configurado.",
+    };
+  }
 
   const userRes = await client.auth.getUser();
   const userId = userRes.data.user?.id;
-  if (!userId) return false;
+  if (!userId) {
+    return {
+      ok: false,
+      code: "not_authenticated",
+      message: "Faça login para sincronizar seu perfil.",
+    };
+  }
 
   const normalized = normalizeProfile(profile);
   const payload: Record<string, unknown> = {
@@ -155,5 +196,11 @@ export async function saveUserProfileToCloud(profile: UserProfile): Promise<bool
 
   const { error } = await client.from("profiles").upsert(payload, { onConflict: "id" });
 
-  return !error;
+  if (error) return mapProfileSaveError(error);
+  return { ok: true };
+}
+
+export async function saveUserProfileToCloud(profile: UserProfile): Promise<boolean> {
+  const result = await saveUserProfileToCloudDetailed(profile);
+  return result.ok;
 }

@@ -12,6 +12,29 @@ interface LoginPayload {
   password?: string;
 }
 
+function getLoginFailure(error?: { message?: string } | null): { message: string; status: number } {
+  const normalizedMessage = error?.message?.toLowerCase() || "";
+
+  if (normalizedMessage.includes("email not confirmed")) {
+    return {
+      message: "Confirme seu email antes de entrar. Veja também Spam/Lixo eletrônico.",
+      status: 403,
+    };
+  }
+
+  if (normalizedMessage.includes("too many") || normalizedMessage.includes("rate limit")) {
+    return {
+      message: "Muitas tentativas. Aguarde alguns minutos e tente novamente.",
+      status: 429,
+    };
+  }
+
+  return {
+    message: "Email ou senha não conferem. Confira os dados ou use Esqueci minha senha.",
+    status: 401,
+  };
+}
+
 export async function POST(request: Request) {
   try {
     const payload = (await parseJsonObjectBody(request, {
@@ -58,7 +81,8 @@ export async function POST(request: Request) {
     });
 
     if (error || !data.session) {
-      return NextResponse.json({ message: "Email ou senha inválidos." }, { status: 401 });
+      const failure = getLoginFailure(error);
+      return NextResponse.json({ message: failure.message }, { status: failure.status });
     }
 
     await resetAuthRateLimit(rateLimit.key);
@@ -72,6 +96,6 @@ export async function POST(request: Request) {
   } catch (error) {
     const validationResponse = validationErrorResponse(error);
     if (validationResponse) return validationResponse;
-    return NextResponse.json({ message: "Falha ao processar login." }, { status: 500 });
+    return NextResponse.json({ message: "Não foi possível processar login agora." }, { status: 500 });
   }
 }

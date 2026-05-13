@@ -25,7 +25,7 @@ function byteLength(value: string): number {
 
 function assertObject(value: unknown): asserts value is JsonObject {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new InputValidationError("Payload JSON invalido.");
+    throw new InputValidationError("Payload JSON inválido.");
   }
 }
 
@@ -51,7 +51,7 @@ export async function parseJsonObjectBody(
   const maxBytes = options?.maxBytes ?? DEFAULT_MAX_BODY_BYTES;
   const contentType = request.headers.get("content-type")?.toLowerCase() || "";
   if (contentType && !contentType.includes("application/json")) {
-    throw new InputValidationError("Content-Type invalido. Use application/json.", 415);
+    throw new InputValidationError("Content-Type inválido. Use application/json.", 415);
   }
 
   const contentLengthRaw = request.headers.get("content-length");
@@ -62,7 +62,7 @@ export async function parseJsonObjectBody(
 
   const raw = await request.text();
   if (!raw.trim()) {
-    throw new InputValidationError("Payload JSON obrigatorio.");
+    throw new InputValidationError("Payload JSON obrigatório.");
   }
 
   if (byteLength(raw) > maxBytes) {
@@ -95,7 +95,7 @@ function sanitizeStringValue(raw: string, options: StringOptions): string {
   assertNoUnsafeControlChars(value, options.fieldName);
 
   if (value.length < minLength) {
-    throw new InputValidationError(`${options.fieldName} invalido.`);
+    throw new InputValidationError(`${options.fieldName} inválido.`);
   }
 
   if (value.length > options.maxLength) {
@@ -117,7 +117,7 @@ export function readRequiredString(
 ): string {
   const value = input[key];
   if (typeof value !== "string") {
-    throw new InputValidationError(`${options.fieldName || key} obrigatorio.`);
+    throw new InputValidationError(`${options.fieldName || key} obrigatório.`);
   }
   return sanitizeStringValue(value, {
     ...options,
@@ -177,7 +177,7 @@ export function readStringArray(
 
   const minItems = options.minItems ?? 0;
   if (normalized.length < minItems) {
-    throw new InputValidationError(`${options.fieldName || key} invalido.`);
+    throw new InputValidationError(`${options.fieldName || key} inválido.`);
   }
 
   return normalized;
@@ -199,7 +199,7 @@ export function readOptionalNumber(
 
   if (!hasValue) {
     if (typeof options.defaultValue === "number") return options.defaultValue;
-    throw new InputValidationError(`${options.fieldName || key} obrigatorio.`);
+    throw new InputValidationError(`${options.fieldName || key} obrigatório.`);
   }
 
   const value = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw.trim()) : NaN;
@@ -242,7 +242,7 @@ export function readOptionalEnum<T extends string>(
   }
   const normalized = raw.trim() as T;
   if (!allowed.includes(normalized)) {
-    throw new InputValidationError(`${fieldName || key} invalido.`);
+    throw new InputValidationError(`${fieldName || key} inválido.`);
   }
   return normalized;
 }
