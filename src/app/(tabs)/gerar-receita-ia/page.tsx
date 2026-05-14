@@ -685,14 +685,14 @@ function CreateRecipePageContent() {
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#A88A57]">TemAi IA</p>
         <h1 className="font-display text-3xl text-[#2A1E17]">Gerar receita</h1>
         <p className="text-sm text-[#726457]">
-          Escolha o formato, informe ingredientes e receba 3 sugestoes inteligentes.
+          Escolha o formato, informe ingredientes e receba 3 sugestões inteligentes.
         </p>
       </header>
 
       <Card className="border-[#E5D7C1] bg-[#FFFCF7]">
         <CardHeader>
           <CardTitle>Criar receita com IA</CardTitle>
-          <CardDescription>Fluxo em duas etapas: sugestoes primeiro, receita completa depois.</CardDescription>
+          <CardDescription>Fluxo em duas etapas: sugestões primeiro, receita completa depois.</CardDescription>
           {!isPremium ? (
             <p className="text-xs text-[#7A6D60]">
               Plano free: {subscription.aiGenerationsUsedThisMonth}/{subscription.aiGenerationsLimitThisMonth} gerações neste mês.
@@ -905,7 +905,7 @@ function CreateRecipePageContent() {
             disabled={!canGenerate}
             className="h-12 w-full rounded-2xl bg-[#C66A3D] text-[#FFF9EE] hover:brightness-95"
           >
-            {isLoading ? "Buscando sugestoes..." : "Gerar 3 sugestoes"}
+            {isLoading ? "Buscando sugestões..." : "Gerar 3 sugestões"}
           </Button>
         </CardContent>
       </Card>
@@ -1024,12 +1024,6 @@ function CreateRecipePageContent() {
                 <p className="mt-1 text-xs font-semibold text-[#5E5348]">Selecionar imagem</p>
               </button>
             </div>
-            <button
-              onClick={() => setIsPhotoPickerOpen(false)}
-              className="mt-4 w-full rounded-full border border-[#E0D2BA] py-2 text-sm font-semibold text-[#6E6154]"
-            >
-              Voltar
-            </button>
           </div>
         </div>
       ) : null}

@@ -225,7 +225,7 @@ function LibraryPageContent() {
         <div className="rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] px-3 py-3">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-wide text-[#7D715F]">
-              Pagina {page} de {totalPages}
+              Página {page} de {totalPages}
             </p>
             <p className="text-xs text-[#7D715F]">{totalItems.toLocaleString("pt-BR")} receitas</p>
           </div>

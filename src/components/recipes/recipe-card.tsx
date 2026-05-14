@@ -30,7 +30,7 @@ export const RecipeCard = memo(function RecipeCard({ recipe, href, footerLabel }
                 {recipe.prepMinutes} min
               </span>
               <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold text-white">
-                {recipe.servings} porcoes
+                {recipe.servings} porções
               </span>
             </div>
           </div>

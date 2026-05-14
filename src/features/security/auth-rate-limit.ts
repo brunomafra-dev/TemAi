@@ -20,6 +20,7 @@ const RATE_LIMIT_CONFIG = {
   "library-import-batch": { maxAttempts: 5, windowSeconds: 60 * 60 },
   "library-publish-manual": { maxAttempts: 20, windowSeconds: 15 * 60 },
   "library-set-category": { maxAttempts: 30, windowSeconds: 15 * 60 },
+  "saved-recipes": { maxAttempts: 120, windowSeconds: 60 },
 } as const;
 
 export type RateLimitedRoute = keyof typeof RATE_LIMIT_CONFIG;

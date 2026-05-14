@@ -44,6 +44,21 @@ export interface Recipe {
   origin: RecipeOrigin;
 }
 
+export interface SavedRecipeRef {
+  recipeId: string;
+  sourceOrigin: Exclude<RecipeOrigin, "manual">;
+  savedAt: string;
+  title?: string;
+  description?: string;
+  imageUrl?: string;
+  sourceLabel?: string;
+  recipeSnapshot?: Recipe;
+  ingredientsSnapshot?: string[];
+  generationId?: string;
+  sourceSuggestionId?: string;
+  cookingEquipment?: CookingEquipment[];
+}
+
 export interface SuggestionsResponse {
   suggestions: RecipeSuggestion[];
   alsoCanMake: RecipeSuggestion[];

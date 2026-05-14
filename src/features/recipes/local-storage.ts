@@ -5,17 +5,7 @@ import {
   SAVED_RECIPE_REFS_KEY,
   SAVED_RECIPES_KEY,
 } from "@/features/recipes/constants";
-import type { CookingEquipment, Recipe, RecipeOrigin } from "@/features/recipes/types";
-
-export interface SavedRecipeRef {
-  recipeId: string;
-  sourceOrigin: Exclude<RecipeOrigin, "manual">;
-  savedAt: string;
-  ingredientsSnapshot?: string[];
-  generationId?: string;
-  sourceSuggestionId?: string;
-  cookingEquipment?: CookingEquipment[];
-}
+import type { Recipe, SavedRecipeRef } from "@/features/recipes/types";
 
 function hasWindow(): boolean {
   return typeof window !== "undefined";
@@ -82,11 +72,30 @@ export function saveSavedRecipeRefs(next: SavedRecipeRef[]): void {
   writeJsonArray(SAVED_RECIPE_REFS_KEY, next);
 }
 
+function savedRecipeKey(ref: SavedRecipeRef): string {
+  return `${ref.sourceOrigin}:${ref.recipeId}`;
+}
+
+export function mergeSavedRecipeRefs(...groups: SavedRecipeRef[][]): SavedRecipeRef[] {
+  const byKey = new Map<string, SavedRecipeRef>();
+  groups.flat().forEach((ref) => {
+    if (!ref.recipeId || !ref.sourceOrigin) return;
+    byKey.set(savedRecipeKey(ref), ref);
+  });
+
+  return Array.from(byKey.values()).sort((a, b) => {
+    const left = new Date(a.savedAt).getTime() || 0;
+    const right = new Date(b.savedAt).getTime() || 0;
+    return right - left;
+  });
+}
+
 export function upsertSavedRecipeRef(ref: SavedRecipeRef): SavedRecipeRef[] {
   const current = getSavedRecipeRefs();
-  const exists = current.some((item) => item.recipeId === ref.recipeId);
+  const targetKey = savedRecipeKey(ref);
+  const exists = current.some((item) => savedRecipeKey(item) === targetKey);
   const next = exists
-    ? current.map((item) => (item.recipeId === ref.recipeId ? ref : item))
+    ? current.map((item) => (savedRecipeKey(item) === targetKey ? ref : item))
     : [ref, ...current];
 
   saveSavedRecipeRefs(next);

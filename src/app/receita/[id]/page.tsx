@@ -18,9 +18,13 @@ import {
   upsertAuthoredRecipe,
   upsertSavedRecipeRef,
 } from "@/features/recipes/local-storage";
+import {
+  deleteSavedRecipeRefFromCloud,
+  saveSavedRecipeRefToCloud,
+  syncSavedRecipeRefsFromCloud,
+} from "@/features/recipes/saved-recipes-cloud";
 import { getUserRecipeRating, setUserRecipeRating } from "@/features/recipes/ratings-storage";
-import type { Recipe } from "@/features/recipes/types";
-import type { CookingEquipment } from "@/features/recipes/types";
+import type { CookingEquipment, Recipe, SavedRecipeRef } from "@/features/recipes/types";
 import { normalizeCookingEquipment } from "@/features/recipes/cooking-equipment";
 import { parseIngredientsText } from "@/features/recipes/helpers";
 import { slugify } from "@/lib/utils";
@@ -121,10 +125,10 @@ function inflectUnit(unitRaw: string, quantity: number): string {
     unidades: { singular: "unidade", plural: "unidades" },
     item: { singular: "item", plural: "itens" },
     itens: { singular: "item", plural: "itens" },
-    porcao: { singular: "porcao", plural: "porcoes" },
-    porcoes: { singular: "porcao", plural: "porcoes" },
-    xicara: { singular: "xicara", plural: "xicaras" },
-    xicaras: { singular: "xicara", plural: "xicaras" },
+    porcao: { singular: "porção", plural: "porções" },
+    porcoes: { singular: "porção", plural: "porções" },
+    xicara: { singular: "xícara", plural: "xícaras" },
+    xicaras: { singular: "xícara", plural: "xícaras" },
     colher: { singular: "colher", plural: "colheres" },
     colheres: { singular: "colher", plural: "colheres" },
     colherzinha: { singular: "colherzinha", plural: "colherzinhas" },
@@ -133,8 +137,8 @@ function inflectUnit(unitRaw: string, quantity: number): string {
     copos: { singular: "copo", plural: "copos" },
     caneca: { singular: "caneca", plural: "canecas" },
     canecas: { singular: "caneca", plural: "canecas" },
-    taca: { singular: "taca", plural: "tacas" },
-    tacas: { singular: "taca", plural: "tacas" },
+    taca: { singular: "taça", plural: "taças" },
+    tacas: { singular: "taça", plural: "taças" },
     quilo: { singular: "quilo", plural: "quilos" },
     quilos: { singular: "quilo", plural: "quilos" },
     kilo: { singular: "kilo", plural: "kilos" },
@@ -173,8 +177,8 @@ function inflectUnit(unitRaw: string, quantity: number): string {
     caixas: { singular: "caixa", plural: "caixas" },
     fatia: { singular: "fatia", plural: "fatias" },
     fatias: { singular: "fatia", plural: "fatias" },
-    pedaco: { singular: "pedaco", plural: "pedacos" },
-    pedacos: { singular: "pedaco", plural: "pedacos" },
+    pedaco: { singular: "pedaço", plural: "pedaços" },
+    pedacos: { singular: "pedaço", plural: "pedaços" },
     ramo: { singular: "ramo", plural: "ramos" },
     ramos: { singular: "ramo", plural: "ramos" },
     folha: { singular: "folha", plural: "folhas" },
@@ -283,6 +287,8 @@ export default function RecipeDetailsPage() {
   const [isShoppingOpen, setIsShoppingOpen] = useState(false);
   const [ownedIngredients, setOwnedIngredients] = useState<Record<string, boolean>>({});
   const [shoppingMessage, setShoppingMessage] = useState("");
+  const [savedRecipeMessage, setSavedRecipeMessage] = useState("");
+  const [isSyncingSavedRecipe, setIsSyncingSavedRecipe] = useState(false);
   const [isTouchOpen, setIsTouchOpen] = useState(false);
   const [touchTitle, setTouchTitle] = useState("");
   const [touchImageUrl, setTouchImageUrl] = useState("");
@@ -307,6 +313,7 @@ export default function RecipeDetailsPage() {
 
     async function loadRecipe() {
       setErrorMessage("");
+      setSavedRecipeMessage("");
 
       if (origin === "library") {
         try {
@@ -346,9 +353,22 @@ export default function RecipeDetailsPage() {
       if (origin === "saved") {
         try {
           setIsLoading(true);
-          const savedRef = getSavedRecipeRefs().find((item) => item.recipeId === recipeId);
+          let savedRef = getSavedRecipeRefs().find((item) => item.recipeId === recipeId);
+          if (!savedRef) {
+            const cloudRefs = await syncSavedRecipeRefsFromCloud().catch(() => []);
+            savedRef = cloudRefs.find((item) => item.recipeId === recipeId);
+          }
           if (!savedRef) {
             throw new Error("Receita salva não encontrada.");
+          }
+
+          if (savedRef.recipeSnapshot) {
+            if (isMounted) {
+              setRecipe(savedRef.recipeSnapshot);
+              setIsSaved(true);
+              setUserRating(getUserRecipeRating(savedRef.recipeSnapshot.id));
+            }
+            return;
           }
 
           if (savedRef.sourceOrigin === "library") {
@@ -446,7 +466,25 @@ export default function RecipeDetailsPage() {
     );
   }, [isShoppingOpen, scaledIngredients]);
 
-  function handleSaveRecipe() {
+  function buildSavedRecipeRef(currentRecipe: Recipe): SavedRecipeRef {
+    const sourceOrigin = origin === "library" ? "library" : "ai";
+    return {
+      recipeId: currentRecipe.id,
+      sourceOrigin,
+      savedAt: new Date().toISOString(),
+      title: currentRecipe.title,
+      description: currentRecipe.description,
+      imageUrl: currentRecipe.imageUrl,
+      sourceLabel: currentRecipe.sourceLabel,
+      recipeSnapshot: currentRecipe,
+      ingredientsSnapshot: sourceOrigin === "ai" ? ingredientList : currentRecipe.ingredients,
+      generationId,
+      cookingEquipment,
+      sourceSuggestionId: sourceOrigin === "ai" ? recipeId : undefined,
+    };
+  }
+
+  async function handleSaveRecipe() {
     if (!recipe) {
       return;
     }
@@ -454,25 +492,45 @@ export default function RecipeDetailsPage() {
       return;
     }
 
-    upsertSavedRecipeRef({
-      recipeId: recipe.id,
-      sourceOrigin: origin === "library" ? "library" : "ai",
-      savedAt: new Date().toISOString(),
-      ingredientsSnapshot: ingredientList,
-      generationId,
-      cookingEquipment,
-      sourceSuggestionId: origin === "ai" ? recipeId : undefined,
-    });
+    const savedRef = buildSavedRecipeRef(recipe);
+    upsertSavedRecipeRef(savedRef);
     setIsSaved(true);
+    setSavedRecipeMessage("Receita salva.");
+
+    setIsSyncingSavedRecipe(true);
+    try {
+      const synced = await saveSavedRecipeRefToCloud(savedRef);
+      setSavedRecipeMessage(
+        synced
+          ? "Receita salva e sincronizada."
+          : "Receita salva neste aparelho. Entre na conta para sincronizar.",
+      );
+    } catch {
+      setSavedRecipeMessage("Receita salva neste aparelho. Sincronização pendente.");
+    } finally {
+      setIsSyncingSavedRecipe(false);
+    }
   }
 
-  function handleUnsaveRecipe() {
+  async function handleUnsaveRecipe() {
     if (!recipe) {
       return;
     }
 
+    const savedRef = getSavedRecipeRefs().find((item) => item.recipeId === recipe.id);
     removeSavedRecipeRef(recipe.id);
     setIsSaved(false);
+    setSavedRecipeMessage("Receita removida dos salvos.");
+
+    if (!savedRef) return;
+    setIsSyncingSavedRecipe(true);
+    try {
+      await deleteSavedRecipeRefFromCloud(savedRef);
+    } catch {
+      setSavedRecipeMessage("Receita removida deste aparelho. Sincronização pendente.");
+    } finally {
+      setIsSyncingSavedRecipe(false);
+    }
   }
 
   function handleRate(rating: number) {
@@ -586,7 +644,7 @@ export default function RecipeDetailsPage() {
     const authored: Recipe = {
       id: `manual-${slugify(touchTitle)}-${Date.now()}`,
       title: touchTitle.trim(),
-      description: `Versao autoral inspirada em: ${recipe.title}`,
+      description: `Versão autoral inspirada em: ${recipe.title}`,
       category: recipe.category,
       ingredients: nextIngredients,
       steps: nextSteps,
@@ -646,7 +704,7 @@ export default function RecipeDetailsPage() {
             <CardContent className="space-y-4">
               <div className="flex flex-wrap gap-2">
                 <Badge>{recipe.prepMinutes} min</Badge>
-                <Badge>{scaledServingsLabel} porcoes</Badge>
+                <Badge>{scaledServingsLabel} porções</Badge>
                 <Badge>Serve ~{scaledServingsLabel} pessoa(s)</Badge>
                 <Badge>{recipe.sourceLabel}</Badge>
               </div>
@@ -657,7 +715,7 @@ export default function RecipeDetailsPage() {
                   </summary>
                   <div className="mt-2 grid grid-cols-2 gap-2 text-sm text-[#4F4338]">
                     <p>Kcal: {recipe.nutrition.caloriesKcal}</p>
-                    <p>Proteina: {recipe.nutrition.proteinG} g</p>
+                    <p>Proteína: {recipe.nutrition.proteinG} g</p>
                     <p>Carbo: {recipe.nutrition.carbsG} g</p>
                     <p>Gordura: {recipe.nutrition.fatG} g</p>
                   </div>
@@ -666,7 +724,7 @@ export default function RecipeDetailsPage() {
               ) : null}
               <div className="space-y-2 rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-[#7A6D60]">
-                  Multiplicador de porcoes
+                  Multiplicador de porções
                 </p>
                 <div className="flex gap-2">
                   {PORTION_MULTIPLIERS.map(({ value, label }) => (
@@ -688,27 +746,32 @@ export default function RecipeDetailsPage() {
                 </p>
                 <RatingStars value={userRating} onChange={handleRate} />
               </div>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-1 gap-2">
                 {origin === "manual" ? (
-                  <Button variant="secondary" className="flex-1" disabled>
+                  <Button variant="secondary" className="w-full" disabled>
                     Receita autoral
                   </Button>
                 ) : isSaved ? (
-                  <Button variant="secondary" className="flex-1" onClick={handleUnsaveRecipe}>
-                    Remover dos salvos
+                  <Button variant="secondary" className="w-full" onClick={() => void handleUnsaveRecipe()} disabled={isSyncingSavedRecipe}>
+                    {isSyncingSavedRecipe ? "Sincronizando..." : "Remover dos salvos"}
                   </Button>
                 ) : (
-                  <Button className="flex-1" onClick={handleSaveRecipe}>
-                    Salvar receita
+                  <Button className="w-full" onClick={() => void handleSaveRecipe()} disabled={isSyncingSavedRecipe}>
+                    {isSyncingSavedRecipe ? "Salvando..." : "Salvar receita"}
                   </Button>
                 )}
                 <Link
                   href="/minhas-receitas"
-                  className="flex flex-1 items-center justify-center rounded-full border border-border bg-surface px-4 text-sm font-semibold text-foreground transition hover:bg-surface-muted"
+                  className="flex h-11 w-full items-center justify-center rounded-full border border-border bg-surface px-4 text-center text-sm font-semibold text-foreground transition hover:bg-surface-muted"
                 >
-                  Ver Minhas receitas
+                  Ver minhas receitas
                 </Link>
               </div>
+              {savedRecipeMessage ? (
+                <p className="rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] px-3 py-2 text-center text-xs font-semibold text-[#6A5E52]">
+                  {savedRecipeMessage}
+                </p>
+              ) : null}
               <Button
                 variant="outline"
                 className="w-full"
@@ -738,13 +801,13 @@ export default function RecipeDetailsPage() {
                       </label>
                     ))}
                   </div>
-                  <div className="flex gap-2">
-                    <Button className="flex-1" onClick={confirmShoppingList}>
-                      Adicionar à lista de compras
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <Button className="w-full justify-center text-center" onClick={confirmShoppingList}>
+                      Adicionar itens à lista
                     </Button>
                     <Button
                       variant="secondary"
-                      className="flex-1"
+                      className="w-full justify-center text-center"
                       onClick={() => setIsShoppingOpen(false)}
                     >
                       Fechar
@@ -823,7 +886,7 @@ export default function RecipeDetailsPage() {
               <input
                 value={touchTitle}
                 onChange={(event) => setTouchTitle(event.target.value)}
-                placeholder="Novo titulo da receita"
+                placeholder="Novo título da receita"
                 className="h-10 w-full rounded-xl border border-[#E5D7BF] bg-white px-3 text-sm"
               />
               <input
@@ -835,7 +898,7 @@ export default function RecipeDetailsPage() {
               <textarea
                 value={touchIngredientsText}
                 onChange={(event) => setTouchIngredientsText(event.target.value)}
-                placeholder="Ingredientes separados por virgula"
+                placeholder="Ingredientes separados por vírgula"
                 className="min-h-[90px] w-full rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm"
               />
               <textarea
@@ -846,10 +909,10 @@ export default function RecipeDetailsPage() {
               />
 
               <div className="mt-3 grid gap-1 rounded-xl border border-[#E5D7BF] bg-[#FAF4EA] p-2 text-xs">
-              <p>{touchValidation.hasNewTitle ? "✅" : "❌"} Novo titulo relevante</p>
-              <p>{touchValidation.hasNewImage ? "✅" : "❌"} Nova imagem obrigatoria</p>
-              <p>{touchValidation.ingredientsChanged ? "✅" : "❌"} Ingredientes mudaram de forma valida</p>
-              <p>{touchValidation.stepsChanged ? "✅" : "❌"} Preparo mudou de forma valida</p>
+              <p>{touchValidation.hasNewTitle ? "✅" : "❌"} Novo título relevante</p>
+              <p>{touchValidation.hasNewImage ? "✅" : "❌"} Nova imagem obrigatória</p>
+              <p>{touchValidation.ingredientsChanged ? "✅" : "❌"} Ingredientes mudaram de forma válida</p>
+              <p>{touchValidation.stepsChanged ? "✅" : "❌"} Preparo mudou de forma válida</p>
               </div>
 
               <div className="mt-3 flex gap-2">

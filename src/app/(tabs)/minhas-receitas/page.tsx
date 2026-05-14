@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { RecipeCard } from "@/components/recipes/recipe-card";
 import { Button } from "@/components/ui/button";
@@ -94,7 +95,7 @@ export default function MyRecipesPage() {
     if (publishingById[recipe.id]) return;
 
     const profile = getUserProfile();
-    const authorName = `${profile.firstName} ${profile.lastName}`.trim() || "Usuario TemAi";
+    const authorName = `${profile.firstName} ${profile.lastName}`.trim() || "Usuário TemAi";
 
     setPublishErrorById((current) => ({ ...current, [recipe.id]: "" }));
     setPublishingById((current) => ({ ...current, [recipe.id]: true }));
@@ -137,6 +138,9 @@ export default function MyRecipesPage() {
   return (
     <section className="space-y-5">
       <header className="space-y-2">
+        <Link href="/perfil" className="inline-flex text-sm font-semibold text-primary">
+          ← Voltar para perfil
+        </Link>
         <h1 className="text-2xl font-semibold">Minhas receitas</h1>
         <p className="text-sm text-muted-foreground">
           Salve receitas da IA e crie suas receitas manuais aqui.
@@ -144,23 +148,23 @@ export default function MyRecipesPage() {
       </header>
 
       <Button variant={isAdding ? "secondary" : "default"} className="w-full" onClick={() => setIsAdding((value) => !value)}>
-        {isAdding ? "Cancelar criacao" : "Criar receita"}
+        {isAdding ? "Cancelar criação" : "Criar receita"}
       </Button>
 
       {isAdding ? (
         <Card>
           <CardHeader>
             <CardTitle>Nova receita</CardTitle>
-            <CardDescription>Titulo, ingredientes, preparo e imagem opcional.</CardDescription>
+            <CardDescription>Título, ingredientes, preparo e imagem opcional.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Input
-              placeholder="Titulo da receita"
+              placeholder="Título da receita"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
             />
             <Textarea
-              placeholder="Descricao curta (opcional)"
+              placeholder="Descrição curta (opcional)"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               className="min-h-[70px]"
@@ -182,7 +186,7 @@ export default function MyRecipesPage() {
               </select>
             </div>
             <Textarea
-              placeholder="Ingredientes separados por virgula"
+              placeholder="Ingredientes separados por vírgula"
               value={ingredientsText}
               onChange={(event) => setIngredientsText(event.target.value)}
               className="min-h-[90px]"

@@ -20,6 +20,8 @@ import {
   type UserProfile,
 } from "@/features/profile/storage";
 import { getMyRecipes, getSavedRecipeRefs } from "@/features/recipes/local-storage";
+import { syncSavedRecipeRefsFromCloud } from "@/features/recipes/saved-recipes-cloud";
+import type { SavedRecipeRef } from "@/features/recipes/types";
 import { buildAuthHeaders } from "@/features/recipes/api-client";
 import { getSupabaseBrowserClient } from "@/lib/supabase-client";
 import {
@@ -103,6 +105,24 @@ function sanitizeUsername(value: string): string {
     .slice(0, 24);
 }
 
+function formatSavedRecipeDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Salva recentemente";
+  return `Salva em ${date.toLocaleDateString("pt-BR")}`;
+}
+
+function savedRecipeHref(item: SavedRecipeRef): string {
+  const params = new URLSearchParams({ origin: "saved" });
+  if (item.title) params.set("title", item.title);
+  if (item.generationId) params.set("generationId", item.generationId);
+  if (item.cookingEquipment?.length) params.set("equipment", item.cookingEquipment.join(","));
+  return `/receita/${encodeURIComponent(item.recipeId)}?${params.toString()}`;
+}
+
+function savedRecipeOriginLabel(item: SavedRecipeRef): string {
+  return item.sourceOrigin === "library" ? "Biblioteca" : "TemAi IA";
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const [activeModal, setActiveModal] = useState<SectionId | null>(null);
@@ -130,6 +150,7 @@ export default function ProfilePage() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [deleteAccountMessage, setDeleteAccountMessage] = useState("");
+  const [savedRefs, setSavedRefs] = useState<SavedRecipeRef[]>(() => getSavedRecipeRefs());
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([
     {
       from: "bot",
@@ -139,7 +160,6 @@ export default function ProfilePage() {
   ]);
 
   const myRecipes = useMemo(() => getMyRecipes(), []);
-  const savedRefs = useMemo(() => getSavedRecipeRefs(), []);
   const categoryCounts = useMemo(() => {
     const next: Record<string, number> = {};
     myRecipes.forEach((recipe) => {
@@ -227,6 +247,24 @@ export default function ProfilePage() {
       })
       .catch(() => {
         if (!isMounted) return;
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeModal]);
+
+  useEffect(() => {
+    if (activeModal !== "saved") return;
+    let isMounted = true;
+    syncSavedRecipeRefsFromCloud()
+      .then((refs) => {
+        if (!isMounted) return;
+        setSavedRefs(refs);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setSavedRefs(getSavedRecipeRefs());
       });
 
     return () => {
@@ -870,10 +908,56 @@ export default function ProfilePage() {
         );
       case "saved":
         return (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <p className="text-sm font-semibold text-[#5D5248]">Receitas Salvas</p>
-            <div className="max-h-[45vh] space-y-2 overflow-auto pr-1">
-              {savedRefs.length === 0 ? <p className="text-sm text-[#7A6D60]">Você ainda não salvou receitas.</p> : savedRefs.map((item) => <p key={`${item.recipeId}-${item.savedAt}`} className="rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-xs">{item.recipeId}</p>)}
+            <div className="max-h-[48vh] space-y-2 overflow-auto pr-1">
+              {savedRefs.length === 0 ? (
+                <p className="text-sm text-[#7A6D60]">Você ainda não salvou receitas.</p>
+              ) : (
+                savedRefs.map((item) => (
+                  <Link
+                    key={`${item.sourceOrigin}-${item.recipeId}-${item.savedAt}`}
+                    href={savedRecipeHref(item)}
+                    className="flex min-h-24 gap-3 rounded-2xl border border-[#E5D7BF] bg-white p-2 text-left shadow-[0_14px_30px_-24px_rgba(42,30,23,0.65)] transition hover:bg-[#FFF8EE]"
+                    onClick={closeModal}
+                  >
+                    <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#F2E4D0]">
+                      {item.imageUrl ? (
+                        <Image
+                          src={item.imageUrl}
+                          alt={item.title || "Receita salva"}
+                          fill
+                          sizes="80px"
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full flex-col items-center justify-center bg-[#EAD7BB] text-[#7A4A31]">
+                          <span className="text-2xl">🍽️</span>
+                          <span className="mt-0.5 text-xs font-bold">
+                            {(item.title || "T").slice(0, 1).toUpperCase()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1 py-1">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full border border-[#E5D7BF] bg-[#FAF4EA] px-2 py-0.5 text-[10px] font-semibold text-[#7A4733]">
+                          {savedRecipeOriginLabel(item)}
+                        </span>
+                        <span className="text-[10px] font-semibold text-[#8A7A69]">
+                          {formatSavedRecipeDate(item.savedAt)}
+                        </span>
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-sm font-semibold text-[#4F4338]">
+                        {item.title || "Receita salva"}
+                      </p>
+                      <p className="mt-1 line-clamp-2 text-xs text-[#7A6D60]">
+                        {item.description || "Toque para abrir a receita completa."}
+                      </p>
+                    </div>
+                  </Link>
+                ))
+              )}
             </div>
           </div>
         );
