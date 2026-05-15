@@ -81,7 +81,6 @@ const categories = [
 ];
 
 const popularCategories = ["principais", "veggie", "massas", "kids", "sobremesas", "lanches", "bebidas"] as const;
-const POPULAR_CACHE_KEY = "temai:home:popular:v2";
 const MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024;
 type Category = (typeof categories)[number];
 
@@ -274,19 +273,9 @@ export default function HomePage() {
   useEffect(() => {
     let isMounted = true;
 
-    const cached = typeof window !== "undefined" ? window.sessionStorage.getItem(POPULAR_CACHE_KEY) : null;
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached) as Array<PopularRecipeView & { category: string }>;
-        setPopularApiRecipes(parsed);
-      } catch {
-        // ignore invalid cache
-      }
-    }
-
     async function loadPopular() {
       try {
-        const response = await fetch("/api/library/popular?limit=7", { cache: "no-store" });
+        const response = await fetch(`/api/library/popular?limit=7&t=${Date.now()}`, { cache: "no-store" });
         if (!response.ok) {
           throw new Error("Falha ao carregar populares.");
         }
@@ -304,9 +293,6 @@ export default function HomePage() {
           }));
         if (isMounted) {
           setPopularApiRecipes(filtered);
-          if (typeof window !== "undefined") {
-            window.sessionStorage.setItem(POPULAR_CACHE_KEY, JSON.stringify(filtered));
-          }
         }
       } catch {
         if (isMounted) {
@@ -315,9 +301,23 @@ export default function HomePage() {
       }
     }
 
-    loadPopular();
+    void loadPopular();
+    const refreshPopular = () => {
+      void loadPopular();
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        void loadPopular();
+      }
+    };
+    window.addEventListener("temai:popular-metrics-changed", refreshPopular);
+    window.addEventListener("focus", refreshPopular);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
       isMounted = false;
+      window.removeEventListener("temai:popular-metrics-changed", refreshPopular);
+      window.removeEventListener("focus", refreshPopular);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, []);
 

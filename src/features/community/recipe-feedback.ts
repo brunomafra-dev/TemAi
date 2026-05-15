@@ -174,25 +174,63 @@ export async function saveLibraryRecipeRating(params: {
 
   const supabase = getSupabaseServiceRoleClient();
   const storedRating = Math.max(0.5, Math.min(5, params.rating / 2));
-  const existing = await supabase
+  const userFingerprint = `user:${params.userId}`;
+  const existingByUser = await supabase
     .from("recipe_ratings")
     .select("id")
     .eq("recipe_id", recipe.id)
     .eq("user_id", params.userId)
+    .limit(1)
     .maybeSingle();
+  if (existingByUser.error) throw existingByUser.error;
 
-  if (existing.data?.id) {
-    await supabase
+  const existingByFingerprint = existingByUser.data?.id
+    ? null
+    : await supabase
+        .from("recipe_ratings")
+        .select("id")
+        .eq("recipe_id", recipe.id)
+        .eq("user_fingerprint", userFingerprint)
+        .limit(1)
+        .maybeSingle();
+  if (existingByFingerprint?.error) throw existingByFingerprint.error;
+
+  const existingId = existingByUser.data?.id || existingByFingerprint?.data?.id;
+
+  if (existingId) {
+    const { error } = await supabase
       .from("recipe_ratings")
-      .update({ rating: storedRating })
-      .eq("id", existing.data.id);
+      .update({
+        rating: storedRating,
+        user_id: params.userId,
+        user_fingerprint: userFingerprint,
+      })
+      .eq("id", existingId);
+    if (error) throw error;
   } else {
-    await supabase.from("recipe_ratings").insert({
+    const { error } = await supabase.from("recipe_ratings").insert({
       recipe_id: recipe.id,
       user_id: params.userId,
-      user_fingerprint: `user:${params.userId}`,
+      user_fingerprint: userFingerprint,
       rating: storedRating,
     });
+    if (error) {
+      const message = error.message.toLowerCase();
+      if (error.code === "23505" || message.includes("duplicate key")) {
+        const retry = await supabase
+          .from("recipe_ratings")
+          .update({
+            rating: storedRating,
+            user_id: params.userId,
+            user_fingerprint: userFingerprint,
+          })
+          .eq("recipe_id", recipe.id)
+          .eq("user_fingerprint", userFingerprint);
+        if (retry.error) throw retry.error;
+      } else {
+        throw error;
+      }
+    }
   }
 
   if (recipe.author_user_id && recipe.author_user_id !== params.userId) {

@@ -54,7 +54,9 @@ export async function POST(
       throw new InputValidationError("Receita não encontrada.", 404);
     }
 
-    return NextResponse.json(feedback);
+    return NextResponse.json(feedback, {
+      headers: { "Cache-Control": "no-store, max-age=0" },
+    });
   } catch (error) {
     const validationResponse = validationErrorResponse(error);
     if (validationResponse) return validationResponse;

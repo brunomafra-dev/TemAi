@@ -157,7 +157,9 @@ export async function saveLibraryRecipeRating(recipeId: string, rating: number):
     },
     body: JSON.stringify({ rating }),
   });
-  return parseResponse(response);
+  const feedback = await parseResponse<LibraryRecipeFeedback>(response);
+  notifyPopularMetricsChanged();
+  return feedback;
 }
 
 export async function postLibraryRecipeComment(recipeId: string, body: string): Promise<LibraryRecipeFeedback> {
@@ -271,6 +273,12 @@ export async function recordLibraryRecipeView(recipeId: string): Promise<void> {
     body: JSON.stringify({ visitorKey }),
   });
   await parseResponse<{ ok: boolean }>(response);
+  notifyPopularMetricsChanged();
+}
+
+function notifyPopularMetricsChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("temai:popular-metrics-changed"));
 }
 
 export async function fetchPersonalBadgeSlugs(): Promise<string[]> {

@@ -19,6 +19,12 @@ interface SupabaseRecipeRow {
   moderation_status?: string;
 }
 
+type SupabasePopularRecipeRow = SupabaseRecipeRow & {
+  rating_average: number | string | null;
+  rating_count: number | string | null;
+  view_count: number | string | null;
+};
+
 const allowedCategories = new Set<LibraryCategory>([
   "principais",
   "veggie",
@@ -152,19 +158,29 @@ function normalizeSearchText(value: string): string {
     .trim();
 }
 
-async function supabaseFetch(pathAndQuery: string, withCount = false) {
+type SupabaseFetchOptions = RequestInit & {
+  withCount?: boolean;
+  next?: { revalidate?: number | false };
+};
+
+async function supabaseFetch(pathAndQuery: string, options: boolean | SupabaseFetchOptions = false) {
   const { url, key } = getSupabaseEnv();
   if (!url || !key) {
     throw new Error("Supabase não configurado.");
   }
 
+  const withCount = typeof options === "boolean" ? options : Boolean(options.withCount);
+  const init = typeof options === "boolean" ? {} : options;
+  const shouldUseDefaultCache = !("cache" in init) && !("next" in init);
   const response = await fetch(`${url}/rest/v1/${pathAndQuery}`, {
+    ...init,
     headers: {
       apikey: key,
       Authorization: `Bearer ${key}`,
       ...(withCount ? { Prefer: "count=exact" } : {}),
+      ...(init.headers || {}),
     },
-    next: { revalidate: 60 * 5 },
+    ...(shouldUseDefaultCache ? { next: { revalidate: 60 * 5 } } : {}),
   });
 
   if (!response.ok) {
@@ -289,62 +305,26 @@ export async function getPopularRecipesFromSupabase(limit = 8): Promise<Array<{
   }
 
   const safeLimit = Math.max(4, Math.min(20, Math.floor(limit)));
-
-  const recipesResponse = await supabaseFetch(
-    "recipes_br?select=id,slug,title,description,category,ingredients,steps,prep_minutes,servings,image_url,source_name,created_at&is_published=eq.true&moderation_status=eq.approved&order=created_at.desc&limit=5000",
-  );
-  const recipeRows = (await recipesResponse.json()) as SupabaseRecipeRow[];
-
-  const [ratingsResponse, viewsResponse] = await Promise.all([
-    supabaseFetch("recipe_ratings?select=recipe_id,rating&limit=20000"),
-    supabaseFetch("recipe_view_events?select=recipe_id&limit=50000"),
-  ]);
-  const ratingRows = (await ratingsResponse.json()) as Array<{ recipe_id: string; rating: number }>;
-  const viewRows = (await viewsResponse.json()) as Array<{ recipe_id: string }>;
-
-  const ratingMap = new Map<string, { sum: number; count: number }>();
-  ratingRows.forEach((entry) => {
-    const current = ratingMap.get(entry.recipe_id) ?? { sum: 0, count: 0 };
-    current.sum += Number(entry.rating) || 0;
-    current.count += 1;
-    ratingMap.set(entry.recipe_id, current);
+  const response = await supabaseFetch("rpc/get_popular_recipes_br", {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ p_limit: safeLimit }),
   });
+  const rows = (await response.json()) as SupabasePopularRecipeRow[];
 
-  const viewMap = new Map<string, number>();
-  viewRows.forEach((entry) => {
-    viewMap.set(entry.recipe_id, (viewMap.get(entry.recipe_id) || 0) + 1);
+  return rows.map((row) => {
+    const ratingAverage = Number(row.rating_average || 0);
+    return {
+      recipe: mapRowToRecipe(row),
+      ratingAverage,
+      ratingCount: Number(row.rating_count || 0),
+      viewCount: Number(row.view_count || 0),
+      rating: ratingAverage > 0 ? Number((ratingAverage / 2).toFixed(1)) : 0,
+    };
   });
-
-  return recipeRows
-    .map((row) => {
-      const ratingStats = ratingMap.get(row.id);
-      const storedAverage =
-        ratingStats && ratingStats.count > 0 ? ratingStats.sum / ratingStats.count : 0;
-      const ratingAverage = storedAverage > 0 ? Number((storedAverage * 2).toFixed(1)) : 0;
-      return {
-        recipe: mapRowToRecipe(row),
-        ratingAverage,
-        ratingCount: ratingStats?.count || 0,
-        viewCount: viewMap.get(row.id) || 0,
-        rating: storedAverage > 0 ? Number(storedAverage.toFixed(1)) : 0,
-        createdAt: row.created_at || "",
-      };
-    })
-    .sort(
-      (a, b) =>
-        b.viewCount - a.viewCount ||
-        b.ratingAverage - a.ratingAverage ||
-        b.ratingCount - a.ratingCount ||
-        b.createdAt.localeCompare(a.createdAt),
-    )
-    .slice(0, safeLimit)
-    .map((entry) => ({
-      recipe: entry.recipe,
-      ratingAverage: entry.ratingAverage,
-      ratingCount: entry.ratingCount,
-      viewCount: entry.viewCount,
-      rating: entry.rating,
-    }));
 }
 
 export async function upsertImportedRecipeToSupabase(recipe: ImportedRecipeDraft): Promise<Recipe> {
