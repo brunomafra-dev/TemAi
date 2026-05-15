@@ -11,8 +11,32 @@ export const BADGE_CATALOG: BadgeDefinition[] = [
   {
     slug: "estagiario",
     label: "🌱 Estagiário",
-    description: "0 a 3 receitas postadas.",
+    description: "Começando sua jornada no TemAi.",
     colorClass: "bg-[#EAE3D6] text-[#6F5F49]",
+  },
+  {
+    slug: "premium_temai",
+    label: "✨ Premium TemAi",
+    description: "Assinatura Premium ativa.",
+    colorClass: "bg-[#F8E8E1] text-[#7A4733]",
+  },
+  {
+    slug: "chef_ia",
+    label: "🪄 Chef IA",
+    description: "10 receitas geradas com IA.",
+    colorClass: "bg-[#E7F0FF] text-[#24508A]",
+  },
+  {
+    slug: "colecionador_receitas",
+    label: "🔖 Colecionador",
+    description: "10 receitas salvas.",
+    colorClass: "bg-[#FFF0C9] text-[#735A14]",
+  },
+  {
+    slug: "autor_organizado",
+    label: "🎙️ Autor Organizado",
+    description: "3 receitas autorais organizadas com IA.",
+    colorClass: "bg-[#E9F8F0] text-[#246346]",
   },
   {
     slug: "cozinheiro_junior",

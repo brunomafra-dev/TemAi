@@ -7,6 +7,9 @@ import {
 import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse } from "@/features/security/auth-user";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 function readLimit(value: string | null): number {
   if (!value) return 8;
   const normalized = value.trim();

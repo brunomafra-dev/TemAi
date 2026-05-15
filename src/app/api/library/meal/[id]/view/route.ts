@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
-import { getLibraryRecipeFeedback } from "@/features/community/recipe-feedback";
+import { recordLibraryRecipeView } from "@/features/community/recipe-feedback";
 import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse, readSafeBearerToken } from "@/features/security/auth-user";
 import { getSupabaseServiceRoleClient } from "@/lib/supabase-admin";
-import { sanitizePathParam, validationErrorResponse } from "@/lib/input-validation";
+import {
+  parseJsonObjectBody,
+  readRequiredString,
+  sanitizePathParam,
+  validationErrorResponse,
+} from "@/lib/input-validation";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -16,7 +21,7 @@ async function readOptionalUserId(request: Request): Promise<string | undefined>
   return userRes.data.user?.id || undefined;
 }
 
-export async function GET(
+export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
@@ -29,7 +34,7 @@ export async function GET(
     });
 
     const endpointRateLimit = await consumeAuthRateLimit({
-      route: "library-feedback",
+      route: "library-view",
       request,
       identifier: recipeSlug,
     });
@@ -37,16 +42,26 @@ export async function GET(
       return rateLimitResponse(endpointRateLimit.retryAfterSeconds);
     }
 
+    const payload = await parseJsonObjectBody(request, {
+      maxBytes: 4 * 1024,
+      allowedKeys: ["visitorKey"],
+    });
+    const visitorKey = readRequiredString(payload, "visitorKey", {
+      fieldName: "Visitante",
+      minLength: 12,
+      maxLength: 120,
+      pattern: /^[a-z0-9._:-]+$/i,
+    });
     const userId = await readOptionalUserId(request);
-    const feedback = await getLibraryRecipeFeedback({ recipeSlug, userId });
-    if (!feedback) {
+    const ok = await recordLibraryRecipeView({ recipeSlug, userId, visitorKey });
+    if (!ok) {
       return NextResponse.json({ message: "Receita não encontrada." }, { status: 404 });
     }
 
-    return NextResponse.json(feedback);
+    return NextResponse.json({ ok: true });
   } catch (error) {
     const validationResponse = validationErrorResponse(error);
     if (validationResponse) return validationResponse;
-    return NextResponse.json({ message: "Falha ao carregar feedback." }, { status: 500 });
+    return NextResponse.json({ message: "Falha ao registrar acesso." }, { status: 500 });
   }
 }

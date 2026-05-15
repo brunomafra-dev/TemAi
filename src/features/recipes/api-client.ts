@@ -105,6 +105,13 @@ export type LibraryRecipeFeedback = {
   comments: RecipeCommentView[];
 };
 
+export type PopularRecipeView = {
+  recipe: Recipe;
+  ratingAverage: number;
+  ratingCount: number;
+  viewCount: number;
+};
+
 export async function fetchUserNotifications(): Promise<{
   notifications: UserNotificationView[];
   unreadCount: number;
@@ -180,4 +187,62 @@ export async function reportLibraryRecipe(params: {
     body: JSON.stringify({ reason: params.reason, detail: params.detail || "" }),
   });
   return parseResponse(response);
+}
+
+export async function reportLibraryRecipeComment(params: {
+  recipeId: string;
+  commentId: string;
+  reason: string;
+  detail?: string;
+}): Promise<{ ok: boolean; hiddenForReview: boolean; message: string }> {
+  const authHeaders = await buildAuthHeaders();
+  const response = await fetch(
+    `/api/library/meal/${encodeURIComponent(params.recipeId)}/comments/${encodeURIComponent(params.commentId)}/report`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders,
+      },
+      body: JSON.stringify({ reason: params.reason, detail: params.detail || "" }),
+    },
+  );
+  return parseResponse(response);
+}
+
+function getRecipeVisitorKey(): string {
+  if (typeof window === "undefined") return "";
+  const key = "temai_recipe_visitor_key_v1";
+  const existing = window.localStorage.getItem(key);
+  if (existing && existing.length >= 12) return existing;
+  const next =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  window.localStorage.setItem(key, next);
+  return next;
+}
+
+export async function recordLibraryRecipeView(recipeId: string): Promise<void> {
+  const authHeaders = await buildAuthHeaders();
+  const visitorKey = getRecipeVisitorKey();
+  const response = await fetch(`/api/library/meal/${encodeURIComponent(recipeId)}/view`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders,
+    },
+    body: JSON.stringify({ visitorKey }),
+  });
+  await parseResponse<{ ok: boolean }>(response);
+}
+
+export async function fetchPersonalBadgeSlugs(): Promise<string[]> {
+  const authHeaders = await buildAuthHeaders();
+  const response = await fetch("/api/profile/badges", {
+    headers: authHeaders,
+    cache: "no-store",
+  });
+  const payload = await parseResponse<{ badges: string[] }>(response);
+  return payload.badges;
 }

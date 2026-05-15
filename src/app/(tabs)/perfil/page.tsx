@@ -8,7 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { BADGE_CATALOG } from "@/features/profile/badges";
-import { getAuthorBadgesFromCloud, normalizeAuthorHandle } from "@/features/profile/badges-cloud";
+import {
+  getAuthorBadgesFromCloud,
+  getPersonalBadgesFromCloud,
+  normalizeAuthorHandle,
+} from "@/features/profile/badges-cloud";
 import { getNotificationPrefs, saveNotificationPrefs } from "@/features/profile/notifications-storage";
 import { createSupportTicket, getMySupportTickets, type SupportTicket } from "@/features/profile/support-tickets";
 import { getSubscriptionState, syncSubscriptionFromCloud, type SubscriptionState } from "@/features/profile/subscription-storage";
@@ -158,6 +162,7 @@ export default function ProfilePage() {
   const [cloudBadgeSlugs, setCloudBadgeSlugs] = useState<string[]>(
     () => getUserProfile().unlockedBadges || ["estagiario"],
   );
+  const [personalBadgeSlugs, setPersonalBadgeSlugs] = useState<string[]>([]);
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([
     {
       from: "bot",
@@ -168,8 +173,8 @@ export default function ProfilePage() {
 
   const myRecipes = useMemo(() => getMyRecipes(), []);
   const unlockedBadges = useMemo(() => {
-    return Array.from(new Set(["estagiario", ...cloudBadgeSlugs]));
-  }, [cloudBadgeSlugs]);
+    return Array.from(new Set(["estagiario", ...cloudBadgeSlugs, ...personalBadgeSlugs]));
+  }, [cloudBadgeSlugs, personalBadgeSlugs]);
 
   const selectedBadgeSlug = unlockedBadges.includes(profile.selectedBadge)
     ? profile.selectedBadge
@@ -292,6 +297,20 @@ export default function ProfilePage() {
       isMounted = false;
     };
   }, [profile.firstName, profile.lastName, profile.username]);
+
+  useEffect(() => {
+    let isMounted = true;
+    getPersonalBadgesFromCloud()
+      .then((badges) => {
+        if (!isMounted) return;
+        setPersonalBadgeSlugs(badges);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [subscription.plan, subscription.status, savedRefs.length]);
 
   useEffect(() => {
     return () => {
@@ -905,9 +924,9 @@ export default function ProfilePage() {
         return (
           <div className="space-y-3">
             <p className="text-sm font-semibold text-[#5D5248]">Insígnias</p>
-            <p className="text-xs text-[#7A6D60]">
-              Toque para ativar. Insígnias de chef contam apenas receitas publicadas e aprovadas na Biblioteca.
-            </p>
+              <p className="text-xs text-[#7A6D60]">
+                Toque para ativar. Insígnias de chef contam receitas aprovadas na Biblioteca; as Premium vêm do uso real do app.
+              </p>
             <div className="grid grid-cols-1 gap-2">
               {BADGE_CATALOG.map((badge) => {
                 const unlocked = unlockedBadges.includes(badge.slug);

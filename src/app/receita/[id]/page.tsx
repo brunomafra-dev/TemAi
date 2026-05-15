@@ -12,7 +12,9 @@ import {
   fetchFullRecipe,
   fetchLibraryRecipeFeedback,
   postLibraryRecipeComment,
+  recordLibraryRecipeView,
   reportLibraryRecipe,
+  reportLibraryRecipeComment,
   saveLibraryRecipeRating,
   type LibraryRecipeFeedback,
 } from "@/features/recipes/api-client";
@@ -54,6 +56,32 @@ const reportOptions = [
   { value: "dangerous", label: "Receita perigosa" },
   { value: "other", label: "Outro motivo" },
 ];
+
+const commentReportOptions = [
+  { value: "inappropriate", label: "Conteúdo impróprio" },
+  { value: "harassment", label: "Ofensa ou xingamento" },
+  { value: "spam", label: "Spam" },
+  { value: "dangerous", label: "Conteúdo perigoso" },
+  { value: "other", label: "Outro motivo" },
+];
+
+const HIDDEN_COMMENT_IDS_KEY = "temai_hidden_comment_ids_v1";
+const INITIAL_VISIBLE_COMMENTS = 3;
+
+function readHiddenCommentIds(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(HIDDEN_COMMENT_IDS_KEY) || "[]") as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHiddenCommentIds(ids: string[]): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(HIDDEN_COMMENT_IDS_KEY, JSON.stringify(Array.from(new Set(ids))));
+}
 
 function parseIngredientsQuery(rawIngredients: string | null): string[] {
   if (!rawIngredients) {
@@ -308,6 +336,12 @@ export default function RecipeDetailsPage() {
   const [reportReason, setReportReason] = useState("wrong_info");
   const [reportDetail, setReportDetail] = useState("");
   const [isReporting, setIsReporting] = useState(false);
+  const [visibleCommentCount, setVisibleCommentCount] = useState(INITIAL_VISIBLE_COMMENTS);
+  const [hiddenCommentIds, setHiddenCommentIds] = useState<string[]>(() => readHiddenCommentIds());
+  const [reportingCommentId, setReportingCommentId] = useState("");
+  const [commentReportReason, setCommentReportReason] = useState("inappropriate");
+  const [commentReportDetail, setCommentReportDetail] = useState("");
+  const [isReportingComment, setIsReportingComment] = useState(false);
   const [isShoppingOpen, setIsShoppingOpen] = useState(false);
   const [ownedIngredients, setOwnedIngredients] = useState<Record<string, boolean>>({});
   const [shoppingMessage, setShoppingMessage] = useState("");
@@ -331,6 +365,15 @@ export default function RecipeDetailsPage() {
     return Math.max(1, recipe.servings * portionMultiplier);
   }, [portionMultiplier, recipe]);
   const scaledServingsLabel = useMemo(() => formatScaledValue(scaledServings), [scaledServings]);
+  const publicComments = useMemo(() => {
+    const hiddenIds = new Set(hiddenCommentIds);
+    return (libraryFeedback?.comments ?? []).filter((comment) => !hiddenIds.has(comment.id));
+  }, [hiddenCommentIds, libraryFeedback?.comments]);
+  const visibleComments = useMemo(
+    () => publicComments.slice(0, visibleCommentCount),
+    [publicComments, visibleCommentCount],
+  );
+  const hasMoreComments = publicComments.length > visibleComments.length;
 
   useEffect(() => {
     let isMounted = true;
@@ -497,6 +540,7 @@ export default function RecipeDetailsPage() {
     }
 
     let isMounted = true;
+    setVisibleCommentCount(INITIAL_VISIBLE_COMMENTS);
     fetchLibraryRecipeFeedback(recipeId)
       .then((feedback) => {
         if (!isMounted) return;
@@ -512,6 +556,11 @@ export default function RecipeDetailsPage() {
       isMounted = false;
     };
   }, [origin, recipeId]);
+
+  useEffect(() => {
+    if (origin !== "library" || !recipe) return;
+    void recordLibraryRecipeView(recipe.id).catch(() => undefined);
+  }, [origin, recipe]);
 
   function buildSavedRecipeRef(currentRecipe: Recipe): SavedRecipeRef {
     const sourceOrigin = origin === "library" ? "library" : "ai";
@@ -616,6 +665,7 @@ export default function RecipeDetailsPage() {
       const feedback = await postLibraryRecipeComment(recipe.id, body);
       setLibraryFeedback(feedback);
       setCommentText("");
+      setVisibleCommentCount(INITIAL_VISIBLE_COMMENTS);
       setFeedbackMessage("Comentário publicado.");
     } catch (error) {
       setFeedbackMessage(error instanceof Error ? error.message : "Não foi possível publicar comentário.");
@@ -641,6 +691,44 @@ export default function RecipeDetailsPage() {
       setFeedbackMessage(error instanceof Error ? error.message : "Não foi possível enviar denúncia.");
     } finally {
       setIsReporting(false);
+    }
+  }
+
+  function hideComment(commentId: string) {
+    setHiddenCommentIds((current) => {
+      const next = current.includes(commentId) ? current : [...current, commentId];
+      saveHiddenCommentIds(next);
+      return next;
+    });
+    setReportingCommentId("");
+    setFeedbackMessage("Comentário ocultado neste aparelho.");
+  }
+
+  async function submitCommentReport(commentId: string) {
+    if (!recipe || origin !== "library" || isReportingComment) return;
+    setIsReportingComment(true);
+    setFeedbackMessage("");
+    try {
+      const result = await reportLibraryRecipeComment({
+        recipeId: recipe.id,
+        commentId,
+        reason: commentReportReason,
+        detail: commentReportDetail,
+      });
+      setFeedbackMessage(result.message);
+      setReportingCommentId("");
+      setCommentReportDetail("");
+      if (result.hiddenForReview) {
+        const feedback = await fetchLibraryRecipeFeedback(recipe.id).catch(() => null);
+        if (feedback) {
+          setLibraryFeedback(feedback);
+          setUserRating(feedback.userRating);
+        }
+      }
+    } catch (error) {
+      setFeedbackMessage(error instanceof Error ? error.message : "Não foi possível denunciar comentário.");
+    } finally {
+      setIsReportingComment(false);
     }
   }
 
@@ -1000,9 +1088,10 @@ export default function RecipeDetailsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  {libraryFeedback?.comments.length ? (
-                    libraryFeedback.comments.map((comment) => (
-                      <div key={comment.id} className="rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] p-3">
+                  {publicComments.length ? (
+                    <>
+                    {visibleComments.map((comment) => (
+                      <div key={comment.id} className="space-y-3 rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] p-3">
                         <div className="flex items-center gap-2">
                           <span className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#EAD7BB] text-xs font-bold text-[#7A4A31]">
                             {comment.authorAvatarUrl ? (
@@ -1025,8 +1114,77 @@ export default function RecipeDetailsPage() {
                           </div>
                         </div>
                         <p className="mt-2 text-sm leading-relaxed text-[#5D5248]">{comment.body}</p>
+                        <div className="flex flex-wrap items-center gap-3 border-t border-[#E5D7BF] pt-2">
+                          <button
+                            type="button"
+                            className="text-xs font-semibold text-[#7A6D60]"
+                            onClick={() => hideComment(comment.id)}
+                          >
+                            Ocultar
+                          </button>
+                          <button
+                            type="button"
+                            className="text-xs font-semibold text-[#9A4635]"
+                            onClick={() => {
+                              setReportingCommentId((current) => (current === comment.id ? "" : comment.id));
+                              setCommentReportReason("inappropriate");
+                              setCommentReportDetail("");
+                            }}
+                          >
+                            Denunciar
+                          </button>
+                        </div>
+                        {reportingCommentId === comment.id ? (
+                          <div className="space-y-2 rounded-2xl border border-[#E5D7BF] bg-white p-3">
+                            <select
+                              value={commentReportReason}
+                              onChange={(event) => setCommentReportReason(event.target.value)}
+                              className="h-10 w-full rounded-xl border border-[#E5D7BF] bg-white px-3 text-sm"
+                            >
+                              {commentReportOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                            <textarea
+                              value={commentReportDetail}
+                              onChange={(event) => setCommentReportDetail(event.target.value)}
+                              placeholder="Conte o problema, se quiser."
+                              className="min-h-[72px] w-full rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm"
+                            />
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                              <Button
+                                variant="outline"
+                                className="w-full"
+                                onClick={() => void submitCommentReport(comment.id)}
+                                disabled={isReportingComment}
+                              >
+                                {isReportingComment ? "Enviando..." : "Enviar denúncia"}
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                className="w-full"
+                                onClick={() => setReportingCommentId("")}
+                                disabled={isReportingComment}
+                              >
+                                Cancelar
+                              </Button>
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
-                    ))
+                    ))}
+                    {hasMoreComments ? (
+                      <Button
+                        variant="secondary"
+                        className="w-full"
+                        onClick={() => setVisibleCommentCount((current) => current + INITIAL_VISIBLE_COMMENTS)}
+                      >
+                        Ver mais comentários
+                      </Button>
+                    ) : null}
+                    </>
                   ) : (
                     <p className="rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] px-3 py-4 text-sm text-[#6A5E52]">
                       Ainda não há comentários nesta receita.

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { moderateCommunityText } from "@/features/community/moderation";
-import { reportLibraryRecipe } from "@/features/community/recipe-feedback";
+import { reportLibraryRecipeComment } from "@/features/community/recipe-feedback";
 import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse, requireAuthUserId } from "@/features/security/auth-user";
 import {
@@ -12,14 +11,14 @@ import {
   validationErrorResponse,
 } from "@/lib/input-validation";
 
-const reportReasons = ["wrong_info", "wrong_image", "inappropriate", "dangerous", "other"] as const;
+const commentReportReasons = ["inappropriate", "harassment", "spam", "dangerous", "other"] as const;
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function POST(
   request: Request,
-  context: { params: Promise<{ id: string }> },
+  context: { params: Promise<{ id: string; commentId: string }> },
 ) {
   try {
     const userId = await requireAuthUserId(request);
@@ -28,7 +27,7 @@ export async function POST(
     }
 
     const endpointRateLimit = await consumeAuthRateLimit({
-      route: "library-report",
+      route: "library-comment-report",
       request,
       identifier: userId,
     });
@@ -42,50 +41,52 @@ export async function POST(
       maxLength: 160,
       pattern: /^[a-z0-9._-]+$/i,
     });
+    const commentId = sanitizePathParam(params.commentId, {
+      fieldName: "ID do comentário",
+      maxLength: 80,
+      pattern: /^[a-f0-9-]+$/i,
+    });
     const payload = await parseJsonObjectBody(request, {
       maxBytes: 6 * 1024,
       allowedKeys: ["reason", "detail"],
     });
-    const reason = readOptionalEnum(payload, "reason", reportReasons, "other", "Motivo");
+    const reason = readOptionalEnum(
+      payload,
+      "reason",
+      commentReportReasons,
+      "inappropriate",
+      "Motivo",
+    );
     const detail = readOptionalString(payload, "detail", {
-      fieldName: "Detalhes",
-      maxLength: 800,
+      fieldName: "Detalhe",
+      maxLength: 600,
     });
 
-    let moderationResult: Record<string, unknown> = {};
-    if (detail) {
-      const moderation = await moderateCommunityText(detail);
-      moderationResult = moderation.result;
-      if (!moderation.allowed) {
-        throw new InputValidationError("Detalhes da denúncia bloqueados pela moderação.", 422);
-      }
-    }
-
-    const result = await reportLibraryRecipe({
+    const result = await reportLibraryRecipeComment({
       recipeSlug,
+      commentId,
       userId,
       reason,
       detail,
-      metadata: { detailModeration: moderationResult },
     });
     if (!result) {
-      throw new InputValidationError("Receita não encontrada.", 404);
+      throw new InputValidationError("Comentário não encontrado.", 404);
     }
 
     return NextResponse.json({
       ok: true,
       hiddenForReview: result.hiddenForReview,
       message: result.hiddenForReview
-        ? "Denúncia recebida. A receita saiu temporariamente da Biblioteca para revisão."
+        ? "Denúncia recebida. O comentário saiu temporariamente da receita para revisão."
         : "Denúncia recebida. Obrigado por ajudar a manter a comunidade segura.",
     });
   } catch (error) {
     const validationResponse = validationErrorResponse(error);
     if (validationResponse) return validationResponse;
     const message = error instanceof Error ? error.message : "";
-    if (message.includes("já denunciou")) {
+    if (message.includes("já denunciou") || message.includes("próprio comentário")) {
       return NextResponse.json({ message }, { status: 409 });
     }
-    return NextResponse.json({ message: "Falha ao enviar denúncia." }, { status: 500 });
+    return NextResponse.json({ message: "Falha ao denunciar comentário." }, { status: 500 });
   }
 }

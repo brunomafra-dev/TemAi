@@ -6,6 +6,7 @@ export type UserNotificationType =
   | "recipe_blocked"
   | "recipe_review"
   | "comment"
+  | "comment_report"
   | "rating"
   | "general";
 

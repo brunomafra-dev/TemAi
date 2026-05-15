@@ -24,6 +24,7 @@ export const serverEnv = {
   openaiApiKey: () => (process.env.OPENAI_API_KEY?.trim() || ""),
   openaiRecipeModel: () => process.env.OPENAI_RECIPE_MODEL?.trim() || "gpt-5.4-mini",
   openaiSuggestionsModel: () => process.env.OPENAI_SUGGESTIONS_MODEL?.trim() || "gpt-5.4-mini",
+  openaiImportModel: () => process.env.OPENAI_IMPORT_MODEL?.trim() || "gpt-5.4-mini",
   openaiAudioModel: () => process.env.OPENAI_AUDIO_MODEL?.trim() || "gpt-4o-mini-transcribe",
   openaiSupportModel: () => process.env.OPENAI_SUPPORT_MODEL?.trim() || process.env.OPENAI_SUGGESTIONS_MODEL?.trim() || "gpt-5.4-mini",
   openaiAuthorRecipeModel: () => process.env.OPENAI_AUTHOR_RECIPE_MODEL?.trim() || process.env.OPENAI_RECIPE_MODEL?.trim() || "gpt-5.4-mini",

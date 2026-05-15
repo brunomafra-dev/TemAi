@@ -49,6 +49,7 @@ function decodeHtmlEntities(value: string): string {
     "&ocirc;": "\u00F4",
     "&otilde;": "\u00F5",
     "&uacute;": "\u00FA",
+    "&uuml;": "\u00FC",
     "&ccedil;": "\u00E7",
     "&Aacute;": "\u00C1",
     "&Agrave;": "\u00C0",
@@ -61,6 +62,7 @@ function decodeHtmlEntities(value: string): string {
     "&Ocirc;": "\u00D4",
     "&Otilde;": "\u00D5",
     "&Uacute;": "\u00DA",
+    "&Uuml;": "\u00DC",
     "&Ccedil;": "\u00C7"
   };
 
@@ -89,6 +91,37 @@ function decodeHtmlEntities(value: string): string {
   }
 
   return decoded;
+}
+
+function textDamageScore(value: string): number {
+  let score = 0;
+  score += (value.match(/\uFFFD/g) || []).length * 5;
+  score += (value.match(/Ã|Â|â€|â€™|â€œ|â€�|â€“|â€”/g) || []).length * 3;
+  score += (value.match(/[A-Za-zÀ-ÿ]\?[A-Za-zÀ-ÿ]|\?\?/g) || []).length * 2;
+  return score;
+}
+
+async function readResponseText(response: Response): Promise<string> {
+  const buffer = await response.arrayBuffer();
+  const contentType = response.headers.get("content-type") || "";
+  const charset = contentType.match(/charset=([^;\s]+)/i)?.[1]?.trim().toLowerCase();
+
+  const utf8 = new TextDecoder("utf-8").decode(buffer);
+  if (charset && charset !== "utf-8" && charset !== "utf8") {
+    try {
+      const declared = new TextDecoder(charset).decode(buffer);
+      if (textDamageScore(declared) <= textDamageScore(utf8)) return declared;
+    } catch {
+      // Unsupported charset falls back to the heuristic below.
+    }
+  }
+
+  try {
+    const latin = new TextDecoder("windows-1252").decode(buffer);
+    return textDamageScore(latin) < textDamageScore(utf8) ? latin : utf8;
+  } catch {
+    return utf8;
+  }
 }
 
 function extractImageFromHtml(html: string): string | undefined {
@@ -199,7 +232,7 @@ export async function importRecipeFromUrl(url: string): Promise<ImportedRecipeDr
     throw new Error("Não foi possível acessar a URL da receita.");
   }
 
-  const html = await response.text();
+  const html = await readResponseText(response);
   const jsonLdCandidates = extractJsonLdScripts(html);
   let recipeNode: RecipeJsonLd | null = null;
 
@@ -260,7 +293,7 @@ async function fetchXml(url: string): Promise<string> {
   if (!response.ok) {
     throw new Error(`Falha ao carregar sitemap: ${url}`);
   }
-  return response.text();
+  return readResponseText(response);
 }
 
 function extractLocEntries(xml: string): string[] {

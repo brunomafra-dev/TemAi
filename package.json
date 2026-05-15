@@ -11,6 +11,7 @@
     "cap:sync": "cap sync android",
     "cap:open": "cap open android",
     "cap:run": "cap run android",
+    "repair:recipe-texts": "node scripts/maintenance/repair-recipe-texts.mjs",
     "security:scan-secrets": "node scripts/security/scan-secrets.mjs"
   },
   "dependencies": {

@@ -1,6 +1,7 @@
 "use client";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase-client";
+import { fetchPersonalBadgeSlugs } from "@/features/recipes/api-client";
 
 export function normalizeAuthorHandle(value: string): string {
   return (
@@ -30,4 +31,12 @@ export async function getAuthorBadgesFromCloud(authorHandle: string): Promise<st
     .filter(Boolean);
 
   return Array.from(new Set(["estagiario", ...badges]));
+}
+
+export async function getPersonalBadgesFromCloud(): Promise<string[]> {
+  try {
+    return await fetchPersonalBadgeSlugs();
+  } catch {
+    return [];
+  }
 }

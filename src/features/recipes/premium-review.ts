@@ -49,7 +49,7 @@ async function requestPremiumReview(input: PremiumRecipeShape): Promise<PremiumR
   const apiKey = serverEnv.openaiApiKey();
   if (!apiKey) return null;
 
-  const model = serverEnv.openaiTranslationModel();
+  const model = serverEnv.openaiImportModel();
   const prompt = [
     "Revise a receita para PT-BR natural e culinario, sem inventar ingredientes ou etapas.",
     "Mantenha sentido original, ajuste concordancia, fluidez, medidas e termos de cozinha.",

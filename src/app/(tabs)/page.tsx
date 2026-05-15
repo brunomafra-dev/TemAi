@@ -15,6 +15,7 @@ import {
 import {
   fetchUserNotifications,
   markUserNotificationsRead,
+  type PopularRecipeView,
   type UserNotificationView,
 } from "@/features/recipes/api-client";
 import { LIBRARY_RECIPES } from "@/features/recipes/library-recipes";
@@ -80,7 +81,7 @@ const categories = [
 ];
 
 const popularCategories = ["principais", "veggie", "massas", "kids", "sobremesas", "lanches", "bebidas"] as const;
-const POPULAR_CACHE_KEY = "temai:home:popular:v1";
+const POPULAR_CACHE_KEY = "temai:home:popular:v2";
 const MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024;
 type Category = (typeof categories)[number];
 
@@ -88,68 +89,76 @@ const libraryMetaById: Record<
   string,
   {
     category: string;
-    rating: number;
+    ratingAverage: number;
+    ratingCount: number;
     image: string;
     author: string;
-    views: number;
+    viewCount: number;
   }
 > = {
   "library-macarrao-alho-e-oleo": {
     category: "massas",
-    rating: 4.8,
+    ratingAverage: 0,
+    ratingCount: 0,
     image:
       "https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=900&q=80",
     author: "Chef Amanda",
-    views: 1540,
+    viewCount: 0,
   },
   "library-omelete-cremosa": {
     category: "fit",
-    rating: 4.7,
+    ratingAverage: 0,
+    ratingCount: 0,
     image:
       "https://images.unsplash.com/photo-1510693206972-df098062cb71?auto=format&fit=crop&w=900&q=80",
     author: "TemAi Test Kitchen",
-    views: 1280,
+    viewCount: 0,
   },
   "library-arroz-forno-legumes": {
     category: "principais",
-    rating: 4.6,
+    ratingAverage: 0,
+    ratingCount: 0,
     image:
       "https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=900&q=80",
     author: "Chef Lucas",
-    views: 1180,
+    viewCount: 0,
   },
   "library-frango-grelhado-limao": {
     category: "fit",
-    rating: 4.9,
+    ratingAverage: 0,
+    ratingCount: 0,
     image:
       "https://images.unsplash.com/photo-1604909052743-94e838986d24?auto=format&fit=crop&w=900&q=80",
     author: "Marta Fit",
-    views: 1730,
+    viewCount: 0,
   },
   "library-bolo-banana-rapido": {
     category: "sobremesas",
-    rating: 4.8,
+    ratingAverage: 0,
+    ratingCount: 0,
     image:
       "https://images.unsplash.com/photo-1603532648955-039310d9ed75?auto=format&fit=crop&w=900&q=80",
     author: "Cozinha da Nina",
-    views: 1490,
+    viewCount: 0,
   },
   "library-sopa-abobora-gengibre": {
     category: "veggie",
-    rating: 4.7,
+    ratingAverage: 0,
+    ratingCount: 0,
     image:
       "https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=900&q=80",
     author: "Verde & Sabor",
-    views: 990,
+    viewCount: 0,
   },
 };
 
 type PopularRecipeEntry = {
   recipe: Recipe;
-  rating: number;
+  ratingAverage: number;
+  ratingCount: number;
   image: string;
   author: string;
-  views: number;
+  viewCount: number;
 };
 
 const CategoryButton = memo(function CategoryButton({
@@ -207,9 +216,11 @@ const PopularRecipeCard = memo(function PopularRecipeCard({ entry }: { entry: Po
           <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold text-white">
             {entry.recipe.prepMinutes} min
           </span>
-          <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold text-white">
-            ★ {(entry.rating * 2).toFixed(1)}
-          </span>
+          {entry.ratingCount > 0 ? (
+            <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold text-white">
+              ★ {entry.ratingAverage.toFixed(1)}
+            </span>
+          ) : null}
         </div>
       </div>
       <div className="flex flex-1 flex-col justify-between p-3">
@@ -219,10 +230,16 @@ const PopularRecipeCard = memo(function PopularRecipeCard({ entry }: { entry: Po
           </p>
           <p className="mt-1 text-xs text-[#7E7366]">por {entry.author}</p>
         </div>
-        <p className="text-[11px] font-semibold text-[#B19460]">
-          {entry.views.toLocaleString("pt-BR")} acessos
-        </p>
-        <RatingStars readonly size="sm" value={entry.rating * 2} />
+        <div className="space-y-1">
+          <p className="text-[11px] font-semibold text-[#B19460]">
+            {entry.viewCount > 0 ? `${entry.viewCount.toLocaleString("pt-BR")} acessos` : "Novo"}
+          </p>
+          {entry.ratingCount > 0 ? (
+            <RatingStars readonly size="sm" value={entry.ratingAverage} />
+          ) : (
+            <p className="text-[11px] font-semibold text-[#8A7A69]">Sem avaliações</p>
+          )}
+        </div>
       </div>
     </Link>
   );
@@ -246,7 +263,7 @@ export default function HomePage() {
   const [isShoppingOpen, setIsShoppingOpen] = useState(false);
   const [shoppingItems, setShoppingItems] = useState<ShoppingListItem[]>([]);
   const [popularApiRecipes, setPopularApiRecipes] = useState<
-    Array<{ recipe: Recipe; rating: number; category: string }>
+    Array<PopularRecipeView & { category: string }>
   >([]);
   const currentBadgeLabel =
     BADGE_CATALOG.find((badge) => badge.slug === profile.selectedBadge)?.label || "🌱 Estagiário";
@@ -260,7 +277,7 @@ export default function HomePage() {
     const cached = typeof window !== "undefined" ? window.sessionStorage.getItem(POPULAR_CACHE_KEY) : null;
     if (cached) {
       try {
-        const parsed = JSON.parse(cached) as Array<{ recipe: Recipe; rating: number; category: string }>;
+        const parsed = JSON.parse(cached) as Array<PopularRecipeView & { category: string }>;
         setPopularApiRecipes(parsed);
       } catch {
         // ignore invalid cache
@@ -274,13 +291,15 @@ export default function HomePage() {
           throw new Error("Falha ao carregar populares.");
         }
         const data = (await response.json()) as {
-          recipes?: Array<{ recipe: Recipe; rating: number }>;
+          recipes?: PopularRecipeView[];
         };
         const filtered = (data.recipes || [])
           .filter((entry) => Boolean(entry.recipe?.id))
           .map((entry) => ({
             recipe: entry.recipe,
-            rating: entry.rating,
+            ratingAverage: entry.ratingAverage,
+            ratingCount: entry.ratingCount,
+            viewCount: entry.viewCount,
             category: entry.recipe.category || "principais",
           }));
         if (isMounted) {
@@ -465,11 +484,12 @@ export default function HomePage() {
     return LIBRARY_RECIPES.map((recipe) => {
       const metadata = libraryMetaById[recipe.id] ?? {
         category: "principais",
-        rating: 4.5,
+        ratingAverage: 0,
+        ratingCount: 0,
         image:
           "https://images.unsplash.com/photo-1482049016688-2d3e1b311543?auto=format&fit=crop&w=900&q=80",
         author: recipe.sourceLabel,
-        views: 850,
+        viewCount: 0,
       };
 
       return {
@@ -489,7 +509,7 @@ export default function HomePage() {
           entry.recipe.ingredients.some((ingredient) => normalizeText(ingredient).includes(normalizedQuery))
         );
       })
-      .sort((a, b) => b.rating - a.rating || b.views - a.views);
+      .sort((a, b) => b.viewCount - a.viewCount || b.ratingAverage - a.ratingAverage);
   }, [searchTerm]);
 
   const popularRecipes = useMemo(() => {
@@ -508,10 +528,11 @@ export default function HomePage() {
     const orderedFeatured = filteredApi
       .map((entry) => ({
         recipe: entry.recipe,
-        rating: entry.rating,
+        ratingAverage: entry.ratingAverage,
+        ratingCount: entry.ratingCount,
         image: entry.recipe.imageUrl || ctaImage,
         author: entry.recipe.sourceLabel,
-        views: 1200,
+        viewCount: entry.viewCount,
       }));
 
     if (orderedFeatured.length > 0) return orderedFeatured;
