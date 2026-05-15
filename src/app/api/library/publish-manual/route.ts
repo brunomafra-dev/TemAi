@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
-import { slugify } from "@/lib/utils";
+import { createUserNotification } from "@/features/community/notifications";
+import { moderateRecipePublication } from "@/features/community/moderation";
 import {
   refreshAuthorBadgesInSupabase,
   upsertImportedRecipeToSupabase,
 } from "@/features/recipes/supabase-library";
+import { getAiEntitlement } from "@/features/security/ai-usage";
+import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
+import { rateLimitResponse, requireAuthUserId } from "@/features/security/auth-user";
 import type { LibraryCategory } from "@/features/recipes/types";
+import { getSupabaseServiceRoleClient } from "@/lib/supabase-admin";
 import {
   InputValidationError,
   parseJsonObjectBody,
@@ -15,9 +20,7 @@ import {
   readStringArray,
   validationErrorResponse,
 } from "@/lib/input-validation";
-import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
-import { rateLimitResponse, requireAuthUserId } from "@/features/security/auth-user";
-import { serverEnv } from "@/lib/env-server";
+import { slugify } from "@/lib/utils";
 
 interface PublishManualPayload {
   title?: string;
@@ -42,45 +45,67 @@ const allowedCategories = new Set<LibraryCategory>([
 ]);
 
 function normalizeAuthorHandle(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, 40) || "usuario_temai";
+  return (
+    value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 40) || "usuario_temai"
+  );
 }
 
-function isPremiumAllowed(authorHandle: string): boolean {
-  const mode = serverEnv.communityPublishMode();
-  if (mode !== "premium") return true;
+function isSupportedImageReference(value: string): boolean {
+  if (/^data:image\/[a-z0-9.+-]+;base64,/i.test(value)) return true;
+  try {
+    const parsedImageUrl = new URL(value);
+    return ["http:", "https:"].includes(parsedImageUrl.protocol);
+  } catch {
+    return false;
+  }
+}
 
-  const allowed = serverEnv.communityPremiumAuthors()
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .map((item) => normalizeAuthorHandle(item));
+async function getAuthorProfile(userId: string): Promise<{
+  authorName: string;
+  authorHandle: string;
+}> {
+  const supabase = getSupabaseServiceRoleClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("first_name,last_name,username")
+    .eq("id", userId)
+    .maybeSingle();
 
-  return allowed.includes(authorHandle);
+  const firstName = typeof data?.first_name === "string" ? data.first_name.trim() : "";
+  const lastName = typeof data?.last_name === "string" ? data.last_name.trim() : "";
+  const username = typeof data?.username === "string" ? data.username.trim() : "";
+  const fullName = [firstName, lastName].filter(Boolean).join(" ");
+
+  return {
+    authorName: fullName || "Usuário TemAi",
+    authorHandle: normalizeAuthorHandle(username || fullName || userId.slice(0, 8)),
+  };
 }
 
 export async function POST(request: Request) {
   try {
-    const endpointRateLimit = await consumeAuthRateLimit({
-      route: "library-publish-manual",
-      request,
-    });
-    if (!endpointRateLimit.allowed) {
-      return rateLimitResponse(endpointRateLimit.retryAfterSeconds);
-    }
-
     const userId = await requireAuthUserId(request);
     if (!userId) {
       return NextResponse.json({ message: "Sessão obrigatória." }, { status: 401 });
     }
 
+    const endpointRateLimit = await consumeAuthRateLimit({
+      route: "library-publish-manual",
+      request,
+      identifier: userId,
+    });
+    if (!endpointRateLimit.allowed) {
+      return rateLimitResponse(endpointRateLimit.retryAfterSeconds);
+    }
+
     const payload = (await parseJsonObjectBody(request, {
-      maxBytes: 96 * 1024,
+      maxBytes: 180 * 1024,
       allowedKeys: [
         "title",
         "description",
@@ -92,8 +117,7 @@ export async function POST(request: Request) {
         "category",
         "authorName",
       ],
-    })) as PublishManualPayload &
-      Record<string, unknown>;
+    })) as PublishManualPayload & Record<string, unknown>;
 
     const title = readRequiredString(payload, "title", {
       fieldName: "Título",
@@ -124,12 +148,11 @@ export async function POST(request: Request) {
       "principais",
       "Categoria",
     );
-    const authorName =
+    const fallbackAuthorName =
       readOptionalString(payload, "authorName", {
         fieldName: "Autor",
         maxLength: 80,
-      }) || "Usuario TemAi";
-    const authorHandle = normalizeAuthorHandle(authorName);
+      }) || "Usuário TemAi";
     const prepMinutes = readOptionalNumber(payload, "prepMinutes", {
       fieldName: "Tempo de preparo",
       min: 5,
@@ -146,30 +169,30 @@ export async function POST(request: Request) {
     });
     const imageUrl = readOptionalString(payload, "imageUrl", {
       fieldName: "Imagem",
-      maxLength: 1000,
+      maxLength: 120 * 1024,
     });
-    if (imageUrl) {
-      let parsedImageUrl: URL;
-      try {
-        parsedImageUrl = new URL(imageUrl);
-      } catch {
-        throw new InputValidationError("URL da imagem malformada.");
-      }
-      if (!["http:", "https:"].includes(parsedImageUrl.protocol)) {
-        throw new InputValidationError("URL da imagem inválida.");
-      }
+
+    if (imageUrl && !isSupportedImageReference(imageUrl)) {
+      throw new InputValidationError("Imagem inválida.");
     }
 
-    if (!isPremiumAllowed(authorHandle)) {
+    const entitlement = await getAiEntitlement(userId);
+    if (!entitlement.isPremium) {
       return NextResponse.json(
-        {
-          message:
-            "Publicação na biblioteca disponível apenas para premium no momento.",
-        },
+        { message: "Publicação na Biblioteca disponível apenas para usuários Premium." },
         { status: 403 },
       );
     }
 
+    const profile = await getAuthorProfile(userId);
+    const authorHandle = profile.authorHandle || normalizeAuthorHandle(fallbackAuthorName);
+    const moderation = await moderateRecipePublication({
+      title,
+      description,
+      ingredients,
+      steps,
+      imageUrl: imageUrl || null,
+    });
     const unique = Date.now().toString(36).slice(-6);
     const slug = `manual-${slugify(title)}-${unique}`.slice(0, 120);
 
@@ -185,15 +208,56 @@ export async function POST(request: Request) {
       imageUrl: imageUrl || undefined,
       sourceName: `@${authorHandle}`,
       sourceUrl: `temai://community/${slug}`,
+      isPublished: moderation.allowed,
+      authorUserId: userId,
+      moderationStatus: moderation.status,
+      moderationReason: moderation.reason || undefined,
+      moderationResult: moderation.result,
+      moderatedAt: new Date().toISOString(),
     });
+
+    if (!moderation.allowed) {
+      await createUserNotification({
+        userId,
+        type: moderation.status === "review" ? "recipe_review" : "recipe_blocked",
+        title: moderation.status === "review" ? "Receita em análise" : "Receita não publicada",
+        body:
+          moderation.status === "review"
+            ? "Sua receita ficou em análise para proteger a comunidade."
+            : "Sua receita foi bloqueada pela moderação e não apareceu na Biblioteca.",
+        metadata: { slug, reason: moderation.reason, moderationStatus: moderation.status },
+      }).catch(() => undefined);
+
+      return NextResponse.json(
+        {
+          ok: false,
+          status: moderation.status,
+          message:
+            moderation.status === "review"
+              ? "Receita enviada para análise e ainda não aparece na Biblioteca."
+              : "Receita bloqueada pela moderação.",
+          reason: moderation.reason,
+        },
+        { status: 422 },
+      );
+    }
+
+    await createUserNotification({
+      userId,
+      type: "recipe_published",
+      title: "Receita publicada",
+      body: `${title} já está na Biblioteca.`,
+      href: `/receita/${slug}?origin=library`,
+      metadata: { slug },
+    }).catch(() => undefined);
 
     try {
       await refreshAuthorBadgesInSupabase(authorHandle);
     } catch {
-      // non-blocking: recipe publish should succeed even if badge refresh fails
+      // A publicação não deve falhar se a atualização de insígnias atrasar.
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, slug });
   } catch (error) {
     const validationResponse = validationErrorResponse(error);
     if (validationResponse) return validationResponse;

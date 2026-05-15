@@ -10,13 +10,13 @@ export interface BadgeDefinition {
 export const BADGE_CATALOG: BadgeDefinition[] = [
   {
     slug: "estagiario",
-    label: "🌱 Estagiario",
+    label: "🌱 Estagiário",
     description: "0 a 3 receitas postadas.",
     colorClass: "bg-[#EAE3D6] text-[#6F5F49]",
   },
   {
     slug: "cozinheiro_junior",
-    label: "🍳 Cozinheiro Junior",
+    label: "🍳 Cozinheiro Júnior",
     description: "4 a 10 receitas postadas.",
     colorClass: "bg-[#E6F4FF] text-[#2B5D80]",
   },
@@ -28,7 +28,7 @@ export const BADGE_CATALOG: BadgeDefinition[] = [
   },
   {
     slug: "cozinheiro_senior",
-    label: "🔥 Cozinheiro Senior",
+    label: "🔥 Cozinheiro Sênior",
     description: "31 a 50 receitas postadas.",
     colorClass: "bg-[#FFEBD8] text-[#8A4E1B]",
   },

@@ -56,7 +56,7 @@ const AI_TEMPLATES: RecipeTemplate[] = [
     optionalIngredients: ["canela", "mel", "iogurte"],
     baseSteps: [
       "Amasse a banana e misture com ovo e aveia.",
-      "Aquece frigideira antiaderente e distribui pequenas porcoes.",
+      "Aquece frigideira antiaderente e distribui pequenas porções.",
       "Doura os dois lados até firmar.",
       "Finaliza com canela ou mel, se quiser.",
     ],

@@ -682,6 +682,13 @@ function CreateRecipePageContent() {
   return (
     <section className="space-y-5 pb-2">
       <header className="space-y-1">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="mb-2 inline-flex text-sm font-semibold text-primary"
+        >
+          ← Voltar
+        </button>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#A88A57]">TemAi IA</p>
         <h1 className="font-display text-3xl text-[#2A1E17]">Gerar receita</h1>
         <p className="text-sm text-[#726457]">

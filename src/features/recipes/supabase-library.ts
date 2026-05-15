@@ -15,6 +15,8 @@ interface SupabaseRecipeRow {
   image_url: string | null;
   source_name: string;
   created_at?: string;
+  author_user_id?: string | null;
+  moderation_status?: string;
 }
 
 const allowedCategories = new Set<LibraryCategory>([
@@ -139,6 +141,15 @@ function hasAnimalProtein(text: string): boolean {
   );
 }
 
+function normalizeSearchText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 async function supabaseFetch(pathAndQuery: string, withCount = false) {
   const { url, key } = getSupabaseEnv();
   if (!url || !key) {
@@ -190,25 +201,29 @@ export async function searchRecipesFromSupabase(params: {
   const category = params.category?.trim();
   const seed = params.seed?.trim() || "default-seed";
   let query =
-    "recipes_br?select=id,slug,title,description,category,ingredients,steps,prep_minutes,servings,image_url,source_name&is_published=eq.true";
+    "recipes_br?select=id,slug,title,description,category,ingredients,steps,prep_minutes,servings,image_url,source_name&is_published=eq.true&moderation_status=eq.approved";
 
   if (category && category !== "todas") {
     query += `&category=eq.${encodeURIComponent(category)}`;
   }
-  if (search) {
-    const encoded = encodeURIComponent(`%${search}%`);
-    query += `&or=(title.ilike.${encoded},description.ilike.${encoded})`;
-  }
-
   query += "&limit=5000";
 
   const response = await supabaseFetch(query);
   const rows = (await response.json()) as SupabaseRecipeRow[];
   const mapped = rows.map(mapRowToRecipe);
+  const searched = search
+    ? mapped.filter((recipe) => {
+        const queryText = normalizeSearchText(search);
+        const searchable = normalizeSearchText(
+          `${recipe.title} ${recipe.description} ${recipe.ingredients.join(" ")}`,
+        );
+        return searchable.includes(queryText);
+      })
+    : mapped;
   const safe =
     category === "veggie"
-      ? mapped.filter((recipe) => !hasAnimalProtein(`${recipe.title} ${recipe.description} ${recipe.ingredients.join(" ")}`))
-      : mapped;
+      ? searched.filter((recipe) => !hasAnimalProtein(`${recipe.title} ${recipe.description} ${recipe.ingredients.join(" ")}`))
+      : searched;
 
   const ranked = safe
     .map((recipe) => ({
@@ -253,7 +268,7 @@ export async function getRecipeBySlugFromSupabase(slug: string): Promise<Recipe 
   }
 
   const response = await supabaseFetch(
-    `recipes_br?select=id,slug,title,description,category,ingredients,steps,prep_minutes,servings,image_url,source_name&slug=eq.${encodeURIComponent(slug)}&is_published=eq.true&limit=1`,
+    `recipes_br?select=id,slug,title,description,category,ingredients,steps,prep_minutes,servings,image_url,source_name&slug=eq.${encodeURIComponent(slug)}&is_published=eq.true&moderation_status=eq.approved&limit=1`,
   );
   const rows = (await response.json()) as SupabaseRecipeRow[];
   if (!rows.length) return null;
@@ -277,7 +292,7 @@ export async function getPopularRecipesFromSupabase(limit = 8): Promise<Array<{ 
   ];
 
   const recipesResponse = await supabaseFetch(
-    "recipes_br?select=id,slug,title,description,category,ingredients,steps,prep_minutes,servings,image_url,source_name,created_at&is_published=eq.true&order=created_at.desc&limit=5000",
+    "recipes_br?select=id,slug,title,description,category,ingredients,steps,prep_minutes,servings,image_url,source_name,created_at&is_published=eq.true&moderation_status=eq.approved&order=created_at.desc&limit=5000",
   );
   const recipeRows = (await recipesResponse.json()) as SupabaseRecipeRow[];
 
@@ -344,7 +359,12 @@ export async function upsertImportedRecipeToSupabase(recipe: ImportedRecipeDraft
     image_url: recipe.imageUrl || null,
     source_name: recipe.sourceName,
     source_url: recipe.sourceUrl,
-    is_published: true,
+    is_published: recipe.isPublished ?? true,
+    author_user_id: recipe.authorUserId || null,
+    moderation_status: recipe.moderationStatus || "approved",
+    moderation_reason: recipe.moderationReason || null,
+    moderation_result: recipe.moderationResult || {},
+    moderated_at: recipe.moderatedAt || new Date().toISOString(),
   };
 
   const response = await fetch(`${url}/rest/v1/recipes_br?on_conflict=slug`, {
@@ -383,7 +403,7 @@ export async function updateRecipeCategoryInSupabase(
   }
 
   const response = await fetch(
-    `${url}/rest/v1/recipes_br?slug=eq.${encodeURIComponent(slug)}&is_published=eq.true`,
+    `${url}/rest/v1/recipes_br?slug=eq.${encodeURIComponent(slug)}&is_published=eq.true&moderation_status=eq.approved`,
     {
       method: "PATCH",
       headers: {

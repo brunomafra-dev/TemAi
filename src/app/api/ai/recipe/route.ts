@@ -74,7 +74,7 @@ function readCookingEquipment(payload: Record<string, unknown>): CookingEquipmen
   });
 
   if (values.some((value) => !COOKING_EQUIPMENT_VALUES.includes(value as CookingEquipment))) {
-    throw new InputValidationError("Equipamentos invalidos.");
+    throw new InputValidationError("Equipamentos inválidos.");
   }
 
   return normalizeCookingEquipment(values);
@@ -228,7 +228,7 @@ export async function POST(request: Request) {
   try {
     const userId = await requireAuthUserId(request);
     if (!userId) {
-      return NextResponse.json({ message: "Sessao obrigatoria para usar IA." }, { status: 401 });
+      return NextResponse.json({ message: "Sessão obrigatória para usar IA." }, { status: 401 });
     }
 
     const endpointRateLimit = await consumeAuthRateLimit({
@@ -287,7 +287,7 @@ export async function POST(request: Request) {
         suggestionId,
       });
       if (!isValidGeneratedSuggestion) {
-        return NextResponse.json({ message: "Sugestao de IA invalida ou expirada." }, { status: 403 });
+        return NextResponse.json({ message: "Sugestão de IA inválida ou expirada." }, { status: 403 });
       }
 
       const cachedRecipe = await readGeneratedRecipeCache({

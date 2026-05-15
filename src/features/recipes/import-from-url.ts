@@ -14,6 +14,12 @@ export interface ImportedRecipeDraft {
   sourceName: string;
   sourceUrl: string;
   sourceRating?: number;
+  isPublished?: boolean;
+  authorUserId?: string;
+  moderationStatus?: "pending" | "approved" | "rejected" | "review";
+  moderationReason?: string;
+  moderationResult?: Record<string, unknown>;
+  moderatedAt?: string;
 }
 
 interface RecipeJsonLd {

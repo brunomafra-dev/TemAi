@@ -7,7 +7,8 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { BADGE_CATALOG, inferUnlockedBadgesByRecipes } from "@/features/profile/badges";
+import { BADGE_CATALOG } from "@/features/profile/badges";
+import { getAuthorBadgesFromCloud, normalizeAuthorHandle } from "@/features/profile/badges-cloud";
 import { getNotificationPrefs, saveNotificationPrefs } from "@/features/profile/notifications-storage";
 import { createSupportTicket, getMySupportTickets, type SupportTicket } from "@/features/profile/support-tickets";
 import { getSubscriptionState, syncSubscriptionFromCloud, type SubscriptionState } from "@/features/profile/subscription-storage";
@@ -54,6 +55,8 @@ const notificationItems = [
   { key: "publishSuccess", label: "Receita publicada com sucesso" },
   { key: "shoppingUpdates", label: "Atualizações da lista de compras" },
 ] as const;
+
+const MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024;
 
 type SectionId = (typeof sections)[number]["id"];
 type SupportQuickOption =
@@ -129,6 +132,7 @@ export default function ProfilePage() {
   const [modalStage, setModalStage] = useState<"enter" | "open" | "exit">("open");
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const editPhotoInputRef = useRef<HTMLInputElement | null>(null);
 
   const [profile, setProfile] = useState<UserProfile>(() => getUserProfile());
   const [workingProfile, setWorkingProfile] = useState<UserProfile>(() => getUserProfile());
@@ -151,6 +155,9 @@ export default function ProfilePage() {
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [deleteAccountMessage, setDeleteAccountMessage] = useState("");
   const [savedRefs, setSavedRefs] = useState<SavedRecipeRef[]>(() => getSavedRecipeRefs());
+  const [cloudBadgeSlugs, setCloudBadgeSlugs] = useState<string[]>(
+    () => getUserProfile().unlockedBadges || ["estagiario"],
+  );
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([
     {
       from: "bot",
@@ -160,28 +167,9 @@ export default function ProfilePage() {
   ]);
 
   const myRecipes = useMemo(() => getMyRecipes(), []);
-  const categoryCounts = useMemo(() => {
-    const next: Record<string, number> = {};
-    myRecipes.forEach((recipe) => {
-      const key = recipe.category || "principais";
-      next[key] = (next[key] || 0) + 1;
-    });
-    return next;
-  }, [myRecipes]);
-
   const unlockedBadges = useMemo(() => {
-    const inferred = inferUnlockedBadgesByRecipes({
-      totalPublished: myRecipes.length,
-      byCategory: {
-        sobremesas: categoryCounts.sobremesas || 0,
-        veggie: categoryCounts.veggie || 0,
-        lanches: categoryCounts.lanches || 0,
-        bebidas: categoryCounts.bebidas || 0,
-      },
-    });
-
-    return Array.from(new Set([...(profile.unlockedBadges || []), ...inferred]));
-  }, [categoryCounts, myRecipes.length, profile.unlockedBadges]);
+    return Array.from(new Set(["estagiario", ...cloudBadgeSlugs]));
+  }, [cloudBadgeSlugs]);
 
   const selectedBadgeSlug = unlockedBadges.includes(profile.selectedBadge)
     ? profile.selectedBadge
@@ -289,6 +277,23 @@ export default function ProfilePage() {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+    const handle = normalizeAuthorHandle(
+      profile.username || `${profile.firstName} ${profile.lastName}`,
+    );
+    getAuthorBadgesFromCloud(handle)
+      .then((badges) => {
+        if (!isMounted) return;
+        setCloudBadgeSlugs(badges);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [profile.firstName, profile.lastName, profile.username]);
+
+  useEffect(() => {
     return () => {
       if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
       if (openTimeoutRef.current) clearTimeout(openTimeoutRef.current);
@@ -314,7 +319,16 @@ export default function ProfilePage() {
 
   function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
+    event.target.value = "";
     if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setProfileMessage("Escolha uma imagem válida.");
+      return;
+    }
+    if (file.size > MAX_PROFILE_PHOTO_BYTES) {
+      setProfileMessage("Use uma imagem de até 2 MB.");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result;
@@ -768,8 +782,10 @@ export default function ProfilePage() {
               <p className="text-sm font-semibold text-[#5D5248]">Benefícios Premium</p>
               <ul className="mt-2 space-y-1 text-xs text-[#6A5E52]">
                 <li>• Geração de receitas ilimitadas com IA</li>
-                <li>• Adicionar suas receitas autorais com voz</li>
-                <li>• Gerar receitas com IA utilizando imagem e voz</li>
+                <li>• Gerar receitas com IA por texto, áudio e foto</li>
+                <li>• Organizar receitas autorais com IA</li>
+                <li>• Adicionar ingredientes e preparo por voz</li>
+                <li>• Publicar receitas na Biblioteca da comunidade</li>
                 <li>• Badges exclusivos para premium</li>
               </ul>
             </div>
@@ -779,7 +795,8 @@ export default function ProfilePage() {
               <ul className="mt-2 space-y-1 text-xs text-[#6A5E52]">
                 <li>• Limite de 3 receitas geradas com IA por mês</li>
                 <li>• Receitas geradas com IA só com texto</li>
-                <li>• Adição de receitas autorais só por texto</li>
+                <li>• Receitas autorais só por texto</li>
+                <li>• Receitas autorais ficam apenas em Minhas receitas</li>
                 <li>• Badges padrão</li>
               </ul>
             </div>
@@ -790,10 +807,30 @@ export default function ProfilePage() {
         return (
           <div className="space-y-3">
             <p className="text-sm font-semibold text-[#5D5248]">Editar Perfil</p>
-            <label className="block rounded-xl border border-[#E8DBC8] bg-[#FAF4EA] px-3 py-2 text-xs text-[#6B6055]">
-              Foto de perfil
-              <input type="file" accept="image/*" className="mt-2 block w-full" onChange={handlePhotoUpload} />
-            </label>
+            <div className="rounded-xl border border-[#E8DBC8] bg-[#FAF4EA] px-3 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#6B6055]">Foto de perfil</p>
+              <button
+                type="button"
+                className="mt-3 flex items-center gap-3 rounded-2xl border border-[#E5D7BF] bg-white p-2 text-left"
+                onClick={() => editPhotoInputRef.current?.click()}
+              >
+                <span className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#EAD7BB] text-lg font-semibold text-[#7A4A31]">
+                  {workingProfile.photoDataUrl ? (
+                    <Image
+                      src={workingProfile.photoDataUrl}
+                      alt="Foto de perfil"
+                      fill
+                      unoptimized
+                      className="object-cover"
+                    />
+                  ) : (
+                    workingProfile.firstName.slice(0, 1).toUpperCase()
+                  )}
+                </span>
+                <span className="text-sm font-semibold text-[#5D5248]">Tocar para trocar foto</span>
+              </button>
+              <input ref={editPhotoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+            </div>
             <Input placeholder="Nome" value={workingProfile.firstName} onChange={(e) => setWorkingProfile((c) => ({ ...c, firstName: e.target.value }))} />
             <Input placeholder="Sobrenome" value={workingProfile.lastName} onChange={(e) => setWorkingProfile((c) => ({ ...c, lastName: e.target.value }))} />
             <div className="space-y-1">
@@ -869,7 +906,7 @@ export default function ProfilePage() {
           <div className="space-y-3">
             <p className="text-sm font-semibold text-[#5D5248]">Insígnias</p>
             <p className="text-xs text-[#7A6D60]">
-              Toque para ativar. As bloqueadas mostram o requisito.
+              Toque para ativar. Insígnias de chef contam apenas receitas publicadas e aprovadas na Biblioteca.
             </p>
             <div className="grid grid-cols-1 gap-2">
               {BADGE_CATALOG.map((badge) => {
@@ -909,7 +946,6 @@ export default function ProfilePage() {
       case "saved":
         return (
           <div className="space-y-3">
-            <p className="text-sm font-semibold text-[#5D5248]">Receitas Salvas</p>
             <div className="max-h-[48vh] space-y-2 overflow-auto pr-1">
               {savedRefs.length === 0 ? (
                 <p className="text-sm text-[#7A6D60]">Você ainda não salvou receitas.</p>

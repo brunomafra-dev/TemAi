@@ -18,7 +18,7 @@ interface IngredientCaptureProps {
 
 const captureModes: Array<{ value: InputMode; label: string }> = [
   { value: "text", label: "Texto" },
-  { value: "audio", label: "Audio" },
+  { value: "audio", label: "Áudio" },
   { value: "photo", label: "Foto" },
 ];
 

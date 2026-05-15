@@ -2,12 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { RatingStars } from "@/components/recipes/rating-stars";
 import { RecipeCard } from "@/components/recipes/recipe-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { Recipe } from "@/features/recipes/types";
-import { getUserRecipeRating, setUserRecipeRating } from "@/features/recipes/ratings-storage";
 
 const libraryFilters = [
   { id: "todas", label: "Todas" },
@@ -25,7 +23,6 @@ export default function LibraryContent() {
   const [page, setPage] = useState(1);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [ratings, setRatings] = useState<Record<string, number>>({});
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
@@ -66,10 +63,6 @@ export default function LibraryContent() {
           if (data.pagination?.page && data.pagination.page !== page) {
             setPage(data.pagination.page);
           }
-          const ratingMap = Object.fromEntries(
-            data.recipes.map((recipe) => [recipe.id, getUserRecipeRating(recipe.id)]),
-          );
-          setRatings(ratingMap);
         }
       } catch {
         if (isMounted) {
@@ -105,11 +98,6 @@ export default function LibraryContent() {
     }
 
     return [...pages].sort((a, b) => a - b);
-  }
-
-  function onRate(recipeId: string, rating: number) {
-    setUserRecipeRating(recipeId, rating);
-    setRatings((current) => ({ ...current, [recipeId]: rating }));
   }
 
   return (
@@ -173,23 +161,12 @@ export default function LibraryContent() {
       ) : (
         <div className="space-y-3">
           {recipes.map((recipe) => (
-            <div key={recipe.id} className="space-y-2">
-              <RecipeCard
-                recipe={recipe}
-                href={`/receita/${recipe.id}?origin=library`}
-                footerLabel={`Fonte: ${recipe.sourceLabel}`}
-              />
-              <div className="rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] px-3 py-2">
-                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#7D715F]">
-                  Sua avaliacao
-                </p>
-                <RatingStars
-                  size="sm"
-                  value={ratings[recipe.id] ?? 0}
-                  onChange={(rating) => onRate(recipe.id, rating)}
-                />
-              </div>
-            </div>
+            <RecipeCard
+              key={recipe.id}
+              recipe={recipe}
+              href={`/receita/${recipe.id}?origin=library`}
+              footerLabel={`Fonte: ${recipe.sourceLabel}`}
+            />
           ))}
         </div>
       )}

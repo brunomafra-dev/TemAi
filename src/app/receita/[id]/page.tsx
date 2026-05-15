@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -7,7 +8,14 @@ import { RatingStars } from "@/components/recipes/rating-stars";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { fetchFullRecipe } from "@/features/recipes/api-client";
+import {
+  fetchFullRecipe,
+  fetchLibraryRecipeFeedback,
+  postLibraryRecipeComment,
+  reportLibraryRecipe,
+  saveLibraryRecipeRating,
+  type LibraryRecipeFeedback,
+} from "@/features/recipes/api-client";
 import { LIBRARY_RECIPES } from "@/features/recipes/library-recipes";
 import { addShoppingItemsFromRecipe } from "@/features/recipes/shopping-storage";
 import {
@@ -37,6 +45,14 @@ const PORTION_MULTIPLIERS: Array<{ value: PortionMultiplier; label: string }> = 
   { value: 1, label: "1x" },
   { value: 2, label: "2x" },
   { value: 3, label: "3x" },
+];
+
+const reportOptions = [
+  { value: "wrong_info", label: "Informação incorreta" },
+  { value: "wrong_image", label: "Foto errada" },
+  { value: "inappropriate", label: "Conteúdo impróprio" },
+  { value: "dangerous", label: "Receita perigosa" },
+  { value: "other", label: "Outro motivo" },
 ];
 
 function parseIngredientsQuery(rawIngredients: string | null): string[] {
@@ -284,6 +300,14 @@ export default function RecipeDetailsPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isSaved, setIsSaved] = useState(false);
   const [userRating, setUserRating] = useState(0);
+  const [libraryFeedback, setLibraryFeedback] = useState<LibraryRecipeFeedback | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [commentText, setCommentText] = useState("");
+  const [isCommenting, setIsCommenting] = useState(false);
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("wrong_info");
+  const [reportDetail, setReportDetail] = useState("");
+  const [isReporting, setIsReporting] = useState(false);
   const [isShoppingOpen, setIsShoppingOpen] = useState(false);
   const [ownedIngredients, setOwnedIngredients] = useState<Record<string, boolean>>({});
   const [shoppingMessage, setShoppingMessage] = useState("");
@@ -466,6 +490,29 @@ export default function RecipeDetailsPage() {
     );
   }, [isShoppingOpen, scaledIngredients]);
 
+  useEffect(() => {
+    if (origin !== "library") {
+      setLibraryFeedback(null);
+      return;
+    }
+
+    let isMounted = true;
+    fetchLibraryRecipeFeedback(recipeId)
+      .then((feedback) => {
+        if (!isMounted) return;
+        setLibraryFeedback(feedback);
+        setUserRating(feedback.userRating);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setFeedbackMessage("Não foi possível carregar avaliações e comentários.");
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [origin, recipeId]);
+
   function buildSavedRecipeRef(currentRecipe: Recipe): SavedRecipeRef {
     const sourceOrigin = origin === "library" ? "library" : "ai";
     return {
@@ -533,12 +580,68 @@ export default function RecipeDetailsPage() {
     }
   }
 
-  function handleRate(rating: number) {
+  async function handleRate(rating: number) {
     if (!recipe) {
       return;
     }
     setUserRecipeRating(recipe.id, rating);
     setUserRating(rating);
+    setFeedbackMessage("");
+
+    if (origin !== "library") {
+      return;
+    }
+
+    try {
+      const feedback = await saveLibraryRecipeRating(recipe.id, rating);
+      setLibraryFeedback(feedback);
+      setUserRating(feedback.userRating || rating);
+      setFeedbackMessage("Avaliação salva.");
+    } catch (error) {
+      setFeedbackMessage(error instanceof Error ? error.message : "Não foi possível salvar avaliação.");
+    }
+  }
+
+  async function submitComment() {
+    if (!recipe || origin !== "library" || isCommenting) return;
+    const body = commentText.trim();
+    if (body.length < 3) {
+      setFeedbackMessage("Escreva um comentário um pouco mais completo.");
+      return;
+    }
+
+    setIsCommenting(true);
+    setFeedbackMessage("");
+    try {
+      const feedback = await postLibraryRecipeComment(recipe.id, body);
+      setLibraryFeedback(feedback);
+      setCommentText("");
+      setFeedbackMessage("Comentário publicado.");
+    } catch (error) {
+      setFeedbackMessage(error instanceof Error ? error.message : "Não foi possível publicar comentário.");
+    } finally {
+      setIsCommenting(false);
+    }
+  }
+
+  async function submitReport() {
+    if (!recipe || origin !== "library" || isReporting) return;
+    setIsReporting(true);
+    setFeedbackMessage("");
+    try {
+      const result = await reportLibraryRecipe({
+        recipeId: recipe.id,
+        reason: reportReason,
+        detail: reportDetail,
+      });
+      setFeedbackMessage(result.message);
+      setReportDetail("");
+      setIsReportOpen(false);
+    } catch (error) {
+      setFeedbackMessage(error instanceof Error ? error.message : "Não foi possível enviar denúncia.");
+    } finally {
+      setIsReporting(false);
+    }
   }
 
   function openShoppingSelector() {
@@ -744,7 +847,23 @@ export default function RecipeDetailsPage() {
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#7A6D60]">
                   Avalie esta Receita
                 </p>
+                {origin === "library" ? (
+                  libraryFeedback && libraryFeedback.ratingCount > 0 ? (
+                    <p className="mb-2 rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] px-3 py-2 text-xs font-semibold text-[#6A5E52]">
+                      Média {libraryFeedback.averageRating.toFixed(1)}/10 com {libraryFeedback.ratingCount} avaliação(ões).
+                    </p>
+                  ) : (
+                    <p className="mb-2 rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] px-3 py-2 text-xs font-semibold text-[#6A5E52]">
+                      Receita ainda não foi avaliada.
+                    </p>
+                  )
+                ) : null}
                 <RatingStars value={userRating} onChange={handleRate} />
+                {feedbackMessage ? (
+                  <p className="mt-2 rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] px-3 py-2 text-xs font-semibold text-[#6A5E52]">
+                    {feedbackMessage}
+                  </p>
+                ) : null}
               </div>
               <div className="grid grid-cols-1 gap-2">
                 {origin === "manual" ? (
@@ -858,6 +977,110 @@ export default function RecipeDetailsPage() {
               </ol>
             </CardContent>
           </Card>
+
+          {origin === "library" ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Comentários</CardTitle>
+                <CardDescription>
+                  Dicas de quem já testou. Perfis de usuários não ficam clicáveis.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-2">
+                  <textarea
+                    value={commentText}
+                    onChange={(event) => setCommentText(event.target.value)}
+                    placeholder="Conte como ficou, uma adaptação que deu certo ou uma dica de preparo."
+                    className="min-h-[92px] w-full rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] px-3 py-2 text-sm outline-none"
+                  />
+                  <Button className="w-full" onClick={() => void submitComment()} disabled={isCommenting}>
+                    {isCommenting ? "Publicando..." : "Comentar"}
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  {libraryFeedback?.comments.length ? (
+                    libraryFeedback.comments.map((comment) => (
+                      <div key={comment.id} className="rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] p-3">
+                        <div className="flex items-center gap-2">
+                          <span className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#EAD7BB] text-xs font-bold text-[#7A4A31]">
+                            {comment.authorAvatarUrl ? (
+                              <Image
+                                src={comment.authorAvatarUrl}
+                                alt={comment.authorName}
+                                fill
+                                unoptimized
+                                className="object-cover"
+                              />
+                            ) : (
+                              comment.authorName.slice(0, 1).toUpperCase()
+                            )}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-[#4F4338]">{comment.authorName}</p>
+                            {comment.authorUsername ? (
+                              <p className="text-xs text-[#8A7A69]">@{comment.authorUsername}</p>
+                            ) : null}
+                          </div>
+                        </div>
+                        <p className="mt-2 text-sm leading-relaxed text-[#5D5248]">{comment.body}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] px-3 py-4 text-sm text-[#6A5E52]">
+                      Ainda não há comentários nesta receita.
+                    </p>
+                  )}
+                </div>
+
+                {feedbackMessage ? (
+                  <p className="rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] px-3 py-2 text-xs font-semibold text-[#6A5E52]">
+                    {feedbackMessage}
+                  </p>
+                ) : null}
+
+                <div className="border-t border-[#E5D7BF] pt-3">
+                  <button
+                    type="button"
+                    className="text-sm font-semibold text-[#9A4635]"
+                    onClick={() => setIsReportOpen((current) => !current)}
+                  >
+                    Denunciar receita
+                  </button>
+                  {isReportOpen ? (
+                    <div className="mt-3 space-y-2 rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] p-3">
+                      <select
+                        value={reportReason}
+                        onChange={(event) => setReportReason(event.target.value)}
+                        className="h-10 w-full rounded-xl border border-[#E5D7BF] bg-white px-3 text-sm"
+                      >
+                        {reportOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <textarea
+                        value={reportDetail}
+                        onChange={(event) => setReportDetail(event.target.value)}
+                        placeholder="Detalhe o problema, se quiser."
+                        className="min-h-[80px] w-full rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm"
+                      />
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => void submitReport()}
+                        disabled={isReporting}
+                      >
+                        {isReporting ? "Enviando..." : "Enviar denúncia"}
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
         </article>
       ) : null}
 

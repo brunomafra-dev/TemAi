@@ -134,7 +134,7 @@ function readRecipeFilter(raw: unknown): RecipeSuggestionFilter {
   }
   const value = raw.trim() as RecipeSuggestionFilter;
   if (!RECIPE_FILTERS.includes(value)) {
-    throw new InputValidationError("Filtro de receita invalido.");
+    throw new InputValidationError("Filtro de receita inválido.");
   }
   return value;
 }
@@ -185,7 +185,7 @@ function readCookingEquipment(payload: Record<string, unknown>): CookingEquipmen
   const normalized = normalizeCookingEquipment(values);
 
   if (values.some((value) => !COOKING_EQUIPMENT_VALUES.includes(value as CookingEquipment))) {
-    throw new InputValidationError("Equipamentos invalidos.");
+    throw new InputValidationError("Equipamentos inválidos.");
   }
 
   return normalized;

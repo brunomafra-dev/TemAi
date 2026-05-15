@@ -12,8 +12,20 @@ import {
   saveUserProfileToCloud,
   syncUserProfileFromCloud,
 } from "@/features/profile/storage";
+import {
+  fetchUserNotifications,
+  markUserNotificationsRead,
+  type UserNotificationView,
+} from "@/features/recipes/api-client";
 import { LIBRARY_RECIPES } from "@/features/recipes/library-recipes";
-import { getPendingShoppingCount } from "@/features/recipes/shopping-storage";
+import {
+  clearCheckedShoppingItems,
+  getPendingShoppingCount,
+  getShoppingListItems,
+  removeShoppingItem,
+  toggleShoppingItemChecked,
+  type ShoppingListItem,
+} from "@/features/recipes/shopping-storage";
 import type { Recipe } from "@/features/recipes/types";
 import { cn, normalizeText } from "@/lib/utils";
 
@@ -227,11 +239,17 @@ export default function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState("principais");
   const [isGeneratorMenuOpen, setIsGeneratorMenuOpen] = useState(false);
   const [pendingShoppingCount, setPendingShoppingCount] = useState(0);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<UserNotificationView[]>([]);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [notificationMessage, setNotificationMessage] = useState("");
+  const [isShoppingOpen, setIsShoppingOpen] = useState(false);
+  const [shoppingItems, setShoppingItems] = useState<ShoppingListItem[]>([]);
   const [popularApiRecipes, setPopularApiRecipes] = useState<
     Array<{ recipe: Recipe; rating: number; category: string }>
   >([]);
   const currentBadgeLabel =
-    BADGE_CATALOG.find((badge) => badge.slug === profile.selectedBadge)?.label || "🌱 Estagiario";
+    BADGE_CATALOG.find((badge) => badge.slug === profile.selectedBadge)?.label || "🌱 Estagiário";
   const usernameHandle = profile.username?.trim()
     ? `@${profile.username.trim().replace(/^@+/, "")}`
     : `@${[profile.firstName, profile.lastName].join("_").toLowerCase().replace(/\s+/g, "_")}`;
@@ -350,6 +368,58 @@ export default function HomePage() {
     setSelectedCategory(categoryId);
     router.push(`/biblioteca?category=${encodeURIComponent(categoryId)}`);
   }, [router]);
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      const data = await fetchUserNotifications();
+      setNotifications(data.notifications);
+      setUnreadNotificationCount(data.unreadCount);
+      setNotificationMessage("");
+    } catch {
+      setNotifications([]);
+      setUnreadNotificationCount(0);
+      setNotificationMessage("Entre na conta para ver notificações.");
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadNotifications();
+  }, [loadNotifications]);
+
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        void loadNotifications();
+      }
+    };
+
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [loadNotifications]);
+
+  const openNotifications = useCallback(() => {
+    setIsNotificationsOpen(true);
+    void loadNotifications().then(() =>
+      markUserNotificationsRead(true)
+        .then(() => setUnreadNotificationCount(0))
+        .catch(() => undefined),
+    );
+  }, [loadNotifications]);
+
+  const openShoppingList = useCallback(() => {
+    setShoppingItems(getShoppingListItems());
+    setIsShoppingOpen(true);
+  }, []);
+
+  const submitSearch = useCallback(() => {
+    const query = searchTerm.trim();
+    if (!query) return;
+    router.push(`/biblioteca?q=${encodeURIComponent(query)}&category=todas`);
+  }, [router, searchTerm]);
 
   const openProfilePhotoPicker = useCallback(() => {
     setProfilePhotoMessage("");
@@ -494,7 +564,7 @@ export default function HomePage() {
                 </span>
               </button>
               <div>
-                <p className="font-display text-2xl leading-none">Ola, {profile.firstName} 👋</p>
+                <p className="font-display text-2xl leading-none">Olá, {profile.firstName} 👋</p>
                 <p className="mt-1 text-xs text-[#E9DCC6]">{usernameHandle}</p>
                 <p className="mt-1 text-xs font-semibold text-[#E9DCC6]">{currentBadgeLabel}</p>
                 {profilePhotoMessage ? (
@@ -503,9 +573,10 @@ export default function HomePage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Link
-                href="/perfil?section=notifications"
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-[#F5F1E8] transition hover:bg-white/25"
+              <button
+                type="button"
+                onClick={openNotifications}
+                className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-[#F5F1E8] transition hover:bg-white/25"
                 aria-label="Notificações"
               >
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor">
@@ -517,9 +588,15 @@ export default function HomePage() {
                   />
                   <path d="M9.8 17.8c.4 1.2 1.3 1.8 2.2 1.8s1.8-.6 2.2-1.8" strokeWidth="1.8" />
                 </svg>
-              </Link>
-              <Link
-                href="/perfil?section=shopping"
+                {unreadNotificationCount > 0 ? (
+                  <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-[#F8D55A] px-1.5 text-center text-[10px] font-bold text-[#2A1E17]">
+                    {Math.min(99, unreadNotificationCount)}
+                  </span>
+                ) : null}
+              </button>
+              <button
+                type="button"
+                onClick={openShoppingList}
                 className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-[#F5F1E8] transition hover:bg-white/25"
                 aria-label="Lista de compras"
               >
@@ -532,7 +609,7 @@ export default function HomePage() {
                     {Math.min(99, pendingShoppingCount)}
                   </span>
                 ) : null}
-              </Link>
+              </button>
             </div>
           </div>
 
@@ -546,6 +623,12 @@ export default function HomePage() {
             <input
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  submitSearch();
+                }
+              }}
               placeholder="Busque por receitas e ingredientes..."
               className="h-12 w-full rounded-full border-0 bg-[#F5F1E8] pl-11 pr-4 text-sm text-[#2A1E17] shadow-[0_10px_25px_-18px_rgba(0,0,0,0.5)] outline-none placeholder:text-[#9F988D]"
             />
@@ -566,7 +649,7 @@ export default function HomePage() {
         <div className="absolute inset-0 bg-[#2A1E17]/60" />
         <div className="relative z-10 flex items-center justify-between px-6 py-7 text-[#FEF8EF]">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-[#E8D8BD]">Experiencia IA</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-[#E8D8BD]">Experiência IA</p>
             <h2 className="mt-2 font-display text-3xl leading-none">Criar receita com IA</h2>
           </div>
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-2xl">
@@ -631,7 +714,7 @@ export default function HomePage() {
                 className="rounded-2xl border border-[#E7DCC8] bg-[#F8F2E7] px-3 py-4 text-center"
               >
                 <p className="text-2xl">🎤</p>
-                <p className="mt-1 text-xs font-semibold text-[#5E5348]">Audio</p>
+                <p className="mt-1 text-xs font-semibold text-[#5E5348]">Áudio</p>
               </button>
               <button
                 onClick={() => redirectToCreate("text")}
@@ -641,12 +724,118 @@ export default function HomePage() {
                 <p className="mt-1 text-xs font-semibold text-[#5E5348]">Texto</p>
               </button>
             </div>
-            <button
-              onClick={closeGeneratorMenu}
-              className="mt-4 w-full rounded-full border border-[#E0D2BA] py-2 text-sm font-semibold text-[#6E6154]"
-            >
-              Voltar
-            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {isNotificationsOpen ? (
+        <div className="fixed inset-0 z-50 flex items-end bg-black/45 p-4 sm:items-center sm:justify-center">
+          <div className="max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-[1.8rem] bg-[#FFFCF7] p-5 shadow-2xl sm:max-w-sm">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-xl font-semibold text-[#2A1E17]">Notificações</h3>
+              <button
+                type="button"
+                onClick={() => setIsNotificationsOpen(false)}
+                className="text-xs font-semibold text-[#7A6D60]"
+              >
+                ← Voltar
+              </button>
+            </div>
+            {notificationMessage ? (
+              <p className="mt-3 rounded-2xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm text-[#6A5E52]">
+                {notificationMessage}
+              </p>
+            ) : notifications.length === 0 ? (
+              <p className="mt-3 rounded-2xl border border-[#E5D7BF] bg-white px-3 py-4 text-sm text-[#6A5E52]">
+                Nenhuma notificação nova por enquanto.
+              </p>
+            ) : (
+              <div className="mt-4 space-y-2">
+                {notifications.map((item) => {
+                  const content = (
+                    <div className="rounded-2xl border border-[#E5D7BF] bg-white px-3 py-2 text-left">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-sm font-semibold text-[#4F4338]">{item.title}</p>
+                        {!item.readAt ? (
+                          <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#C66A3D]" />
+                        ) : null}
+                      </div>
+                      <p className="mt-1 text-xs text-[#6A5E52]">{item.body}</p>
+                    </div>
+                  );
+
+                  return item.href ? (
+                    <Link
+                      key={item.id}
+                      href={item.href}
+                      onClick={() => setIsNotificationsOpen(false)}
+                    >
+                      {content}
+                    </Link>
+                  ) : (
+                    <div key={item.id}>{content}</div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {isShoppingOpen ? (
+        <div className="fixed inset-0 z-50 flex items-end bg-black/45 p-4 sm:items-center sm:justify-center">
+          <div className="max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-[1.8rem] bg-[#FFFCF7] p-5 shadow-2xl sm:max-w-sm">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-xl font-semibold text-[#2A1E17]">Lista de compras</h3>
+              <button
+                type="button"
+                onClick={() => setIsShoppingOpen(false)}
+                className="text-xs font-semibold text-[#7A6D60]"
+              >
+                ← Voltar
+              </button>
+            </div>
+            <div className="mt-4 space-y-2">
+              {shoppingItems.length === 0 ? (
+                <p className="rounded-2xl border border-[#E5D7BF] bg-white px-3 py-4 text-sm text-[#6A5E52]">
+                  Sua lista está vazia.
+                </p>
+              ) : (
+                shoppingItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-[#E5D7BF] bg-white px-3 py-2"
+                  >
+                    <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-[#4F4338]">
+                      <input
+                        type="checkbox"
+                        checked={item.checked}
+                        onChange={() => setShoppingItems(toggleShoppingItemChecked(item.id))}
+                      />
+                      <span className={item.checked ? "truncate line-through text-[#9A8D7E]" : "truncate"}>
+                        {item.name}
+                      </span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShoppingItems(removeShoppingItem(item.id))}
+                      className="shrink-0 text-xs font-semibold text-[#9A4635]"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+            {shoppingItems.some((item) => item.checked) ? (
+              <button
+                type="button"
+                onClick={() => setShoppingItems(clearCheckedShoppingItems())}
+                className="mt-4 w-full rounded-full border border-[#E0D2BA] py-2 text-sm font-semibold text-[#6E6154]"
+              >
+                Limpar concluídos
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}

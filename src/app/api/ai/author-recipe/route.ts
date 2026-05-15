@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isOpenAiGenerationError, polishAuthorRecipeWithOpenAi } from "@/features/recipes/openai-generator";
-import { aiUsageErrorResponse, consumeAiUsage } from "@/features/security/ai-usage";
+import { aiUsageErrorResponse, consumeAiUsage, getAiEntitlement } from "@/features/security/ai-usage";
 import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse, requireAuthUserId } from "@/features/security/auth-user";
 import {
@@ -23,6 +23,14 @@ export async function POST(request: Request) {
     });
     if (!endpointRateLimit.allowed) {
       return rateLimitResponse(endpointRateLimit.retryAfterSeconds);
+    }
+
+    const entitlement = await getAiEntitlement(userId);
+    if (!entitlement.isPremium) {
+      return NextResponse.json(
+        { message: "Organizar receita com IA é um recurso Premium." },
+        { status: 403 },
+      );
     }
 
     const payload = await parseJsonObjectBody(request, {

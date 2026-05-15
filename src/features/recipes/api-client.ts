@@ -77,3 +77,107 @@ export async function fetchFullRecipe(body: FullRecipeRequestBody): Promise<Reci
 
   return parseResponse<Recipe>(response);
 }
+
+export type UserNotificationView = {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  href?: string;
+  readAt?: string;
+  createdAt: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type RecipeCommentView = {
+  id: string;
+  body: string;
+  authorName: string;
+  authorUsername?: string;
+  authorAvatarUrl?: string;
+  createdAt: string;
+};
+
+export type LibraryRecipeFeedback = {
+  averageRating: number;
+  ratingCount: number;
+  userRating: number;
+  comments: RecipeCommentView[];
+};
+
+export async function fetchUserNotifications(): Promise<{
+  notifications: UserNotificationView[];
+  unreadCount: number;
+}> {
+  const authHeaders = await buildAuthHeaders();
+  const response = await fetch("/api/notifications", {
+    headers: authHeaders,
+    cache: "no-store",
+  });
+  return parseResponse(response);
+}
+
+export async function markUserNotificationsRead(all = true, notificationId?: string): Promise<void> {
+  const authHeaders = await buildAuthHeaders();
+  const response = await fetch("/api/notifications", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders,
+    },
+    body: JSON.stringify({ all, notificationId }),
+  });
+  await parseResponse<{ ok: boolean }>(response);
+}
+
+export async function fetchLibraryRecipeFeedback(recipeId: string): Promise<LibraryRecipeFeedback> {
+  const authHeaders = await buildAuthHeaders();
+  const response = await fetch(`/api/library/meal/${encodeURIComponent(recipeId)}/feedback`, {
+    headers: authHeaders,
+    cache: "no-store",
+  });
+  return parseResponse(response);
+}
+
+export async function saveLibraryRecipeRating(recipeId: string, rating: number): Promise<LibraryRecipeFeedback> {
+  const authHeaders = await buildAuthHeaders();
+  const response = await fetch(`/api/library/meal/${encodeURIComponent(recipeId)}/rating`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders,
+    },
+    body: JSON.stringify({ rating }),
+  });
+  return parseResponse(response);
+}
+
+export async function postLibraryRecipeComment(recipeId: string, body: string): Promise<LibraryRecipeFeedback> {
+  const authHeaders = await buildAuthHeaders();
+  const response = await fetch(`/api/library/meal/${encodeURIComponent(recipeId)}/comments`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders,
+    },
+    body: JSON.stringify({ body }),
+  });
+  return parseResponse(response);
+}
+
+export async function reportLibraryRecipe(params: {
+  recipeId: string;
+  reason: string;
+  detail?: string;
+}): Promise<{ ok: boolean; hiddenForReview: boolean; message: string }> {
+  const authHeaders = await buildAuthHeaders();
+  const response = await fetch(`/api/library/meal/${encodeURIComponent(params.recipeId)}/report`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders,
+    },
+    body: JSON.stringify({ reason: params.reason, detail: params.detail || "" }),
+  });
+  return parseResponse(response);
+}

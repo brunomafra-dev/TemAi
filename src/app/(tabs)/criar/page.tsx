@@ -88,7 +88,7 @@ export default function CreatePage() {
   const [ingredientsText, setIngredientsText] = useState("");
   const [stepsText, setStepsText] = useState("");
   const [imageDataUrl, setImageDataUrl] = useState("");
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(true);
   const [isSaveChoiceOpen, setIsSaveChoiceOpen] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isPolishing, setIsPolishing] = useState(false);
@@ -125,7 +125,7 @@ export default function CreatePage() {
     setIngredientsText("");
     setStepsText("");
     setImageDataUrl("");
-    setIsDetailsOpen(false);
+    setIsDetailsOpen(true);
   }
 
   function buildManualRecipe(): Recipe {
@@ -144,8 +144,13 @@ export default function CreatePage() {
   }
 
   async function polishRecipeWithAi() {
+    if (!isPremiumUser()) {
+      setSaveFeedback("Organizar receita com IA é um recurso Premium.");
+      return;
+    }
+
     if (!title.trim() || !ingredientsText.trim() || !stepsText.trim()) {
-      setSaveFeedback("Preencha titulo, ingredientes e preparo antes de organizar com IA.");
+      setSaveFeedback("Preencha título, ingredientes e preparo antes de organizar com IA.");
       return;
     }
 
@@ -219,7 +224,7 @@ export default function CreatePage() {
       .split(/,|\n/g)
       .map((item) => item.trim())
       .filter(Boolean)
-      .join(", ");
+      .join("\n");
   }
 
   function formatStepsFromVoice(raw: string): string {
@@ -310,6 +315,13 @@ export default function CreatePage() {
       return;
     }
 
+    if (!isPremiumUser()) {
+      setSaveFeedback("Receita salva em Minhas receitas. Publicar na Biblioteca é um recurso Premium.");
+      setIsSaveChoiceOpen(false);
+      clearForm();
+      return;
+    }
+
     setIsPublishing(true);
     try {
       const authHeaders = await buildAuthHeaders();
@@ -383,7 +395,7 @@ export default function CreatePage() {
         <CardHeader>
           <CardTitle className="font-display text-2xl text-[#2A1E17]">Nova receita</CardTitle>
           <CardDescription>
-            Comece pelo nome. Depois, adicione os detalhes quando quiser.
+            Preencha título, ingredientes e modo de preparo no mesmo fluxo.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -393,7 +405,7 @@ export default function CreatePage() {
             </p>
             <div className="space-y-3">
               <Input
-                placeholder="Titulo da receita"
+                placeholder="Título da receita"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 className="h-11 border-[#E5D7C1] bg-[#FAF5EC]"
@@ -404,7 +416,7 @@ export default function CreatePage() {
           <div className="rounded-2xl border border-[#EADFCC] bg-[#FFF9EF] p-4">
             <div className="flex items-center justify-between gap-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8A7351]">
-                Adicionar
+                Receita
               </p>
               <Button
                 type="button"
@@ -412,7 +424,7 @@ export default function CreatePage() {
                 className="h-8 border-[#E5D7C1] bg-[#FFFCF7] px-3 text-xs"
                 onClick={() => setIsDetailsOpen((current) => !current)}
               >
-                {isDetailsOpen ? "Ocultar" : "Adicionar"}
+                {isDetailsOpen ? "Ocultar" : "Editar"}
               </Button>
             </div>
             {!isDetailsOpen ? (
@@ -427,12 +439,17 @@ export default function CreatePage() {
                   onChange={(event) => setDescription(event.target.value)}
                   className="min-h-[84px] border-[#E5D7C1] bg-[#FAF5EC]"
                 />
-                <Textarea
-                  placeholder="Ingredientes separados por virgula"
-                  value={ingredientsText}
-                  onChange={(event) => setIngredientsText(event.target.value)}
-                  className="min-h-[96px] border-[#E5D7C1] bg-[#FAF5EC]"
-                />
+                <div className="space-y-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8A7351]">
+                    Ingredientes
+                  </p>
+                  <Textarea
+                    placeholder={"1 xícara de arroz\n2 ovos\n1 fio de azeite"}
+                    value={ingredientsText}
+                    onChange={(event) => setIngredientsText(event.target.value)}
+                    className="min-h-[96px] border-[#E5D7C1] bg-[#FAF5EC]"
+                  />
+                </div>
                 <div className="flex gap-2">
                   <Button
                     type="button"
@@ -443,12 +460,17 @@ export default function CreatePage() {
                     {voiceTarget === "ingredients" ? "Parar voz (ingredientes)" : "Adicionar ingredientes por voz"}
                   </Button>
                 </div>
-                <Textarea
-                  placeholder="Modo de preparo (um passo por linha)"
-                  value={stepsText}
-                  onChange={(event) => setStepsText(event.target.value)}
-                  className="min-h-[135px] border-[#E5D7C1] bg-[#FAF5EC]"
-                />
+                <div className="space-y-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8A7351]">
+                    Modo de preparo
+                  </p>
+                  <Textarea
+                    placeholder="Escreva um passo por linha."
+                    value={stepsText}
+                    onChange={(event) => setStepsText(event.target.value)}
+                    className="min-h-[135px] border-[#E5D7C1] bg-[#FAF5EC]"
+                  />
+                </div>
                 <div className="flex gap-2">
                   <Button
                     type="button"
@@ -587,13 +609,18 @@ export default function CreatePage() {
               </button>
             </div>
             <p className="mt-1 text-sm text-[#7E7366]">
-              Deseja disponibilizar esta receita na Biblioteca para outros usuarios?
+              Deseja disponibilizar esta receita na Biblioteca para outros usuários?
             </p>
+            {!isPremiumUser() ? (
+              <p className="mt-2 rounded-xl border border-[#E5D7C1] bg-[#FAF5EC] px-3 py-2 text-xs text-[#6A5E52]">
+                No plano Free, a receita fica salva apenas em Minhas receitas. Publicar na Biblioteca é Premium.
+              </p>
+            ) : null}
             <div className="mt-4 grid gap-2">
               <Button
                 type="button"
                 className="h-11 rounded-2xl bg-[#C66A3D] text-[#FFF9EE] hover:brightness-95"
-                onClick={() => handleSave(false)}
+                onClick={() => handleSave(true)}
                 disabled={isPublishing}
               >
                 Salvar só em Minhas receitas
@@ -601,8 +628,8 @@ export default function CreatePage() {
               <Button
                 type="button"
                 className="h-11 rounded-2xl bg-[#2A1E17] text-[#FFF9EE] hover:brightness-110"
-                onClick={() => handleSave(true)}
-                disabled={isPublishing}
+                onClick={() => handleSave(false)}
+                disabled={isPublishing || !isPremiumUser()}
               >
                 {isPublishing ? "Publicando..." : "Salvar e publicar na Biblioteca"}
               </Button>

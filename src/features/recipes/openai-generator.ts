@@ -97,7 +97,7 @@ async function callOpenAiJson(params: {
       normalized.includes("billing") ||
       normalized.includes("credit")
     ) {
-      throw new OpenAiGenerationError("IA indisponivel: verifique creditos/billing da OpenAI.", 402);
+      throw new OpenAiGenerationError("IA indisponível: verifique créditos/billing da OpenAI.", 402);
     }
 
     throw new OpenAiGenerationError(message, response.status);
@@ -156,7 +156,7 @@ function normalizeSuggestion(value: unknown, fallbackId: string): RecipeSuggesti
   return {
     id: typeof item.id === "string" && item.id.trim() ? item.id.trim() : fallbackId,
     title: typeof item.title === "string" ? item.title.trim() : "Receita sugerida",
-    description: typeof item.description === "string" ? item.description.trim() : "Sugestao criada pela IA.",
+    description: typeof item.description === "string" ? item.description.trim() : "Sugestão criada pela IA.",
     matchedIngredients: Array.isArray(item.matchedIngredients)
       ? item.matchedIngredients.filter((entry): entry is string => typeof entry === "string")
       : [],
@@ -247,7 +247,7 @@ Regras:
     {
       "id": "slug-curto",
       "title": "Nome da receita",
-      "description": "Descricao curta",
+      "description": "Descrição curta",
       "matchedIngredients": ["ingrediente usado"],
       "missingIngredients": ["ingrediente faltante"]
     }
@@ -313,7 +313,7 @@ export async function transcribeAudioWithOpenAi(
     const message = payload.error?.message || "Falha ao transcrever audio.";
     const normalized = message.toLowerCase();
     if (response.status === 402 || response.status === 429 || normalized.includes("quota") || normalized.includes("billing")) {
-      throw new OpenAiGenerationError("IA indisponivel: verifique creditos/billing da OpenAI.", 402);
+      throw new OpenAiGenerationError("IA indisponível: verifique créditos/billing da OpenAI.", 402);
     }
     throw new OpenAiGenerationError(message, response.status);
   }
@@ -405,7 +405,7 @@ Regras:
 {
   "id": "slug-curto",
   "title": "Nome",
-  "description": "Descricao curta",
+  "description": "Descrição curta",
   "ingredients": ["ingrediente"],
   "steps": ["passo"],
   "prepMinutes": 20,
@@ -460,17 +460,17 @@ export async function polishAuthorRecipeWithOpenAi(params: {
   const parsed = (await callOpenAiJson({
     model: serverEnv.openaiAuthorRecipeModel(),
     prompt: `
-Organize uma receita autoral em portugues brasileiro, mantendo a ideia do usuario.
+Organize uma receita autoral em português brasileiro, mantendo a ideia do usuário.
 
-Titulo: ${params.title}
-Descricao atual: ${params.description}
+Título: ${params.title}
+Descrição atual: ${params.description}
 Ingredientes/transcricao: ${params.ingredientsText}
 Preparo/transcricao: ${params.stepsText}
 
 Retorne apenas JSON valido:
 {
   "description": "descricao curta bonita",
-  "ingredientsText": "um ingrediente por linha, com quantidade quando possivel",
+  "ingredientsText": "um ingrediente por linha, com quantidade quando possível",
   "stepsText": "um passo didatico por linha, com tempos, ponto visual, fogo/forno e temperatura quando aplicavel",
   "prepMinutes": 30,
   "servings": 2
@@ -499,12 +499,12 @@ export async function answerSupportWithOpenAi(message: string, userId?: string):
   return callOpenAiText({
     model: serverEnv.openaiSupportModel(),
     prompt: `
-Voce e o agente de suporte do app TemAi. Responda em portugues brasileiro, com clareza e gentileza.
-Ajude com login, cadastro, exclusao de conta, assinatura, limites de IA, foto/audio/texto, receitas e privacidade.
-Se for problema sensivel de conta/cobranca, oriente a abrir ticket e enviar email da conta, print e descricao.
-Nao invente politicas legais ou promessas de reembolso.
+Você é o agente de suporte do app TemAi. Responda em português brasileiro, com clareza e gentileza.
+Ajude com login, cadastro, exclusão de conta, assinatura, limites de IA, foto/áudio/texto, receitas e privacidade.
+Se for problema sensível de conta/cobrança, oriente a abrir ticket e enviar email da conta, print e descrição.
+Não invente políticas legais ou promessas de reembolso.
 
-Usuario: ${message}
+Usuário: ${message}
 `,
     maxOutputTokens: 500,
     telemetry: {

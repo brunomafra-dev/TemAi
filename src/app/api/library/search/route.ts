@@ -54,7 +54,7 @@ export async function GET(request: Request) {
       pattern: /^[a-z0-9_-]*$/i,
     });
     const page = readIntParam(url.searchParams.get("page"), {
-      fieldName: "Pagina",
+      fieldName: "Página",
       min: 1,
       max: 5000,
       fallback: 1,
