@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  deleteLibraryRecipeComment,
   fetchFullRecipe,
   fetchLibraryRecipeFeedback,
   postLibraryRecipeComment,
@@ -16,6 +17,7 @@ import {
   reportLibraryRecipe,
   reportLibraryRecipeComment,
   saveLibraryRecipeRating,
+  updateLibraryRecipeComment,
   type LibraryRecipeFeedback,
 } from "@/features/recipes/api-client";
 import { LIBRARY_RECIPES } from "@/features/recipes/library-recipes";
@@ -342,6 +344,9 @@ export default function RecipeDetailsPage() {
   const [commentReportReason, setCommentReportReason] = useState("inappropriate");
   const [commentReportDetail, setCommentReportDetail] = useState("");
   const [isReportingComment, setIsReportingComment] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState("");
+  const [editingCommentText, setEditingCommentText] = useState("");
+  const [isMutatingComment, setIsMutatingComment] = useState(false);
   const [isShoppingOpen, setIsShoppingOpen] = useState(false);
   const [ownedIngredients, setOwnedIngredients] = useState<Record<string, boolean>>({});
   const [shoppingMessage, setShoppingMessage] = useState("");
@@ -732,6 +737,63 @@ export default function RecipeDetailsPage() {
     }
   }
 
+  function startEditComment(commentId: string, body: string) {
+    setReportingCommentId("");
+    setEditingCommentId(commentId);
+    setEditingCommentText(body);
+    setFeedbackMessage("");
+  }
+
+  async function submitCommentEdit(commentId: string) {
+    if (!recipe || origin !== "library" || isMutatingComment) return;
+    const body = editingCommentText.trim();
+    if (body.length < 3) {
+      setFeedbackMessage("Escreva um comentário um pouco mais completo.");
+      return;
+    }
+
+    setIsMutatingComment(true);
+    setFeedbackMessage("");
+    try {
+      const feedback = await updateLibraryRecipeComment({
+        recipeId: recipe.id,
+        commentId,
+        body,
+      });
+      setLibraryFeedback(feedback);
+      setEditingCommentId("");
+      setEditingCommentText("");
+      setFeedbackMessage("Comentário atualizado.");
+    } catch (error) {
+      setFeedbackMessage(error instanceof Error ? error.message : "Não foi possível editar comentário.");
+    } finally {
+      setIsMutatingComment(false);
+    }
+  }
+
+  async function deleteComment(commentId: string) {
+    if (!recipe || origin !== "library" || isMutatingComment) return;
+    const confirmed = window.confirm("Excluir este comentário?");
+    if (!confirmed) return;
+
+    setIsMutatingComment(true);
+    setFeedbackMessage("");
+    try {
+      const feedback = await deleteLibraryRecipeComment({
+        recipeId: recipe.id,
+        commentId,
+      });
+      setLibraryFeedback(feedback);
+      setEditingCommentId("");
+      setEditingCommentText("");
+      setFeedbackMessage("Comentário excluído.");
+    } catch (error) {
+      setFeedbackMessage(error instanceof Error ? error.message : "Não foi possível excluir comentário.");
+    } finally {
+      setIsMutatingComment(false);
+    }
+  }
+
   function openShoppingSelector() {
     if (!recipe) return;
     setOwnedIngredients(
@@ -1113,26 +1175,79 @@ export default function RecipeDetailsPage() {
                             ) : null}
                           </div>
                         </div>
-                        <p className="mt-2 text-sm leading-relaxed text-[#5D5248]">{comment.body}</p>
+                        {editingCommentId === comment.id ? (
+                          <div className="space-y-2">
+                            <textarea
+                              value={editingCommentText}
+                              onChange={(event) => setEditingCommentText(event.target.value)}
+                              className="min-h-[84px] w-full rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm"
+                            />
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                              <Button
+                                className="w-full"
+                                onClick={() => void submitCommentEdit(comment.id)}
+                                disabled={isMutatingComment}
+                              >
+                                {isMutatingComment ? "Salvando..." : "Salvar edição"}
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                className="w-full"
+                                onClick={() => {
+                                  setEditingCommentId("");
+                                  setEditingCommentText("");
+                                }}
+                                disabled={isMutatingComment}
+                              >
+                                Cancelar
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="mt-2 text-sm leading-relaxed text-[#5D5248]">{comment.body}</p>
+                        )}
                         <div className="flex flex-wrap items-center gap-3 border-t border-[#E5D7BF] pt-2">
-                          <button
-                            type="button"
-                            className="text-xs font-semibold text-[#7A6D60]"
-                            onClick={() => hideComment(comment.id)}
-                          >
-                            Ocultar
-                          </button>
-                          <button
-                            type="button"
-                            className="text-xs font-semibold text-[#9A4635]"
-                            onClick={() => {
-                              setReportingCommentId((current) => (current === comment.id ? "" : comment.id));
-                              setCommentReportReason("inappropriate");
-                              setCommentReportDetail("");
-                            }}
-                          >
-                            Denunciar
-                          </button>
+                          {comment.isMine ? (
+                            <>
+                              <button
+                                type="button"
+                                className="text-xs font-semibold text-[#7A6D60]"
+                                onClick={() => startEditComment(comment.id, comment.body)}
+                                disabled={isMutatingComment}
+                              >
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                className="text-xs font-semibold text-[#9A4635]"
+                                onClick={() => void deleteComment(comment.id)}
+                                disabled={isMutatingComment}
+                              >
+                                Excluir
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                className="text-xs font-semibold text-[#7A6D60]"
+                                onClick={() => hideComment(comment.id)}
+                              >
+                                Ocultar
+                              </button>
+                              <button
+                                type="button"
+                                className="text-xs font-semibold text-[#9A4635]"
+                                onClick={() => {
+                                  setReportingCommentId((current) => (current === comment.id ? "" : comment.id));
+                                  setCommentReportReason("inappropriate");
+                                  setCommentReportDetail("");
+                                }}
+                              >
+                                Denunciar
+                              </button>
+                            </>
+                          )}
                         </div>
                         {reportingCommentId === comment.id ? (
                           <div className="space-y-2 rounded-2xl border border-[#E5D7BF] bg-white p-3">

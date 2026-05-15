@@ -22,6 +22,7 @@ export type RecipeCommentView = {
   authorUsername?: string;
   authorAvatarUrl?: string;
   createdAt: string;
+  isMine: boolean;
 };
 
 export type LibraryRecipeRow = {
@@ -44,6 +45,7 @@ type CommentRow = {
   author_username: string | null;
   author_avatar_url: string | null;
   created_at: string;
+  user_id: string | null;
 };
 
 type CommentWithRecipeRow = CommentRow & {
@@ -72,7 +74,7 @@ function toUiRating(value: number | string): number {
   return Math.max(1, Math.min(10, Math.round(numeric * 2)));
 }
 
-function mapComment(row: CommentRow): RecipeCommentView {
+function mapComment(row: CommentRow, currentUserId?: string): RecipeCommentView {
   return {
     id: row.id,
     body: row.body,
@@ -80,6 +82,7 @@ function mapComment(row: CommentRow): RecipeCommentView {
     authorUsername: row.author_username || undefined,
     authorAvatarUrl: row.author_avatar_url || undefined,
     createdAt: row.created_at,
+    isMine: Boolean(currentUserId && row.user_id === currentUserId),
   };
 }
 
@@ -98,7 +101,7 @@ export async function getLibraryRecipeFeedback(params: {
       .eq("recipe_id", recipe.id),
     supabase
       .from("recipe_comments")
-      .select("id,body,author_name,author_username,author_avatar_url,created_at")
+      .select("id,body,author_name,author_username,author_avatar_url,created_at,user_id")
       .eq("recipe_id", recipe.id)
       .eq("status", "visible")
       .order("created_at", { ascending: false })
@@ -116,7 +119,7 @@ export async function getLibraryRecipeFeedback(params: {
     averageRating: average > 0 ? Number((average * 2).toFixed(1)) : 0,
     ratingCount: ratings.length,
     userRating: userRatingRow ? toUiRating(userRatingRow.rating) : 0,
-    comments: ((commentsRes.data || []) as CommentRow[]).map(mapComment),
+    comments: ((commentsRes.data || []) as CommentRow[]).map((row) => mapComment(row, params.userId)),
   };
 }
 
@@ -261,6 +264,77 @@ export async function insertLibraryRecipeComment(params: {
       metadata: { recipeSlug: recipe.slug },
     }).catch(() => undefined);
   }
+
+  return getLibraryRecipeFeedback({ recipeSlug: params.recipeSlug, userId: params.userId });
+}
+
+export async function updateLibraryRecipeComment(params: {
+  recipeSlug: string;
+  commentId: string;
+  userId: string;
+  body: string;
+  moderationResult: Record<string, unknown>;
+}): Promise<LibraryRecipeFeedback | null> {
+  const recipe = await resolveApprovedRecipe(params.recipeSlug);
+  if (!recipe) return null;
+
+  const supabase = getSupabaseServiceRoleClient();
+  const { data } = await supabase
+    .from("recipe_comments")
+    .select("id,user_id")
+    .eq("id", params.commentId)
+    .eq("recipe_id", recipe.id)
+    .eq("status", "visible")
+    .maybeSingle();
+
+  const comment = data as { id: string; user_id: string | null } | null;
+  if (!comment) return null;
+  if (comment.user_id !== params.userId) {
+    throw new Error("Você só pode editar seus próprios comentários.");
+  }
+
+  const { error } = await supabase
+    .from("recipe_comments")
+    .update({
+      body: params.body,
+      moderation_result: params.moderationResult,
+    })
+    .eq("id", params.commentId)
+    .eq("user_id", params.userId);
+  if (error) throw error;
+
+  return getLibraryRecipeFeedback({ recipeSlug: params.recipeSlug, userId: params.userId });
+}
+
+export async function deleteLibraryRecipeComment(params: {
+  recipeSlug: string;
+  commentId: string;
+  userId: string;
+}): Promise<LibraryRecipeFeedback | null> {
+  const recipe = await resolveApprovedRecipe(params.recipeSlug);
+  if (!recipe) return null;
+
+  const supabase = getSupabaseServiceRoleClient();
+  const { data } = await supabase
+    .from("recipe_comments")
+    .select("id,user_id")
+    .eq("id", params.commentId)
+    .eq("recipe_id", recipe.id)
+    .eq("status", "visible")
+    .maybeSingle();
+
+  const comment = data as { id: string; user_id: string | null } | null;
+  if (!comment) return null;
+  if (comment.user_id !== params.userId) {
+    throw new Error("Você só pode excluir seus próprios comentários.");
+  }
+
+  const { error } = await supabase
+    .from("recipe_comments")
+    .update({ status: "hidden" })
+    .eq("id", params.commentId)
+    .eq("user_id", params.userId);
+  if (error) throw error;
 
   return getLibraryRecipeFeedback({ recipeSlug: params.recipeSlug, userId: params.userId });
 }

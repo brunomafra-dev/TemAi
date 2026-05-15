@@ -96,6 +96,7 @@ export type RecipeCommentView = {
   authorUsername?: string;
   authorAvatarUrl?: string;
   createdAt: string;
+  isMine: boolean;
 };
 
 export type LibraryRecipeFeedback = {
@@ -169,6 +170,41 @@ export async function postLibraryRecipeComment(recipeId: string, body: string): 
     },
     body: JSON.stringify({ body }),
   });
+  return parseResponse(response);
+}
+
+export async function updateLibraryRecipeComment(params: {
+  recipeId: string;
+  commentId: string;
+  body: string;
+}): Promise<LibraryRecipeFeedback> {
+  const authHeaders = await buildAuthHeaders();
+  const response = await fetch(
+    `/api/library/meal/${encodeURIComponent(params.recipeId)}/comments/${encodeURIComponent(params.commentId)}`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders,
+      },
+      body: JSON.stringify({ body: params.body }),
+    },
+  );
+  return parseResponse(response);
+}
+
+export async function deleteLibraryRecipeComment(params: {
+  recipeId: string;
+  commentId: string;
+}): Promise<LibraryRecipeFeedback> {
+  const authHeaders = await buildAuthHeaders();
+  const response = await fetch(
+    `/api/library/meal/${encodeURIComponent(params.recipeId)}/comments/${encodeURIComponent(params.commentId)}`,
+    {
+      method: "DELETE",
+      headers: authHeaders,
+    },
+  );
   return parseResponse(response);
 }
 
