@@ -42,7 +42,7 @@ interface SuggestionsPayload {
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 15 * 1024 * 1024;
 const MAX_MULTIPART_BYTES = 16 * 1024 * 1024;
-const RECIPE_FILTERS: readonly RecipeSuggestionFilter[] = ["all", "meal", "vegetarian", "dessert", "drink"];
+const RECIPE_FILTERS: readonly RecipeSuggestionFilter[] = ["all", "meal", "fit", "vegetarian", "dessert", "drink"];
 const TITLE_STOP_WORDS = new Set([
   "a",
   "as",

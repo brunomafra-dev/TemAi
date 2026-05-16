@@ -5,7 +5,7 @@ import {
   generateFullRecipeWithOpenAi,
   isOpenAiGenerationError,
 } from "@/features/recipes/openai-generator";
-import type { CookingEquipment, Recipe } from "@/features/recipes/types";
+import type { CookingEquipment, Recipe, RecipeSuggestionFilter } from "@/features/recipes/types";
 import {
   COOKING_EQUIPMENT_VALUES,
   DEFAULT_COOKING_EQUIPMENT,
@@ -31,9 +31,12 @@ interface RecipePayload {
   suggestionTitle?: string;
   ingredients?: string[];
   includeNutrition?: boolean;
+  recipeFilter?: RecipeSuggestionFilter;
   cookingEquipment?: unknown;
   generationId?: string;
 }
+
+const RECIPE_FILTERS: readonly RecipeSuggestionFilter[] = ["all", "meal", "fit", "vegetarian", "dessert", "drink"];
 
 const inFlightRecipeRequests = new Map<string, Promise<Recipe>>();
 
@@ -80,6 +83,18 @@ function readCookingEquipment(payload: Record<string, unknown>): CookingEquipmen
   return normalizeCookingEquipment(values);
 }
 
+function readRecipeFilter(raw: unknown): RecipeSuggestionFilter {
+  if (raw === undefined || raw === null || raw === "") return "all";
+  if (typeof raw !== "string") {
+    throw new InputValidationError("Filtro de receita malformado.");
+  }
+  const value = raw.trim() as RecipeSuggestionFilter;
+  if (!RECIPE_FILTERS.includes(value)) {
+    throw new InputValidationError("Filtro de receita invalido.");
+  }
+  return value;
+}
+
 function normalizeCacheText(value: string): string {
   return value
     .trim()
@@ -95,6 +110,7 @@ function buildRecipeCacheKey(params: {
   model: string;
   suggestionTitle: string;
   ingredients: string[];
+  recipeFilter: RecipeSuggestionFilter;
   cookingEquipment: CookingEquipment[];
 }): string {
   const payload = {
@@ -102,6 +118,7 @@ function buildRecipeCacheKey(params: {
     model: params.model,
     title: normalizeCacheText(params.suggestionTitle),
     ingredients: Array.from(new Set(params.ingredients.map(normalizeCacheText).filter(Boolean))).sort(),
+    recipeFilter: params.recipeFilter,
     cookingEquipment: normalizeCookingEquipment(params.cookingEquipment).slice().sort(),
   };
 
@@ -242,7 +259,7 @@ export async function POST(request: Request) {
 
     const payload = (await parseJsonObjectBody(request, {
       maxBytes: 12 * 1024,
-      allowedKeys: ["suggestionId", "suggestionTitle", "ingredients", "includeNutrition", "cookingEquipment", "generationId"],
+      allowedKeys: ["suggestionId", "suggestionTitle", "ingredients", "includeNutrition", "recipeFilter", "cookingEquipment", "generationId"],
     })) as RecipePayload &
       Record<string, unknown>;
     const suggestionId = readRequiredString(payload, "suggestionId", {
@@ -265,6 +282,7 @@ export async function POST(request: Request) {
             minItems: 0,
           });
     const includeNutrition = readOptionalBoolean(payload, "includeNutrition", false);
+    const recipeFilter = readRecipeFilter(payload.recipeFilter);
     const cookingEquipment = readCookingEquipment(payload);
     const generationId = readOptionalString(payload, "generationId", {
       fieldName: "ID da geracao",
@@ -277,6 +295,7 @@ export async function POST(request: Request) {
       model: recipeModel,
       suggestionTitle,
       ingredients,
+      recipeFilter,
       cookingEquipment,
     });
 
@@ -318,6 +337,7 @@ export async function POST(request: Request) {
           suggestionTitle,
           ingredients,
           includeNutrition,
+          recipeFilter,
           cookingEquipment,
           userId,
         }),
@@ -351,6 +371,7 @@ export async function POST(request: Request) {
         suggestionTitle,
         ingredients,
         includeNutrition,
+        recipeFilter,
         cookingEquipment,
         userId,
       }),

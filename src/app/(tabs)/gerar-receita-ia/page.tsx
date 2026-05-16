@@ -43,6 +43,7 @@ const modes: Array<{ value: InputMode; label: string; emoji: string }> = [
 const recipeFilters: Array<{ value: RecipeSuggestionFilter; label: string }> = [
   { value: "all", label: "Sem filtro" },
   { value: "meal", label: "Refeição" },
+  { value: "fit", label: "Fit" },
   { value: "vegetarian", label: "Veggie" },
   { value: "dessert", label: "Sobremesa" },
   { value: "drink", label: "Bebidas" },
@@ -116,7 +117,7 @@ function isValidMode(value: string | null): value is InputMode {
 }
 
 function isValidRecipeFilter(value: unknown): value is RecipeSuggestionFilter {
-  return value === "all" || value === "meal" || value === "vegetarian" || value === "dessert" || value === "drink";
+  return value === "all" || value === "meal" || value === "fit" || value === "vegetarian" || value === "dessert" || value === "drink";
 }
 
 function normalizeSuggestionKey(value: string): string {
@@ -657,9 +658,10 @@ function CreateRecipePageContent() {
     const nutritionFlag = includeNutritionEstimate ? "&nutrition=1" : "";
     const generationFlag = generationId ? `&generationId=${encodeURIComponent(generationId)}` : "";
     const equipmentFlag = `&equipment=${encodeURIComponent(cookingEquipment.join(","))}`;
+    const filterFlag = `&filter=${encodeURIComponent(recipeFilter)}`;
     const titleQuery = encodeURIComponent(suggestion.title);
-    router.push(`/receita/${suggestion.id}?origin=ai&ingredients=${encodeURIComponent(ingredientsQuery)}&title=${titleQuery}${nutritionFlag}${generationFlag}${equipmentFlag}`);
-  }, [cookingEquipment, includeNutritionEstimate, response?.normalizedIngredients, router]);
+    router.push(`/receita/${suggestion.id}?origin=ai&ingredients=${encodeURIComponent(ingredientsQuery)}&title=${titleQuery}${nutritionFlag}${generationFlag}${equipmentFlag}${filterFlag}`);
+  }, [cookingEquipment, includeNutritionEstimate, recipeFilter, response?.normalizedIngredients, router]);
 
   const pickFromCamera = useCallback(() => {
     cameraInputRef.current?.click();

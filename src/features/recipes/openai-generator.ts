@@ -16,8 +16,8 @@ import {
   logOpenAiTelemetry,
 } from "@/features/security/ai-telemetry";
 
-export const SUGGESTIONS_PROMPT_VERSION = "suggestions-v3-equipment";
-export const FULL_RECIPE_PROMPT_VERSION = "full-recipe-v3-equipment";
+export const SUGGESTIONS_PROMPT_VERSION = "suggestions-v4-fit-equipment";
+export const FULL_RECIPE_PROMPT_VERSION = "full-recipe-v4-fit-equipment";
 
 class OpenAiGenerationError extends Error {
   status: number;
@@ -174,6 +174,8 @@ function recipeFilterInstruction(recipeFilter: RecipeSuggestionFilter): string {
   switch (recipeFilter) {
     case "meal":
       return "Filtro escolhido: Refeicao. Gere pratos principais salgados para almoco ou jantar; evite bebidas e sobremesas.";
+    case "fit":
+      return "Filtro escolhido: Fit/Saudavel. Gere receitas equilibradas para quem treina ou busca alimentacao mais leve: priorize proteina, vegetais, fibras e carboidratos de boa qualidade quando fizer sentido. Evite fritura pesada, excesso de acucar, excesso de creme/queijo/embutidos e ultraprocessados. Nao transforme automaticamente em low carb, vegano ou sem gordura; a receita deve continuar saborosa, pratica e viavel com os ingredientes informados.";
     case "vegetarian":
       return "Filtro escolhido: Vegano/Vegetariano. Nao use carne, frango, peixe, frutos do mar, bacon, presunto ou embutidos. Ovos, leite e queijo podem ser usados se estiverem nos ingredientes.";
     case "dessert":
@@ -376,16 +378,20 @@ export async function generateFullRecipeWithOpenAi(params: {
   suggestionTitle: string;
   ingredients: string[];
   includeNutrition: boolean;
+  recipeFilter?: RecipeSuggestionFilter;
   cookingEquipment?: CookingEquipment[];
   userId?: string;
 }): Promise<Recipe> {
   const cookingEquipment = normalizeCookingEquipment(params.cookingEquipment);
+  const recipeFilter = params.recipeFilter || "all";
   const prompt = `
 Crie uma receita completa em portugues brasileiro.
 
 Receita escolhida: ${params.suggestionTitle}
 Ingredientes disponiveis:
 ${params.ingredients.map((item) => `- ${item}`).join("\n")}
+
+${recipeFilterInstruction(recipeFilter)}
 
 ${cookingEquipmentInstruction(cookingEquipment)}
 
@@ -428,6 +434,7 @@ Regras:
       metadata: {
         promptVersion: FULL_RECIPE_PROMPT_VERSION,
         includeNutrition: params.includeNutrition,
+        recipeFilter,
         cookingEquipment,
       },
     },
