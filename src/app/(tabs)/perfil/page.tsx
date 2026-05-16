@@ -14,6 +14,7 @@ import {
   normalizeAuthorHandle,
 } from "@/features/profile/badges-cloud";
 import { getNotificationPrefs, saveNotificationPrefs } from "@/features/profile/notifications-storage";
+import { prepareProfilePhoto } from "@/features/profile/photo";
 import { createSupportTicket, getMySupportTickets, type SupportTicket } from "@/features/profile/support-tickets";
 import { getSubscriptionState, syncSubscriptionFromCloud, type SubscriptionState } from "@/features/profile/subscription-storage";
 import {
@@ -59,8 +60,6 @@ const notificationItems = [
   { key: "publishSuccess", label: "Receita publicada com sucesso" },
   { key: "shoppingUpdates", label: "Atualizações da lista de compras" },
 ] as const;
-
-const MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024;
 
 type SectionId = (typeof sections)[number]["id"];
 type SupportQuickOption =
@@ -336,26 +335,18 @@ export default function ProfilePage() {
     }, 180);
   }, []);
 
-  function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setProfileMessage("Escolha uma imagem válida.");
-      return;
+    setProfileMessage("Processando foto...");
+    try {
+      const result = await prepareProfilePhoto(file);
+      setWorkingProfile((current) => ({ ...current, photoDataUrl: result }));
+      setProfileMessage("Foto pronta. Toque em Salvar alterações.");
+    } catch (error) {
+      setProfileMessage(error instanceof Error ? error.message : "Não foi possível carregar a imagem.");
     }
-    if (file.size > MAX_PROFILE_PHOTO_BYTES) {
-      setProfileMessage("Use uma imagem de até 2 MB.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result === "string") {
-        setWorkingProfile((current) => ({ ...current, photoDataUrl: result }));
-      }
-    };
-    reader.readAsDataURL(file);
   }
 
   async function saveProfileChanges() {

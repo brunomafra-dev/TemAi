@@ -12,6 +12,7 @@ import {
   saveUserProfileToCloud,
   syncUserProfileFromCloud,
 } from "@/features/profile/storage";
+import { prepareProfilePhoto } from "@/features/profile/photo";
 import {
   fetchUserNotifications,
   markUserNotificationsRead,
@@ -81,7 +82,6 @@ const categories = [
 ];
 
 const popularCategories = ["principais", "veggie", "massas", "kids", "sobremesas", "lanches", "bebidas"] as const;
-const MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024;
 type Category = (typeof categories)[number];
 
 const libraryMetaById: Record<
@@ -445,39 +445,24 @@ export default function HomePage() {
     profilePhotoInputRef.current?.click();
   }, []);
 
-  const handleProfilePhotoChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleProfilePhotoChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      setProfilePhotoMessage("Escolha uma imagem válida.");
-      return;
-    }
-
-    if (file.size > MAX_PROFILE_PHOTO_BYTES) {
-      setProfilePhotoMessage("Use uma imagem de até 2 MB.");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result !== "string") {
-        setProfilePhotoMessage("Não foi possível carregar a imagem.");
-        return;
-      }
-
+    setProfilePhotoMessage("Processando foto...");
+    try {
+      const result = await prepareProfilePhoto(file);
       const nextProfile = { ...getUserProfile(), photoDataUrl: result };
       saveUserProfile(nextProfile);
       setProfile(nextProfile);
-      setProfilePhotoMessage("Foto atualizada.");
-      void saveUserProfileToCloud(nextProfile);
-    };
-    reader.onerror = () => {
-      setProfilePhotoMessage("Não foi possível carregar a imagem.");
-    };
-    reader.readAsDataURL(file);
+      const synced = await saveUserProfileToCloud(nextProfile);
+      setProfilePhotoMessage(
+        synced ? "Foto atualizada." : "Foto salva neste aparelho. Entre na conta para sincronizar.",
+      );
+    } catch (error) {
+      setProfilePhotoMessage(error instanceof Error ? error.message : "Não foi possível carregar a imagem.");
+    }
   }, []);
 
   const fallbackPopularRecipes = useMemo(() => {
