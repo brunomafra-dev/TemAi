@@ -281,7 +281,7 @@ export async function searchRecipesFromSupabase(params: {
   }
   query += "&limit=5000";
 
-  const response = await supabaseFetch(query);
+  const response = await supabaseFetch(query, { cache: "no-store" });
   const rows = (await response.json()) as SupabaseRecipeRow[];
   const mapped = rows.map(mapRowToRecipe);
   const searchTokens = search ? tokenizeSearchText(search) : [];
@@ -343,6 +343,7 @@ export async function getRecipeBySlugFromSupabase(slug: string): Promise<Recipe 
 
   const response = await supabaseFetch(
     `recipes_br?select=id,slug,title,description,category,ingredients,steps,prep_minutes,servings,image_url,source_name&slug=eq.${encodeURIComponent(slug)}&is_published=eq.true&moderation_status=eq.approved&limit=1`,
+    { cache: "no-store" },
   );
   const rows = (await response.json()) as SupabaseRecipeRow[];
   if (!rows.length) return null;
