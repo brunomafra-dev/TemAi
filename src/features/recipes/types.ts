@@ -1,6 +1,7 @@
 export type InputMode = "text" | "audio" | "photo";
 export type RecipeSuggestionFilter = "all" | "meal" | "fit" | "vegetarian" | "dessert" | "drink";
 export type CookingEquipment = "stove" | "oven" | "air_fryer" | "microwave" | "blender";
+export type RecipeDifficulty = "Fácil" | "Médio" | "Avançado";
 export type LibraryCategory =
   | "principais"
   | "veggie"
@@ -38,6 +39,7 @@ export interface Recipe {
   steps: string[];
   prepMinutes: number;
   servings: number;
+  difficulty?: RecipeDifficulty;
   imageUrl?: string;
   nutrition?: NutritionEstimate;
   sourceLabel: string;

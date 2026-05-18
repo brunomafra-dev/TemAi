@@ -20,6 +20,7 @@ import {
   type UserNotificationView,
 } from "@/features/recipes/api-client";
 import { LIBRARY_RECIPES } from "@/features/recipes/library-recipes";
+import { getRecipeDifficulty } from "@/features/recipes/quality";
 import {
   clearCheckedShoppingItems,
   getPendingShoppingCount,
@@ -200,6 +201,8 @@ const CategoryButton = memo(function CategoryButton({
 CategoryButton.displayName = "CategoryButton";
 
 const PopularRecipeCard = memo(function PopularRecipeCard({ entry }: { entry: PopularRecipeEntry }) {
+  const difficulty = entry.recipe.difficulty || getRecipeDifficulty(entry.recipe);
+
   return (
     <Link
       href={`/receita/${entry.recipe.id}?origin=library`}
@@ -220,6 +223,9 @@ const PopularRecipeCard = memo(function PopularRecipeCard({ entry }: { entry: Po
               ★ {entry.ratingAverage.toFixed(1)}
             </span>
           ) : null}
+          <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold text-white">
+            {difficulty}
+          </span>
         </div>
       </div>
       <div className="flex flex-1 flex-col justify-between p-3">
@@ -635,7 +641,7 @@ export default function HomePage() {
                   submitSearch();
                 }
               }}
-              placeholder="Busque por receitas e ingredientes..."
+              placeholder="Busque receitas de usuários..."
               className="h-12 w-full rounded-full border-0 bg-[#F5F1E8] pl-11 pr-4 text-sm text-[#2A1E17] shadow-[0_10px_25px_-18px_rgba(0,0,0,0.5)] outline-none placeholder:text-[#9F988D]"
             />
           </div>
@@ -656,7 +662,7 @@ export default function HomePage() {
         <div className="relative z-10 flex items-center justify-between px-6 py-7 text-[#FEF8EF]">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-[#E8D8BD]">Experiência IA</p>
-            <h2 className="mt-2 font-display text-3xl leading-none">Criar receita com IA</h2>
+            <h2 className="mt-2 font-display text-3xl leading-none">Gerar receita com IA</h2>
           </div>
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-2xl">
             ✨
@@ -698,8 +704,14 @@ export default function HomePage() {
       </section>
 
       {isGeneratorMenuOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/45 p-4 sm:items-center sm:justify-center">
-          <div className="max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-[1.8rem] bg-[#FFFCF7] p-5 shadow-2xl sm:max-w-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-end bg-black/45 p-4 sm:items-center sm:justify-center"
+          onClick={closeGeneratorMenu}
+        >
+          <div
+            className="max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-[1.8rem] bg-[#FFFCF7] p-5 shadow-2xl sm:max-w-sm"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-xl font-semibold text-[#2A1E17]">Gerar receita</h3>
               <button onClick={closeGeneratorMenu} className="text-xs font-semibold text-[#7A6D60]">
@@ -735,8 +747,14 @@ export default function HomePage() {
       ) : null}
 
       {isNotificationsOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/45 p-4 sm:items-center sm:justify-center">
-          <div className="max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-[1.8rem] bg-[#FFFCF7] p-5 shadow-2xl sm:max-w-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-end bg-black/45 p-4 sm:items-center sm:justify-center"
+          onClick={() => setIsNotificationsOpen(false)}
+        >
+          <div
+            className="max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-[1.8rem] bg-[#FFFCF7] p-5 shadow-2xl sm:max-w-sm"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-xl font-semibold text-[#2A1E17]">Notificações</h3>
               <button
@@ -789,8 +807,14 @@ export default function HomePage() {
       ) : null}
 
       {isShoppingOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/45 p-4 sm:items-center sm:justify-center">
-          <div className="max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-[1.8rem] bg-[#FFFCF7] p-5 shadow-2xl sm:max-w-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-end bg-black/45 p-4 sm:items-center sm:justify-center"
+          onClick={() => setIsShoppingOpen(false)}
+        >
+          <div
+            className="max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-[1.8rem] bg-[#FFFCF7] p-5 shadow-2xl sm:max-w-sm"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-xl font-semibold text-[#2A1E17]">Lista de compras</h3>
               <button

@@ -11,6 +11,7 @@ import {
   DEFAULT_COOKING_EQUIPMENT,
   normalizeCookingEquipment,
 } from "@/features/recipes/cooking-equipment";
+import { getRecipeDifficulty, normalizePrepMinutesForRecipe } from "@/features/recipes/quality";
 import { aiUsageErrorResponse, consumeAiUsage } from "@/features/security/ai-usage";
 import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse, requireAuthUserId } from "@/features/security/auth-user";
@@ -125,6 +126,21 @@ function buildRecipeCacheKey(params: {
   return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 }
 
+function withRecipeQuality(recipe: Recipe): Recipe {
+  const prepMinutes = normalizePrepMinutesForRecipe({
+    title: recipe.title,
+    ingredients: recipe.ingredients,
+    steps: recipe.steps,
+    prepMinutes: recipe.prepMinutes,
+  });
+
+  return {
+    ...recipe,
+    prepMinutes,
+    difficulty: getRecipeDifficulty({ ...recipe, prepMinutes }),
+  };
+}
+
 async function verifyGeneratedSuggestion(params: {
   userId: string;
   generationId: string;
@@ -159,7 +175,7 @@ async function readGeneratedRecipeCache(params: {
 
   if (error || !Array.isArray(data) || data.length === 0) return null;
   const recipe = (data[0] as { recipe?: unknown }).recipe;
-  return isRecipe(recipe) ? recipe : null;
+  return isRecipe(recipe) ? withRecipeQuality(recipe) : null;
 }
 
 async function readGeneratedRecipeCacheByKey(params: {
@@ -177,7 +193,7 @@ async function readGeneratedRecipeCacheByKey(params: {
 
   if (error || !Array.isArray(data) || data.length === 0) return null;
   const recipe = (data[0] as { recipe?: unknown }).recipe;
-  return isRecipe(recipe) ? recipe : null;
+  return isRecipe(recipe) ? withRecipeQuality(recipe) : null;
 }
 
 async function persistGeneratedRecipeCache(params: {
@@ -199,7 +215,7 @@ async function persistGeneratedRecipeCache(params: {
     prompt_version: FULL_RECIPE_PROMPT_VERSION,
     model: params.model,
     cache_key: params.cacheKey,
-    recipe: params.recipe,
+    recipe: withRecipeQuality(params.recipe),
   };
 
   const { error } = await supabase.from("ai_generated_recipes").upsert(

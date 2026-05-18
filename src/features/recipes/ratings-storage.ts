@@ -39,3 +39,9 @@ export function setUserRecipeRating(recipeId: string, rating: number): void {
   map[recipeId] = rounded;
   saveMap(map);
 }
+
+export function removeUserRecipeRating(recipeId: string): void {
+  const map = getMap();
+  delete map[recipeId];
+  saveMap(map);
+}

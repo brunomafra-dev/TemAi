@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { RecipeCard } from "@/components/recipes/recipe-card";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,9 +29,13 @@ export default function LibraryContent() {
 
   useEffect(() => {
     const fromUrl = searchParams.get("category")?.trim();
+    const queryFromUrl = searchParams.get("q")?.trim();
     const allowed = new Set(libraryFilters.map((item) => item.id));
     if (fromUrl && allowed.has(fromUrl)) {
       setSelectedFilter(fromUrl);
+    }
+    if (queryFromUrl) {
+      setSearch(queryFromUrl);
     }
   }, [searchParams]);
 
@@ -115,7 +120,7 @@ export default function LibraryContent() {
           <p className="text-xs uppercase tracking-[0.2em] text-[#EADBC0]">Curadoria</p>
           <h1 className="mt-2 font-display text-3xl">Biblioteca de receitas</h1>
           <p className="mt-2 max-w-sm text-sm text-[#E6D7BF]">
-            Explore receitas reais com filtros por categoria e navegação por páginas.
+            Explore receitas compartilhadas pela comunidade TemAI e pela curadoria da plataforma.
           </p>
           <div className="mt-4 rounded-full bg-[#F5F1E8] p-1 shadow-[0_10px_25px_-18px_rgba(0,0,0,0.5)]">
             <Input
@@ -152,10 +157,19 @@ export default function LibraryContent() {
         </Card>
       ) : recipes.length === 0 ? (
         <Card className="border-[#E5D7C1] bg-[#FFFCF7] shadow-[0_20px_35px_-25px_rgba(42,30,23,0.7)]">
-          <CardContent className="pt-5">
-            <p className="text-sm text-[#7A6D60]">
-              Nenhuma receita encontrada para a busca atual.
+          <CardContent className="space-y-3 pt-5 text-center">
+            <p className="text-sm font-semibold text-[#5E5348]">
+              Oops! Ainda não temos essa receita na biblioteca.
             </p>
+            <p className="text-xs text-[#7A6D60]">
+              Que tal gerar uma sugestão com IA e transformar essa ideia na primeira?
+            </p>
+            <Link
+              href="/gerar-receita-ia"
+              className="inline-flex h-10 items-center justify-center rounded-full bg-[#C66A3D] px-5 text-sm font-semibold text-[#FFF9EE]"
+            >
+              Gerar receita com IA
+            </Link>
           </CardContent>
         </Card>
       ) : (

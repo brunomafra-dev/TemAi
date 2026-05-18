@@ -162,6 +162,17 @@ export async function saveLibraryRecipeRating(recipeId: string, rating: number):
   return feedback;
 }
 
+export async function deleteLibraryRecipeRating(recipeId: string): Promise<LibraryRecipeFeedback> {
+  const authHeaders = await buildAuthHeaders();
+  const response = await fetch(`/api/library/meal/${encodeURIComponent(recipeId)}/rating`, {
+    method: "DELETE",
+    headers: authHeaders,
+  });
+  const feedback = await parseResponse<LibraryRecipeFeedback>(response);
+  notifyPopularMetricsChanged();
+  return feedback;
+}
+
 export async function postLibraryRecipeComment(recipeId: string, body: string): Promise<LibraryRecipeFeedback> {
   const authHeaders = await buildAuthHeaders();
   const response = await fetch(`/api/library/meal/${encodeURIComponent(recipeId)}/comments`, {

@@ -247,6 +247,25 @@ export async function saveLibraryRecipeRating(params: {
   return getLibraryRecipeFeedback({ recipeSlug: params.recipeSlug, userId: params.userId });
 }
 
+export async function deleteLibraryRecipeRating(params: {
+  recipeSlug: string;
+  userId: string;
+}): Promise<LibraryRecipeFeedback | null> {
+  const recipe = await resolveApprovedRecipe(params.recipeSlug);
+  if (!recipe) return null;
+
+  const supabase = getSupabaseServiceRoleClient();
+  const userFingerprint = `user:${params.userId}`;
+  const { error } = await supabase
+    .from("recipe_ratings")
+    .delete()
+    .eq("recipe_id", recipe.id)
+    .or(`user_id.eq.${params.userId},user_fingerprint.eq.${userFingerprint}`);
+  if (error) throw error;
+
+  return getLibraryRecipeFeedback({ recipeSlug: params.recipeSlug, userId: params.userId });
+}
+
 export async function getUserCommentSnapshot(userId: string): Promise<{
   authorName: string;
   authorUsername?: string;

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   deleteLibraryRecipeComment,
+  deleteLibraryRecipeRating,
   fetchFullRecipe,
   fetchLibraryRecipeFeedback,
   postLibraryRecipeComment,
@@ -35,7 +36,12 @@ import {
   saveSavedRecipeRefToCloud,
   syncSavedRecipeRefsFromCloud,
 } from "@/features/recipes/saved-recipes-cloud";
-import { getUserRecipeRating, setUserRecipeRating } from "@/features/recipes/ratings-storage";
+import {
+  getUserRecipeRating,
+  removeUserRecipeRating,
+  setUserRecipeRating,
+} from "@/features/recipes/ratings-storage";
+import { getRecipeDifficulty } from "@/features/recipes/quality";
 import type { CookingEquipment, Recipe, RecipeSuggestionFilter, SavedRecipeRef } from "@/features/recipes/types";
 import { normalizeCookingEquipment } from "@/features/recipes/cooking-equipment";
 import { parseIngredientsText } from "@/features/recipes/helpers";
@@ -348,6 +354,9 @@ export default function RecipeDetailsPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isSaved, setIsSaved] = useState(false);
   const [userRating, setUserRating] = useState(0);
+  const [draftRating, setDraftRating] = useState(0);
+  const [isRatingOpen, setIsRatingOpen] = useState(false);
+  const [isRatingSaving, setIsRatingSaving] = useState(false);
   const [libraryFeedback, setLibraryFeedback] = useState<LibraryRecipeFeedback | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [commentText, setCommentText] = useState("");
@@ -388,6 +397,11 @@ export default function RecipeDetailsPage() {
     return Math.max(1, recipe.servings * portionMultiplier);
   }, [portionMultiplier, recipe]);
   const scaledServingsLabel = useMemo(() => formatScaledValue(scaledServings), [scaledServings]);
+  const recipeDifficulty = recipe ? recipe.difficulty || getRecipeDifficulty(recipe) : "";
+
+  useEffect(() => {
+    setDraftRating(userRating || 0);
+  }, [userRating]);
   const publicComments = useMemo(() => {
     const hiddenIds = new Set(hiddenCommentIds);
     return (libraryFeedback?.comments ?? []).filter((comment) => !hiddenIds.has(comment.id));
@@ -658,11 +672,19 @@ export default function RecipeDetailsPage() {
     if (!recipe) {
       return;
     }
+    if (rating < 1) {
+      setFeedbackMessage("Escolha uma nota antes de salvar.");
+      return;
+    }
+    setIsRatingSaving(true);
     setUserRecipeRating(recipe.id, rating);
     setUserRating(rating);
     setFeedbackMessage("");
 
     if (origin !== "library") {
+      setFeedbackMessage("Avaliação salva.");
+      setIsRatingOpen(false);
+      setIsRatingSaving(false);
       return;
     }
 
@@ -671,8 +693,41 @@ export default function RecipeDetailsPage() {
       setLibraryFeedback(feedback);
       setUserRating(feedback.userRating || rating);
       setFeedbackMessage("Avaliação salva.");
+      setIsRatingOpen(false);
     } catch (error) {
       setFeedbackMessage(error instanceof Error ? error.message : "Não foi possível salvar avaliação.");
+    } finally {
+      setIsRatingSaving(false);
+    }
+  }
+
+  async function undoRating() {
+    if (!recipe) {
+      return;
+    }
+    setIsRatingSaving(true);
+    removeUserRecipeRating(recipe.id);
+    setUserRating(0);
+    setDraftRating(0);
+    setFeedbackMessage("");
+
+    if (origin !== "library") {
+      setFeedbackMessage("Avaliação desfeita.");
+      setIsRatingOpen(false);
+      setIsRatingSaving(false);
+      return;
+    }
+
+    try {
+      const feedback = await deleteLibraryRecipeRating(recipe.id);
+      setLibraryFeedback(feedback);
+      setUserRating(feedback.userRating || 0);
+      setFeedbackMessage("Avaliação desfeita.");
+      setIsRatingOpen(false);
+    } catch (error) {
+      setFeedbackMessage(error instanceof Error ? error.message : "Não foi possível desfazer avaliação.");
+    } finally {
+      setIsRatingSaving(false);
     }
   }
 
@@ -979,6 +1034,7 @@ export default function RecipeDetailsPage() {
                 <Badge>{recipe.prepMinutes} min</Badge>
                 <Badge>{scaledServingsLabel} porções</Badge>
                 <Badge>Serve ~{scaledServingsLabel} pessoa(s)</Badge>
+                <Badge>{recipeDifficulty}</Badge>
                 <Badge>{recipe.sourceLabel}</Badge>
               </div>
               {recipe.nutrition ? (
@@ -1015,7 +1071,7 @@ export default function RecipeDetailsPage() {
               </div>
               <div>
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#7A6D60]">
-                  Avalie esta Receita
+                  Avaliação
                 </p>
                 {origin === "library" ? (
                   libraryFeedback && libraryFeedback.ratingCount > 0 ? (
@@ -1028,7 +1084,27 @@ export default function RecipeDetailsPage() {
                     </p>
                   )
                 ) : null}
-                <RatingStars value={userRating} onChange={handleRate} />
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] px-3 py-3">
+                  <div>
+                    <RatingStars readonly value={userRating || libraryFeedback?.averageRating || 0} />
+                    {userRating > 0 ? (
+                      <p className="mt-1 text-xs font-semibold text-[#7A6D60]">
+                        Sua nota: {userRating}/10
+                      </p>
+                    ) : null}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="h-9 rounded-full px-4 text-xs"
+                    onClick={() => {
+                      setDraftRating(userRating || 0);
+                      setIsRatingOpen(true);
+                    }}
+                  >
+                    Avaliar receita
+                  </Button>
+                </div>
                 {feedbackMessage ? (
                   <p className="mt-2 rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] px-3 py-2 text-xs font-semibold text-[#6A5E52]">
                     {feedbackMessage}
@@ -1377,18 +1453,68 @@ export default function RecipeDetailsPage() {
         </article>
       ) : null}
 
+      {isRatingOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end bg-black/45 p-4 sm:items-center sm:justify-center"
+          onClick={() => {
+            if (!isRatingSaving) setIsRatingOpen(false);
+          }}
+        >
+          <div
+            className="w-full rounded-[1.6rem] border border-[#E5D7BF] bg-[#FFFCF7] p-5 shadow-2xl sm:max-w-sm"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-lg font-semibold text-[#2A1E17]">Avaliar receita</h3>
+              <button
+                type="button"
+                className="text-xs font-semibold text-[#7A6D60]"
+                onClick={() => setIsRatingOpen(false)}
+                disabled={isRatingSaving}
+              >
+                ← Voltar
+              </button>
+            </div>
+            <div className="mt-4 rounded-2xl border border-[#E5D7BF] bg-white p-3">
+              <RatingStars value={draftRating} onChange={setDraftRating} />
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-2">
+              <Button
+                type="button"
+                className="w-full"
+                onClick={() => void handleRate(draftRating)}
+                disabled={isRatingSaving || draftRating < 1}
+              >
+                {isRatingSaving ? "Salvando..." : "Salvar avaliação"}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full"
+                onClick={() => void undoRating()}
+                disabled={isRatingSaving || userRating < 1}
+              >
+                Desfazer avaliação
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {isTouchOpen ? (
         <div
           className={`fixed inset-0 z-50 flex items-end p-4 sm:items-center sm:justify-center ${
             isTouchClosing ? "bg-black/0" : "bg-black/45"
           }`}
           style={{ transition: "background-color 180ms ease" }}
+          onClick={closeTouchEditor}
         >
           <div
             className={`flex max-h-[calc(100dvh-2rem)] w-full flex-col rounded-[1.6rem] border border-[#E5D7BF] bg-[#FFFCF7] shadow-2xl sm:max-w-lg ${
               isTouchClosing ? "translate-y-2 opacity-0" : "translate-y-0 opacity-100"
             }`}
             style={{ transition: "opacity 180ms ease, transform 180ms ease" }}
+            onClick={(event) => event.stopPropagation()}
           >
             <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[#E5D7BF] px-4 py-3">
               <p className="text-sm font-semibold text-[#5D5248]">

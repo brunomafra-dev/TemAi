@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getRecipeDifficulty } from "@/features/recipes/quality";
 import type { Recipe } from "@/features/recipes/types";
 
 interface RecipeCardProps {
@@ -12,6 +13,8 @@ interface RecipeCardProps {
 }
 
 export const RecipeCard = memo(function RecipeCard({ recipe, href, footerLabel }: RecipeCardProps) {
+  const difficulty = recipe.difficulty || getRecipeDifficulty(recipe);
+
   return (
     <Link href={href} className="block">
       <Card className="overflow-hidden border-[#E5D7C1] bg-[#FFFCF7] shadow-[0_20px_35px_-25px_rgba(42,30,23,0.7)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_42px_-24px_rgba(42,30,23,0.75)]">
@@ -31,6 +34,9 @@ export const RecipeCard = memo(function RecipeCard({ recipe, href, footerLabel }
               </span>
               <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold text-white">
                 {recipe.servings} porções
+              </span>
+              <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold text-white">
+                {difficulty}
               </span>
             </div>
           </div>

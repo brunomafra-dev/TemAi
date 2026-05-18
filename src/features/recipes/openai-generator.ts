@@ -15,6 +15,7 @@ import {
   extractOpenAiUsage,
   logOpenAiTelemetry,
 } from "@/features/security/ai-telemetry";
+import { getRecipeDifficulty, normalizePrepMinutesForRecipe } from "@/features/recipes/quality";
 
 export const SUGGESTIONS_PROMPT_VERSION = "suggestions-v4-fit-equipment";
 export const FULL_RECIPE_PROMPT_VERSION = "full-recipe-v4-fit-equipment";
@@ -405,7 +406,7 @@ Regras:
 - Se forno nao estiver disponivel, nao escreva "leve ao forno" nem dependa dele.
 - Se forno estiver disponivel e for usado, inclua temperatura e tempo.
 - Se incluir ingrediente extra indispensavel, deixe claro na lista.
-- prepMinutes deve representar o tempo medio total.
+- prepMinutes deve representar o tempo medio total realista. Exemplos: arroz nao leva 2 minutos; feijao nao leva 15 minutos.
 - Retorne apenas JSON valido, sem markdown.
 - Formato:
 {
@@ -440,7 +441,7 @@ Regras:
     },
   })) as Partial<Recipe>;
 
-  return {
+  const recipe: Recipe = {
     id: typeof parsed.id === "string" && parsed.id.trim() ? parsed.id.trim() : "receita-ia",
     title: typeof parsed.title === "string" && parsed.title.trim() ? parsed.title.trim() : params.suggestionTitle,
     description: typeof parsed.description === "string" ? parsed.description.trim() : "Receita criada pela IA.",
@@ -454,6 +455,19 @@ Regras:
     servings: typeof parsed.servings === "number" ? parsed.servings : 2,
     sourceLabel: "TemAi IA",
     origin: "ai",
+  };
+
+  const prepMinutes = normalizePrepMinutesForRecipe({
+    title: recipe.title,
+    ingredients: recipe.ingredients,
+    steps: recipe.steps,
+    prepMinutes: recipe.prepMinutes,
+  });
+
+  return {
+    ...recipe,
+    prepMinutes,
+    difficulty: getRecipeDifficulty({ ...recipe, prepMinutes }),
   };
 }
 

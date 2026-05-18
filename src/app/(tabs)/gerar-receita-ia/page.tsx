@@ -54,6 +54,14 @@ const cookingEquipmentOptions = COOKING_EQUIPMENT_VALUES.map((value) => ({
   label: COOKING_EQUIPMENT_LABELS[value],
 }));
 
+const AI_LOADING_MESSAGES = [
+  "Analisando ingredientes...",
+  "Pensando em combinações...",
+  "Montando sugestões...",
+  "Ajustando à sua cozinha...",
+  "Quase pronto...",
+];
+
 const AI_SUGGESTIONS_CACHE_KEY = "temai:ai-suggestions:last";
 
 type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
@@ -263,7 +271,9 @@ function CreateRecipePageContent() {
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const isMountedRef = useRef(true);
 
   const [mode, setMode] = useState<InputMode>("text");
   const [ingredientsText, setIngredientsText] = useState("");
@@ -282,6 +292,7 @@ function CreateRecipePageContent() {
   const [speechSupported, setSpeechSupported] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isPhotoPickerOpen, setIsPhotoPickerOpen] = useState(false);
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [selectedPhotoName, setSelectedPhotoName] = useState("");
   const [recordedAudioFile, setRecordedAudioFile] = useState<File | null>(null);
   const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
@@ -289,6 +300,57 @@ function CreateRecipePageContent() {
   const [subscription, setSubscription] = useState<SubscriptionState>(() => getSubscriptionState());
 
   const isPremium = subscription.plan === "premium" && subscription.status === "active";
+
+  const releaseAudioStream = useCallback(() => {
+    audioStreamRef.current?.getTracks().forEach((track) => track.stop());
+    audioStreamRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      const recognition = recognitionRef.current;
+      if (recognition) {
+        recognition.onresult = null;
+        recognition.onerror = null;
+        recognition.onend = null;
+        try {
+          recognition.abort();
+        } catch {
+          // Browser already closed the recognizer.
+        }
+        recognitionRef.current = null;
+      }
+
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        recorder.ondataavailable = null;
+        recorder.onstop = null;
+        recorder.onerror = null;
+        try {
+          recorder.stop();
+        } catch {
+          // Browser already stopped the recorder.
+        }
+      }
+      mediaRecorderRef.current = null;
+      audioChunksRef.current = [];
+      releaseAudioStream();
+    };
+  }, [releaseAudioStream]);
+
+  useEffect(() => {
+    if (!isLoading && !isLoadingMore) {
+      setLoadingMessageIndex(0);
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setLoadingMessageIndex((current) => (current + 1) % AI_LOADING_MESSAGES.length);
+    }, 1400);
+
+    return () => window.clearInterval(timer);
+  }, [isLoading, isLoadingMore]);
 
   useEffect(() => {
     if (searchParams.get("restore") === "1") {
@@ -396,17 +458,34 @@ function CreateRecipePageContent() {
   }, []);
 
   const stopVoiceCapture = useCallback(() => {
-    recognitionRef.current?.stop();
+    const recognition = recognitionRef.current;
+    if (recognition) {
+      try {
+        recognition.stop();
+      } catch {
+        try {
+          recognition.abort();
+        } catch {
+          // Browser already stopped the recognizer.
+        }
+        recognitionRef.current = null;
+      }
+    }
     setIsListening(false);
   }, []);
 
   const stopAudioRecording = useCallback(() => {
     const recorder = mediaRecorderRef.current;
     if (recorder && recorder.state !== "inactive") {
-      recorder.stop();
+      try {
+        recorder.stop();
+      } catch {
+        releaseAudioStream();
+        mediaRecorderRef.current = null;
+      }
     }
     setIsRecordingAudio(false);
-  }, []);
+  }, [releaseAudioStream]);
 
   const startAudioRecording = useCallback(async () => {
     if (!isPremium) {
@@ -420,8 +499,21 @@ function CreateRecipePageContent() {
     }
 
     try {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        return;
+      }
+
+      if (recognitionRef.current) {
+        stopVoiceCapture();
+      }
+
+      releaseAudioStream();
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const preferredMimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+      audioStreamRef.current = stream;
+      const preferredMimeType =
+        ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/aac"].find((type) =>
+          MediaRecorder.isTypeSupported(type),
+        ) || "";
       const recorder = new MediaRecorder(stream, preferredMimeType ? { mimeType: preferredMimeType } : undefined);
 
       audioChunksRef.current = [];
@@ -433,29 +525,51 @@ function CreateRecipePageContent() {
       recorder.onstop = () => {
         const mimeType = recorder.mimeType || "audio/webm";
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        if (audioBlob.size > 0) {
+        if (isMountedRef.current && audioBlob.size > 0) {
           setRecordedAudioFile(new File([audioBlob], `temai-audio-${Date.now()}.webm`, { type: mimeType }));
         }
-        stream.getTracks().forEach((track) => track.stop());
+        releaseAudioStream();
+        audioChunksRef.current = [];
         mediaRecorderRef.current = null;
-        setIsRecordingAudio(false);
+        if (isMountedRef.current) {
+          setIsRecordingAudio(false);
+        }
+      };
+      recorder.onerror = () => {
+        releaseAudioStream();
+        audioChunksRef.current = [];
+        mediaRecorderRef.current = null;
+        if (isMountedRef.current) {
+          setIsRecordingAudio(false);
+          setErrorMessage("A gravação foi interrompida. Tente novamente.");
+        }
       };
 
       mediaRecorderRef.current = recorder;
       setRecordedAudioFile(null);
       setErrorMessage("");
       setIsRecordingAudio(true);
-      recorder.start();
+      recorder.start(1000);
     } catch {
+      releaseAudioStream();
+      mediaRecorderRef.current = null;
       setIsRecordingAudio(false);
       setErrorMessage("Não foi possível acessar o microfone. Verifique a permissão e tente novamente.");
     }
-  }, [isPremium]);
+  }, [isPremium, releaseAudioStream, stopVoiceCapture]);
 
   const startVoiceCapture = useCallback(() => {
     if (!isPremium) {
       setErrorMessage("Áudio é um recurso premium.");
       return;
+    }
+
+    if (isListening) {
+      return;
+    }
+
+    if (isRecordingAudio) {
+      stopAudioRecording();
     }
 
     const Recognition = getSpeechRecognitionConstructor();
@@ -517,7 +631,7 @@ function CreateRecipePageContent() {
       recognitionRef.current = null;
       setErrorMessage("Não foi possível abrir o microfone agora.");
     }
-  }, [ingredientsText, isPremium, startAudioRecording]);
+  }, [ingredientsText, isListening, isPremium, isRecordingAudio, startAudioRecording, stopAudioRecording]);
 
   async function handleGenerateSuggestions() {
     if (!isPremium && mode !== "text") {
@@ -681,6 +795,8 @@ function CreateRecipePageContent() {
     }
   }
 
+  const loadingMessage = AI_LOADING_MESSAGES[loadingMessageIndex] || AI_LOADING_MESSAGES[0];
+
   return (
     <section className="space-y-5 pb-2">
       <header className="space-y-1">
@@ -700,7 +816,7 @@ function CreateRecipePageContent() {
 
       <Card className="border-[#E5D7C1] bg-[#FFFCF7]">
         <CardHeader>
-          <CardTitle>Criar receita com IA</CardTitle>
+          <CardTitle>Gerar receita com IA</CardTitle>
           <CardDescription>Fluxo em duas etapas: sugestões primeiro, receita completa depois.</CardDescription>
           {!isPremium ? (
             <p className="text-xs text-[#7A6D60]">
@@ -834,7 +950,7 @@ function CreateRecipePageContent() {
                 className="h-11 w-full rounded-2xl"
               >
                 {isListening
-                  ? "Parar ditado"
+                  ? "Parar gravação"
                   : isRecordingAudio
                     ? "Parar gravação"
                     : speechSupported
@@ -914,8 +1030,13 @@ function CreateRecipePageContent() {
             disabled={!canGenerate}
             className="h-12 w-full rounded-2xl bg-[#C66A3D] text-[#FFF9EE] hover:brightness-95"
           >
-            {isLoading ? "Buscando sugestões..." : "Gerar 3 sugestões"}
+            {isLoading ? loadingMessage : "Gerar 3 sugestões"}
           </Button>
+          {isLoading ? (
+            <p className="rounded-2xl border border-[#E5D7C1] bg-[#FFFCF7] px-3 py-2 text-center text-xs font-semibold text-[#7A6D60]">
+              {loadingMessage}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -954,7 +1075,7 @@ function CreateRecipePageContent() {
             disabled={isLoading || isLoadingMore}
             className="h-11 w-full rounded-2xl"
           >
-            {isLoadingMore ? "Buscando mais receitas..." : "Sugerir mais receitas"}
+            {isLoadingMore ? loadingMessage : "Sugerir mais receitas"}
           </Button>
 
           {suggestionsNotice ? (
@@ -1008,8 +1129,14 @@ function CreateRecipePageContent() {
       ) : null}
 
       {isPhotoPickerOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/45 p-4 sm:items-center sm:justify-center">
-          <div className="max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-[1.8rem] bg-[#FFFCF7] p-5 shadow-2xl sm:max-w-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-end bg-black/45 p-4 sm:items-center sm:justify-center"
+          onClick={() => setIsPhotoPickerOpen(false)}
+        >
+          <div
+            className="max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-[1.8rem] bg-[#FFFCF7] p-5 shadow-2xl sm:max-w-sm"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-xl font-semibold text-[#2A1E17]">Selecionar foto</h3>
               <button onClick={() => setIsPhotoPickerOpen(false)} className="text-xs font-semibold text-[#7A6D60]">

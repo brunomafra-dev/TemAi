@@ -1,5 +1,6 @@
 ﻿import type { LibraryCategory, Recipe } from "@/features/recipes/types";
 import type { ImportedRecipeDraft } from "@/features/recipes/import-from-url";
+import { getRecipeDifficulty } from "@/features/recipes/quality";
 import { serverEnv } from "@/lib/env-server";
 
 interface SupabaseRecipeRow {
@@ -128,7 +129,7 @@ function mapRowToRecipe(row: SupabaseRecipeRow): Recipe {
     ? (row.category as LibraryCategory)
     : undefined;
 
-  return {
+  const recipe: Recipe = {
     id: row.slug,
     title: decodeHtmlEntities(row.title || ""),
     description: decodeHtmlEntities(row.description || ""),
@@ -140,6 +141,11 @@ function mapRowToRecipe(row: SupabaseRecipeRow): Recipe {
     imageUrl: row.image_url || undefined,
     sourceLabel: row.source_name || "TemAi Curadoria",
     origin: "library",
+  };
+
+  return {
+    ...recipe,
+    difficulty: getRecipeDifficulty(recipe),
   };
 }
 
@@ -156,6 +162,46 @@ function normalizeSearchText(value: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function tokenizeSearchText(value: string): string[] {
+  const normalized = normalizeSearchText(value)
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalized) return [];
+  return Array.from(new Set(normalized.split(" ").filter((token) => token.length >= 2)));
+}
+
+function tokenMatches(queryToken: string, fieldTokens: string[]): boolean {
+  return fieldTokens.some(
+    (fieldToken) =>
+      fieldToken === queryToken ||
+      (queryToken.length >= 4 && fieldToken.startsWith(queryToken)),
+  );
+}
+
+function scoreRecipeSearch(recipe: Recipe, queryTokens: string[]): number {
+  if (!queryTokens.length) return 0;
+
+  const titleTokens = tokenizeSearchText(recipe.title);
+  const ingredientTokens = tokenizeSearchText(recipe.ingredients.join(" "));
+  const categoryTokens = tokenizeSearchText(recipe.category || "");
+  const descriptionTokens = tokenizeSearchText(recipe.description);
+  const allTokens = [...titleTokens, ...ingredientTokens, ...categoryTokens, ...descriptionTokens];
+
+  if (!queryTokens.every((token) => tokenMatches(token, allTokens))) {
+    return 0;
+  }
+
+  return queryTokens.reduce((score, token) => {
+    if (tokenMatches(token, titleTokens)) return score + 100;
+    if (tokenMatches(token, ingredientTokens)) return score + 70;
+    if (tokenMatches(token, categoryTokens)) return score + 35;
+    if (tokenMatches(token, descriptionTokens)) return score + 10;
+    return score;
+  }, 0);
 }
 
 type SupabaseFetchOptions = RequestInit & {
@@ -229,26 +275,27 @@ export async function searchRecipesFromSupabase(params: {
   const response = await supabaseFetch(query);
   const rows = (await response.json()) as SupabaseRecipeRow[];
   const mapped = rows.map(mapRowToRecipe);
-  const searched = search
-    ? mapped.filter((recipe) => {
-        const queryText = normalizeSearchText(search);
-        const searchable = normalizeSearchText(
-          `${recipe.title} ${recipe.description} ${recipe.ingredients.join(" ")}`,
-        );
-        return searchable.includes(queryText);
-      })
-    : mapped;
+  const searchTokens = search ? tokenizeSearchText(search) : [];
+  const searched = searchTokens.length
+    ? mapped
+        .map((recipe) => ({
+          recipe,
+          searchScore: scoreRecipeSearch(recipe, searchTokens),
+        }))
+        .filter((entry) => entry.searchScore > 0)
+    : mapped.map((recipe) => ({ recipe, searchScore: 0 }));
   const safe =
     category === "veggie"
-      ? searched.filter((recipe) => !hasAnimalProtein(`${recipe.title} ${recipe.description} ${recipe.ingredients.join(" ")}`))
+      ? searched.filter((entry) => !hasAnimalProtein(`${entry.recipe.title} ${entry.recipe.description} ${entry.recipe.ingredients.join(" ")}`))
       : searched;
 
   const ranked = safe
-    .map((recipe) => ({
-      recipe,
-      rank: hashString(`${seed}:${recipe.id}`),
+    .map((entry) => ({
+      recipe: entry.recipe,
+      searchScore: entry.searchScore,
+      rank: hashString(`${seed}:${entry.recipe.id}`),
     }))
-    .sort((a, b) => a.rank - b.rank || a.recipe.id.localeCompare(b.recipe.id))
+    .sort((a, b) => b.searchScore - a.searchScore || a.rank - b.rank || a.recipe.id.localeCompare(b.recipe.id))
     .map((entry) => entry.recipe);
 
   const total = ranked.length;
