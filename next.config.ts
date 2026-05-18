@@ -31,7 +31,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "s2-receitas.glbimg.com" },
       { protocol: "https", hostname: "s2.glbimg.com" },
       { protocol: "https", hostname: "img.itdg.com.br" },
-      { protocol: "https", hostname: "www.themealdb.com" },
+      { protocol: "https", hostname: "upload.wikimedia.org" },
     ],
   },
 };

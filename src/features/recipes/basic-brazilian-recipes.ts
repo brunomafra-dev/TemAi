@@ -11,7 +11,6 @@ export const BASIC_BRAZILIAN_RECIPE_SLUGS = [
   "panqueca-simples",
   "farofa-simples",
   "bolo-simples",
-  "brigadeiro",
   "cuscuz-simples",
   "tapioca-simples",
   "molho-de-tomate-caseiro",
