@@ -188,8 +188,7 @@ function scoreRecipeSearch(recipe: Recipe, queryTokens: string[]): number {
   const titleTokens = tokenizeSearchText(recipe.title);
   const ingredientTokens = tokenizeSearchText(recipe.ingredients.join(" "));
   const categoryTokens = tokenizeSearchText(recipe.category || "");
-  const descriptionTokens = tokenizeSearchText(recipe.description);
-  const allTokens = [...titleTokens, ...ingredientTokens, ...categoryTokens, ...descriptionTokens];
+  const allTokens = [...titleTokens, ...ingredientTokens, ...categoryTokens];
 
   if (!queryTokens.every((token) => tokenMatches(token, allTokens))) {
     return 0;
@@ -199,7 +198,6 @@ function scoreRecipeSearch(recipe: Recipe, queryTokens: string[]): number {
     if (tokenMatches(token, titleTokens)) return score + 100;
     if (tokenMatches(token, ingredientTokens)) return score + 70;
     if (tokenMatches(token, categoryTokens)) return score + 35;
-    if (tokenMatches(token, descriptionTokens)) return score + 10;
     return score;
   }, 0);
 }
