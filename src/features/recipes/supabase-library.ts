@@ -150,16 +150,6 @@ function mapRowToRecipe(row: SupabaseRecipeRow): Recipe {
   };
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
-}
-
-function wasCategoryReviewedForBatch(row: SupabaseRecipeRow, batch: string): boolean {
-  const categoryReview = row.moderation_result?.categoryReview;
-  if (!isRecord(categoryReview)) return false;
-  return categoryReview.batch === batch;
-}
-
 function hasAnimalProtein(text: string): boolean {
   return /(carne bovina|carne suina|frango|peixe|camarao|atum|salmao|bacalhau|linguica|presunto|bacon|chicken|beef|pork|fish|shrimp|tuna|salmon|ham|sausage|meat|seafood)/i.test(
     text,
@@ -369,32 +359,6 @@ export async function getRecipesBySlugsFromSupabase(slugs: readonly string[]): P
   return safeSlugs.map((slug) => recipesById.get(slug)).filter((recipe): recipe is Recipe => Boolean(recipe));
 }
 
-export async function getUnreviewedRecipesBySlugsFromSupabase(
-  slugs: readonly string[],
-  batch: string,
-): Promise<Recipe[]> {
-  if (!canUseSupabase()) {
-    return [];
-  }
-
-  const safeSlugs = Array.from(
-    new Set(slugs.map((slug) => slug.trim()).filter((slug) => /^[a-z0-9._-]+$/i.test(slug))),
-  );
-  if (!safeSlugs.length) return [];
-
-  const response = await supabaseFetch(
-    `recipes_br?select=id,slug,title,description,category,ingredients,steps,prep_minutes,servings,image_url,source_name,moderation_result&slug=in.(${safeSlugs.map(encodeURIComponent).join(",")})&is_published=eq.true&moderation_status=eq.approved&limit=${safeSlugs.length}`,
-    { cache: "no-store" },
-  );
-  const rows = (await response.json()) as SupabaseRecipeRow[];
-  const recipesById = new Map(
-    rows
-      .filter((row) => !wasCategoryReviewedForBatch(row, batch))
-      .map((row) => [row.slug, mapRowToRecipe(row)]),
-  );
-  return safeSlugs.map((slug) => recipesById.get(slug)).filter((recipe): recipe is Recipe => Boolean(recipe));
-}
-
 export async function getPopularRecipesFromSupabase(limit = 8): Promise<Array<{
   recipe: Recipe;
   ratingAverage: number;
@@ -474,78 +438,6 @@ export async function upsertImportedRecipeToSupabase(recipe: ImportedRecipeDraft
   const rows = (await response.json()) as SupabaseRecipeRow[];
   if (!rows.length) {
     throw new Error("Nenhuma receita retornada apos salvar.");
-  }
-
-  return mapRowToRecipe(rows[0]);
-}
-
-
-
-export async function updateRecipeCategoryInSupabase(
-  slug: string,
-  category: LibraryCategory,
-  categoryReview?: { batch: string; reviewedBy: string },
-): Promise<Recipe> {
-  const { url, key } = getSupabaseEnv();
-  if (!url || !key) {
-    throw new Error("Supabase não configurado.");
-  }
-
-  let moderationResult: Record<string, unknown> | undefined;
-  if (categoryReview) {
-    const currentResponse = await fetch(
-      `${url}/rest/v1/recipes_br?select=moderation_result&slug=eq.${encodeURIComponent(slug)}&is_published=eq.true&moderation_status=eq.approved&limit=1`,
-      {
-        headers: {
-          apikey: key,
-          Authorization: `Bearer ${key}`,
-        },
-        cache: "no-store",
-      },
-    );
-
-    if (!currentResponse.ok) {
-      const errorText = await currentResponse.text();
-      throw new Error(`Falha ao ler revisão de categoria no Supabase: ${errorText}`);
-    }
-
-    const currentRows = (await currentResponse.json()) as Array<{ moderation_result?: unknown }>;
-    const currentResult = currentRows[0]?.moderation_result;
-    moderationResult = {
-      ...(isRecord(currentResult) ? currentResult : {}),
-      categoryReview: {
-        batch: categoryReview.batch,
-        reviewedAt: new Date().toISOString(),
-        reviewedBy: categoryReview.reviewedBy,
-      },
-    };
-  }
-
-  const response = await fetch(
-    `${url}/rest/v1/recipes_br?slug=eq.${encodeURIComponent(slug)}&is_published=eq.true&moderation_status=eq.approved`,
-    {
-      method: "PATCH",
-      headers: {
-        apikey: key,
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-        Prefer: "return=representation",
-      },
-      body: JSON.stringify({
-        category,
-        ...(moderationResult ? { moderation_result: moderationResult } : {}),
-      }),
-    },
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Falha ao atualizar categoria no Supabase: ${errorText}`);
-  }
-
-  const rows = (await response.json()) as SupabaseRecipeRow[];
-  if (!rows.length) {
-    throw new Error("Receita não encontrada para atualizar categoria.");
   }
 
   return mapRowToRecipe(rows[0]);
