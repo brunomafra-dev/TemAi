@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { BASIC_BRAZILIAN_RECIPE_SLUGS } from "@/features/recipes/basic-brazilian-recipes";
 import { getRecipesBySlugsFromSupabase } from "@/features/recipes/supabase-library";
-import { requireAdminUserId } from "@/features/security/admin-guard";
 import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse } from "@/features/security/auth-user";
 import {
@@ -21,9 +20,6 @@ export async function GET(request: Request) {
     if (!endpointRateLimit.allowed) {
       return rateLimitResponse(endpointRateLimit.retryAfterSeconds);
     }
-
-    const admin = await requireAdminUserId(request);
-    if (!admin.ok) return admin.response;
 
     const url = new URL(request.url);
     const batch = sanitizeQueryString(url.searchParams.get("batch"), {

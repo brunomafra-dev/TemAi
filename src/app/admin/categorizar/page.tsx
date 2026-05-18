@@ -46,6 +46,7 @@ export default function CategorizeRecipesPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [reviewedIds, setReviewedIds] = useState<string[]>([]);
   const [message, setMessage] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [savingCategory, setSavingCategory] = useState<LibraryCategory | "">("");
 
@@ -61,6 +62,7 @@ export default function CategorizeRecipesPage() {
   const loadBatch = useCallback(async () => {
     setIsLoading(true);
     setMessage("");
+    setLoadError("");
     try {
       const authHeaders = await buildAuthHeaders();
       const response = await fetch("/api/library/category-review?batch=basic-brazilian", {
@@ -72,7 +74,10 @@ export default function CategorizeRecipesPage() {
       setCurrentIndex(0);
       setReviewedIds([]);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Não foi possível carregar o lote.");
+      setLoadError(error instanceof Error ? error.message : "Não foi possível carregar o lote.");
+      setRecipes([]);
+      setCurrentIndex(0);
+      setReviewedIds([]);
     } finally {
       setIsLoading(false);
     }
@@ -152,6 +157,14 @@ export default function CategorizeRecipesPage() {
           <Card className="border-[#E5D7C1] bg-[#FFFCF7]">
             <CardContent className="py-8">
               <p className="text-sm text-[#7A6D60]">Puxando receitas novas...</p>
+            </CardContent>
+          </Card>
+        ) : loadError ? (
+          <Card className="border-[#E5D7C1] bg-[#FFFCF7]">
+            <CardContent className="space-y-3 py-8 text-center">
+              <p className="font-semibold text-[#5E5348]">Não consegui carregar o lote.</p>
+              <p className="text-sm text-[#7A6D60]">{loadError}</p>
+              <Button onClick={() => void loadBatch()}>Tentar novamente</Button>
             </CardContent>
           </Card>
         ) : currentRecipe ? (
