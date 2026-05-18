@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,20 +44,16 @@ async function parseResponse<T>(response: Response): Promise<T> {
 export default function CategorizeRecipesPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [reviewedIds, setReviewedIds] = useState<string[]>([]);
+  const [reviewedCount, setReviewedCount] = useState(0);
   const [message, setMessage] = useState("");
   const [loadError, setLoadError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [savingCategory, setSavingCategory] = useState<LibraryCategory | "">("");
 
   const currentRecipe = recipes[currentIndex] || null;
-  const reviewedCount = reviewedIds.length;
-  const progressPercent = recipes.length ? Math.round((reviewedCount / recipes.length) * 100) : 0;
-
-  const remainingRecipes = useMemo(
-    () => recipes.filter((recipe) => !reviewedIds.includes(recipe.id)).length,
-    [recipes, reviewedIds],
-  );
+  const remainingRecipes = recipes.length;
+  const sessionTotal = reviewedCount + remainingRecipes;
+  const progressPercent = sessionTotal ? Math.round((reviewedCount / sessionTotal) * 100) : 0;
 
   const loadBatch = useCallback(async () => {
     setIsLoading(true);
@@ -72,12 +68,13 @@ export default function CategorizeRecipesPage() {
       const data = await parseResponse<ReviewPayload>(response);
       setRecipes(data.recipes);
       setCurrentIndex(0);
-      setReviewedIds([]);
+      setReviewedCount(0);
+      setMessage(data.recipes.length ? "" : "Todas as receitas deste lote já foram revisadas.");
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Não foi possível carregar o lote.");
       setRecipes([]);
       setCurrentIndex(0);
-      setReviewedIds([]);
+      setReviewedCount(0);
     } finally {
       setIsLoading(false);
     }
@@ -114,14 +111,11 @@ export default function CategorizeRecipesPage() {
         }),
       });
       const data = await parseResponse<{ recipe: Recipe }>(response);
-      setRecipes((current) =>
-        current.map((recipe) => (recipe.id === currentRecipe.id ? data.recipe : recipe)),
-      );
-      setReviewedIds((current) =>
-        current.includes(currentRecipe.id) ? current : [...current, currentRecipe.id],
-      );
-      setMessage(`${currentRecipe.title} foi movida para ${categories.find((item) => item.value === category)?.label}.`);
-      setCurrentIndex((current) => Math.min(recipes.length - 1, current + 1));
+      const nextRecipes = recipes.filter((recipe) => recipe.id !== currentRecipe.id);
+      setRecipes(nextRecipes);
+      setReviewedCount((current) => current + 1);
+      setMessage(`${data.recipe.title} foi salva em ${categories.find((item) => item.value === category)?.label}.`);
+      setCurrentIndex((current) => Math.min(current, Math.max(0, nextRecipes.length - 1)));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível salvar categoria.");
     } finally {
@@ -149,7 +143,7 @@ export default function CategorizeRecipesPage() {
             />
           </div>
           <p className="text-xs font-semibold text-[#7A6D60]">
-            {reviewedCount}/{recipes.length || 0} revisadas · {remainingRecipes} restantes
+            {reviewedCount}/{sessionTotal || 0} revisadas · {remainingRecipes} restantes
           </p>
         </header>
 

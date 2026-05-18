@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { BASIC_BRAZILIAN_RECIPE_SLUGS } from "@/features/recipes/basic-brazilian-recipes";
-import { getRecipesBySlugsFromSupabase } from "@/features/recipes/supabase-library";
+import { getUnreviewedRecipesBySlugsFromSupabase } from "@/features/recipes/supabase-library";
 import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse } from "@/features/security/auth-user";
 import {
@@ -34,11 +34,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: "Lote não encontrado." }, { status: 404 });
     }
 
-    const recipes = await getRecipesBySlugsFromSupabase(BASIC_BRAZILIAN_RECIPE_SLUGS);
+    const recipes = await getUnreviewedRecipesBySlugsFromSupabase(BASIC_BRAZILIAN_RECIPE_SLUGS, batch);
     return NextResponse.json(
       {
         batch,
-        total: BASIC_BRAZILIAN_RECIPE_SLUGS.length,
+        total: recipes.length,
         recipes,
       },
       { headers: { "Cache-Control": "no-store, max-age=0" } },

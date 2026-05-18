@@ -25,6 +25,7 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "images.pexels.com" },
       { protocol: "https", hostname: "www.receiteria.com.br" },
       { protocol: "https", hostname: "static.itdg.com.br" },
       { protocol: "https", hostname: "www.tudogostoso.com.br" },

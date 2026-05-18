@@ -61,7 +61,10 @@ export async function POST(request: Request) {
     }
     const category = categoryRaw as LibraryCategory;
 
-    const recipe = await updateRecipeCategoryInSupabase(recipeId, category);
+    const recipe = await updateRecipeCategoryInSupabase(recipeId, category, {
+      batch: "basic-brazilian",
+      reviewedBy: admin.userId,
+    });
     return NextResponse.json({ recipe, source: "supabase" });
   } catch (error) {
     const validationResponse = validationErrorResponse(error);
