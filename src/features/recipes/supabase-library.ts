@@ -338,6 +338,25 @@ export async function getRecipeBySlugFromSupabase(slug: string): Promise<Recipe 
   return mapRowToRecipe(rows[0]);
 }
 
+export async function getRecipesBySlugsFromSupabase(slugs: readonly string[]): Promise<Recipe[]> {
+  if (!canUseSupabase()) {
+    return [];
+  }
+
+  const safeSlugs = Array.from(
+    new Set(slugs.map((slug) => slug.trim()).filter((slug) => /^[a-z0-9._-]+$/i.test(slug))),
+  );
+  if (!safeSlugs.length) return [];
+
+  const response = await supabaseFetch(
+    `recipes_br?select=id,slug,title,description,category,ingredients,steps,prep_minutes,servings,image_url,source_name&slug=in.(${safeSlugs.map(encodeURIComponent).join(",")})&is_published=eq.true&moderation_status=eq.approved&limit=${safeSlugs.length}`,
+    { cache: "no-store" },
+  );
+  const rows = (await response.json()) as SupabaseRecipeRow[];
+  const recipesById = new Map(rows.map((row) => [row.slug, mapRowToRecipe(row)]));
+  return safeSlugs.map((slug) => recipesById.get(slug)).filter((recipe): recipe is Recipe => Boolean(recipe));
+}
+
 export async function getPopularRecipesFromSupabase(limit = 8): Promise<Array<{
   recipe: Recipe;
   ratingAverage: number;
