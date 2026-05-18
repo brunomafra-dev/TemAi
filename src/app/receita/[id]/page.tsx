@@ -612,7 +612,9 @@ export default function RecipeDetailsPage() {
       imageUrl: currentRecipe.imageUrl,
       sourceLabel: currentRecipe.sourceLabel,
       recipeSnapshot: currentRecipe,
-      ingredientsSnapshot: sourceOrigin === "ai" ? ingredientList : currentRecipe.ingredients,
+      ingredientsSnapshot: sourceOrigin === "ai"
+        ? (ingredientList.length ? ingredientList : currentRecipe.ingredients)
+        : currentRecipe.ingredients,
       generationId,
       cookingEquipment,
       sourceSuggestionId: sourceOrigin === "ai" ? recipeId : undefined,

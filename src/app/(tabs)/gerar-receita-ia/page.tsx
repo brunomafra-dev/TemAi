@@ -25,6 +25,7 @@ import {
   COOKING_EQUIPMENT_VALUES,
   normalizeCookingEquipment,
 } from "@/features/recipes/cooking-equipment";
+import { compactIngredientsForAi } from "@/features/recipes/helpers";
 import type {
   CookingEquipment,
   InputMode,
@@ -768,13 +769,26 @@ function CreateRecipePageContent() {
   }
 
   const openRecipe = useCallback((suggestion: RecipeSuggestion, generationId?: string) => {
-    const ingredientsQuery = response?.normalizedIngredients.join(",") ?? "";
-    const nutritionFlag = includeNutritionEstimate ? "&nutrition=1" : "";
-    const generationFlag = generationId ? `&generationId=${encodeURIComponent(generationId)}` : "";
-    const equipmentFlag = `&equipment=${encodeURIComponent(cookingEquipment.join(","))}`;
-    const filterFlag = `&filter=${encodeURIComponent(recipeFilter)}`;
-    const titleQuery = encodeURIComponent(suggestion.title);
-    router.push(`/receita/${suggestion.id}?origin=ai&ingredients=${encodeURIComponent(ingredientsQuery)}&title=${titleQuery}${nutritionFlag}${generationFlag}${equipmentFlag}${filterFlag}`);
+    const params = new URLSearchParams();
+    params.set("origin", "ai");
+    params.set("title", suggestion.title);
+    params.set("equipment", cookingEquipment.join(","));
+    params.set("filter", recipeFilter);
+
+    if (includeNutritionEstimate) {
+      params.set("nutrition", "1");
+    }
+
+    if (generationId) {
+      params.set("generationId", generationId);
+    } else {
+      const ingredientsQuery = compactIngredientsForAi(response?.normalizedIngredients ?? []).join(",");
+      if (ingredientsQuery) {
+        params.set("ingredients", ingredientsQuery);
+      }
+    }
+
+    router.push(`/receita/${suggestion.id}?${params.toString()}`);
   }, [cookingEquipment, includeNutritionEstimate, recipeFilter, response?.normalizedIngredients, router]);
 
   const pickFromCamera = useCallback(() => {

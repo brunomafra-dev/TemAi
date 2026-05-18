@@ -11,6 +11,7 @@ import {
   DEFAULT_COOKING_EQUIPMENT,
   normalizeCookingEquipment,
 } from "@/features/recipes/cooking-equipment";
+import { compactIngredientsForAi } from "@/features/recipes/helpers";
 import { getRecipeDifficulty, normalizePrepMinutesForRecipe } from "@/features/recipes/quality";
 import { aiUsageErrorResponse, consumeAiUsage } from "@/features/security/ai-usage";
 import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
@@ -38,8 +39,14 @@ interface RecipePayload {
 }
 
 const RECIPE_FILTERS: readonly RecipeSuggestionFilter[] = ["all", "meal", "fit", "vegetarian", "dessert", "drink"];
+const MAX_RECIPE_INGREDIENT_PAYLOAD_ITEMS = 200;
+const MAX_RECIPE_INGREDIENT_ITEM_LENGTH = 300;
 
 const inFlightRecipeRequests = new Map<string, Promise<Recipe>>();
+
+type VerifiedGenerationLog = {
+  normalizedIngredients: string[];
+};
 
 function isRecipe(value: unknown): value is Recipe {
   if (!value || typeof value !== "object") return false;
@@ -63,6 +70,23 @@ function generationHasSuggestion(suggestions: unknown, suggestionId: string): bo
     if (!item || typeof item !== "object") return false;
     return (item as { id?: unknown }).id === suggestionId;
   });
+}
+
+function readRecipeIngredients(payload: Record<string, unknown>): string[] {
+  const raw = payload.ingredients;
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) {
+    throw new InputValidationError("Ingredientes malformado.");
+  }
+
+  const values = raw.slice(0, MAX_RECIPE_INGREDIENT_PAYLOAD_ITEMS).map((item) => {
+    if (typeof item !== "string") {
+      throw new InputValidationError("Ingredientes malformado.");
+    }
+    return item.slice(0, MAX_RECIPE_INGREDIENT_ITEM_LENGTH);
+  });
+
+  return compactIngredientsForAi(values);
 }
 
 function readCookingEquipment(payload: Record<string, unknown>): CookingEquipment[] {
@@ -141,21 +165,28 @@ function withRecipeQuality(recipe: Recipe): Recipe {
   };
 }
 
-async function verifyGeneratedSuggestion(params: {
+async function readVerifiedGenerationLog(params: {
   userId: string;
   generationId: string;
   suggestionId: string;
-}): Promise<boolean> {
+}): Promise<VerifiedGenerationLog | null> {
   const supabase = getSupabaseServiceRoleClient();
   const { data, error } = await supabase
     .from("ai_generation_logs")
-    .select("id,suggestions")
+    .select("id,suggestions,normalized_ingredients")
     .eq("id", params.generationId)
     .eq("user_id", params.userId)
     .maybeSingle();
 
-  if (error || !data) return false;
-  return generationHasSuggestion((data as { suggestions?: unknown }).suggestions, params.suggestionId);
+  if (error || !data) return null;
+  const log = data as { suggestions?: unknown; normalized_ingredients?: unknown };
+  if (!generationHasSuggestion(log.suggestions, params.suggestionId)) return null;
+
+  return {
+    normalizedIngredients: Array.isArray(log.normalized_ingredients)
+      ? compactIngredientsForAi(log.normalized_ingredients.filter((item): item is string => typeof item === "string"))
+      : [],
+  };
 }
 
 async function readGeneratedRecipeCache(params: {
@@ -274,7 +305,7 @@ export async function POST(request: Request) {
     }
 
     const payload = (await parseJsonObjectBody(request, {
-      maxBytes: 12 * 1024,
+      maxBytes: 24 * 1024,
       allowedKeys: ["suggestionId", "suggestionTitle", "ingredients", "includeNutrition", "recipeFilter", "cookingEquipment", "generationId"],
     })) as RecipePayload &
       Record<string, unknown>;
@@ -288,15 +319,6 @@ export async function POST(request: Request) {
       typeof payload.suggestionTitle === "string" && payload.suggestionTitle.trim()
         ? payload.suggestionTitle.trim().slice(0, 120)
         : suggestionId.replace(/[-_]+/g, " ");
-    const ingredients =
-      payload.ingredients === undefined
-        ? []
-        : readStringArray(payload, "ingredients", {
-            fieldName: "Ingredientes",
-            maxItems: 100,
-            itemMaxLength: 120,
-            minItems: 0,
-          });
     const includeNutrition = readOptionalBoolean(payload, "includeNutrition", false);
     const recipeFilter = readRecipeFilter(payload.recipeFilter);
     const cookingEquipment = readCookingEquipment(payload);
@@ -306,6 +328,24 @@ export async function POST(request: Request) {
       maxLength: 36,
       pattern: /^[0-9a-f-]{36}$/i,
     });
+    const requestIngredients = readRecipeIngredients(payload);
+    let ingredients = requestIngredients;
+    let verifiedGenerationLog: VerifiedGenerationLog | null = null;
+
+    if (generationId) {
+      verifiedGenerationLog = await readVerifiedGenerationLog({
+        userId,
+        generationId,
+        suggestionId,
+      });
+      if (!verifiedGenerationLog) {
+        return NextResponse.json({ message: "Sugestão de IA inválida ou expirada." }, { status: 403 });
+      }
+      if (verifiedGenerationLog.normalizedIngredients.length) {
+        ingredients = verifiedGenerationLog.normalizedIngredients;
+      }
+    }
+
     const recipeModel = serverEnv.openaiRecipeModel();
     const cacheKey = buildRecipeCacheKey({
       model: recipeModel,
@@ -316,15 +356,6 @@ export async function POST(request: Request) {
     });
 
     if (generationId) {
-      const isValidGeneratedSuggestion = await verifyGeneratedSuggestion({
-        userId,
-        generationId,
-        suggestionId,
-      });
-      if (!isValidGeneratedSuggestion) {
-        return NextResponse.json({ message: "Sugestão de IA inválida ou expirada." }, { status: 403 });
-      }
-
       const cachedRecipe = await readGeneratedRecipeCache({
         userId,
         generationId,

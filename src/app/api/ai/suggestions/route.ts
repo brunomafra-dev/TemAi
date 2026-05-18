@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { parseIngredientsText, uniqueIngredients } from "@/features/recipes/helpers";
+import { compactIngredientsForAi, parseIngredientsText, uniqueIngredients } from "@/features/recipes/helpers";
 import {
   generateRecipeSuggestionsWithOpenAi,
   identifyIngredientsFromPhotoWithOpenAi,
@@ -42,6 +42,7 @@ interface SuggestionsPayload {
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 15 * 1024 * 1024;
 const MAX_MULTIPART_BYTES = 16 * 1024 * 1024;
+const MAX_INGREDIENTS_TEXT_LENGTH = 8000;
 const RECIPE_FILTERS: readonly RecipeSuggestionFilter[] = ["all", "meal", "fit", "vegetarian", "dessert", "drink"];
 const TITLE_STOP_WORDS = new Set([
   "a",
@@ -88,8 +89,8 @@ async function readSuggestionsInput(request: Request): Promise<SuggestionsPayloa
   const rawRecipeFilter = String(form.get("recipeFilter") || "").trim();
   const rawCookingEquipment = String(form.get("cookingEquipment") || "").trim();
   const rawExcludedSuggestionTitles = String(form.get("excludedSuggestionTitles") || "").trim();
-  if (rawIngredientsText.length > 4000) {
-    throw new InputValidationError("Ingredientes muito grande.", 413);
+  if (rawIngredientsText.length > MAX_INGREDIENTS_TEXT_LENGTH) {
+    throw new InputValidationError("Texto de ingredientes muito grande. Resuma a lista e tente novamente.", 413);
   }
   if (!/^(text|audio|photo)$/i.test(rawInputMode)) {
     throw new InputValidationError("Modo de entrada malformado.");
@@ -374,14 +375,14 @@ export async function POST(request: Request) {
           inputMode,
         });
         ingredientsText = [transcribedIngredientsText, typedIngredientsText].filter(Boolean).join(", ");
-        ingredients = parseIngredientsText(ingredientsText);
+        ingredients = compactIngredientsForAi(parseIngredientsText(ingredientsText));
       } else {
         ingredientsText = readRequiredString(payload as Record<string, unknown>, "ingredientsText", {
           fieldName: "Ingredientes por áudio",
           minLength: 1,
-          maxLength: 4000,
+          maxLength: MAX_INGREDIENTS_TEXT_LENGTH,
         });
-        ingredients = parseIngredientsText(ingredientsText);
+        ingredients = compactIngredientsForAi(parseIngredientsText(ingredientsText));
         if (!ingredients.length) {
           return NextResponse.json({ message: "Não foi possível identificar ingredientes válidos." }, { status: 400 });
         }
@@ -406,15 +407,15 @@ export async function POST(request: Request) {
           detail: "high",
         });
       }
-      ingredients = uniqueIngredients([...photoIngredients, ...parseIngredientsText(ingredientsText)]);
+      ingredients = compactIngredientsForAi(uniqueIngredients([...photoIngredients, ...parseIngredientsText(ingredientsText)]));
       ingredientsText = ingredients.join(", ");
     } else {
       ingredientsText = readRequiredString(payload as Record<string, unknown>, "ingredientsText", {
         fieldName: "Ingredientes",
         minLength: 1,
-        maxLength: 4000,
+        maxLength: MAX_INGREDIENTS_TEXT_LENGTH,
       });
-      ingredients = parseIngredientsText(ingredientsText);
+      ingredients = compactIngredientsForAi(parseIngredientsText(ingredientsText));
       if (!ingredients.length) {
         return NextResponse.json({ message: "Não foi possível identificar ingredientes válidos." }, { status: 400 });
       }
