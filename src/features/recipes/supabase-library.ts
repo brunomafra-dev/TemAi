@@ -27,6 +27,10 @@ type SupabasePopularRecipeRow = SupabaseRecipeRow & {
   view_count: number | string | null;
 };
 
+type SupabaseSearchRecipeRow = SupabaseRecipeRow & {
+  total_count: number | string | null;
+};
+
 const allowedCategories = new Set<LibraryCategory>([
   "principais",
   "veggie",
@@ -253,6 +257,83 @@ export async function searchRecipesFromSupabase(params: {
   pageSize?: number;
   seed?: string;
 }): Promise<PagedRecipeResult> {
+  if (serverEnv.librarySearchEngine() !== "legacy") {
+    try {
+      return await searchRecipesWithRpcFromSupabase(params);
+    } catch (error) {
+      console.warn(
+        JSON.stringify({
+          event: "temai.library_search_fallback",
+          reason: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+        }),
+      );
+    }
+  }
+
+  return searchRecipesLegacyFromSupabase(params);
+}
+
+async function searchRecipesWithRpcFromSupabase(params: {
+  query?: string;
+  category?: string;
+  page?: number;
+  pageSize?: number;
+  seed?: string;
+}): Promise<PagedRecipeResult> {
+  const page = sanitizePage(params.page);
+  const pageSize = sanitizePageSize(params.pageSize);
+
+  if (!canUseSupabase()) {
+    return { recipes: [], total: 0, page, pageSize, totalPages: 1 };
+  }
+
+  const runRpc = async (targetPage: number) => {
+    const response = await supabaseFetch("rpc/search_recipes_br_v1", {
+      method: "POST",
+      next: { revalidate: 60 },
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        p_query: params.query?.trim() || "",
+        p_category: params.category?.trim() || "",
+        p_page: targetPage,
+        p_page_size: pageSize,
+        p_seed: params.seed?.trim() || "default-seed",
+      }),
+    });
+    return (await response.json()) as SupabaseSearchRecipeRow[];
+  };
+
+  let rows = await runRpc(page);
+  let total = Number(rows[0]?.total_count || 0);
+  let totalPages = Math.max(1, Math.ceil(total / pageSize));
+  let safePage = Math.min(page, totalPages);
+
+  if (!rows.length && page > 1) {
+    const firstPageRows = await runRpc(1);
+    total = Number(firstPageRows[0]?.total_count || 0);
+    totalPages = Math.max(1, Math.ceil(total / pageSize));
+    safePage = Math.min(page, totalPages);
+    rows = total > 0 ? await runRpc(safePage) : [];
+  }
+
+  return {
+    recipes: rows.map(mapRowToRecipe),
+    total,
+    page: safePage,
+    pageSize,
+    totalPages,
+  };
+}
+
+async function searchRecipesLegacyFromSupabase(params: {
+  query?: string;
+  category?: string;
+  page?: number;
+  pageSize?: number;
+  seed?: string;
+}): Promise<PagedRecipeResult> {
   const page = sanitizePage(params.page);
   const pageSize = sanitizePageSize(params.pageSize);
 
@@ -333,7 +414,7 @@ export async function getRecipeBySlugFromSupabase(slug: string): Promise<Recipe 
 
   const response = await supabaseFetch(
     `recipes_br?select=id,slug,title,description,category,ingredients,steps,prep_minutes,servings,image_url,source_name&slug=eq.${encodeURIComponent(slug)}&is_published=eq.true&moderation_status=eq.approved&limit=1`,
-    { cache: "no-store" },
+    { next: { revalidate: 60 * 5 } },
   );
   const rows = (await response.json()) as SupabaseRecipeRow[];
   if (!rows.length) return null;
@@ -352,7 +433,7 @@ export async function getRecipesBySlugsFromSupabase(slugs: readonly string[]): P
 
   const response = await supabaseFetch(
     `recipes_br?select=id,slug,title,description,category,ingredients,steps,prep_minutes,servings,image_url,source_name&slug=in.(${safeSlugs.map(encodeURIComponent).join(",")})&is_published=eq.true&moderation_status=eq.approved&limit=${safeSlugs.length}`,
-    { cache: "no-store" },
+    { next: { revalidate: 60 * 5 } },
   );
   const rows = (await response.json()) as SupabaseRecipeRow[];
   const recipesById = new Map(rows.map((row) => [row.slug, mapRowToRecipe(row)]));
@@ -373,7 +454,7 @@ export async function getPopularRecipesFromSupabase(limit = 8): Promise<Array<{
   const safeLimit = Math.max(4, Math.min(20, Math.floor(limit)));
   const response = await supabaseFetch("rpc/get_popular_recipes_br", {
     method: "POST",
-    cache: "no-store",
+    next: { revalidate: 60 },
     headers: {
       "Content-Type": "application/json",
     },
@@ -390,6 +471,19 @@ export async function getPopularRecipesFromSupabase(limit = 8): Promise<Array<{
       viewCount: Number(row.view_count || 0),
       rating: ratingAverage > 0 ? Number((ratingAverage / 2).toFixed(1)) : 0,
     };
+  });
+}
+
+export async function refreshRecipePopularityMetric(recipeId: string): Promise<void> {
+  if (!canUseSupabase()) return;
+
+  await supabaseFetch("rpc/refresh_recipe_popularity_metric", {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ p_recipe_id: recipeId }),
   });
 }
 

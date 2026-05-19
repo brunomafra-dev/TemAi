@@ -281,7 +281,7 @@ export default function HomePage() {
 
     async function loadPopular() {
       try {
-        const response = await fetch(`/api/library/popular?limit=7&t=${Date.now()}`, { cache: "no-store" });
+        const response = await fetch("/api/library/popular?limit=7");
         if (!response.ok) {
           throw new Error("Falha ao carregar populares.");
         }

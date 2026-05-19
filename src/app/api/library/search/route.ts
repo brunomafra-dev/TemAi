@@ -5,8 +5,13 @@ import {
   sanitizeQueryString,
   validationErrorResponse,
 } from "@/lib/input-validation";
-import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
+import { consumePublicReadRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse } from "@/features/security/auth-user";
+import { elapsedMs, logApiEvent } from "@/lib/observability";
+
+const SEARCH_CACHE_HEADERS = {
+  "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+};
 
 function readIntParam(
   value: string | null,
@@ -25,13 +30,16 @@ function readIntParam(
 }
 
 export async function GET(request: Request) {
+  const startedAt = Date.now();
   try {
-    const endpointRateLimit = await consumeAuthRateLimit({
+    const endpointRateLimit = await consumePublicReadRateLimit({
       route: "library-search",
       request,
     });
     if (!endpointRateLimit.allowed) {
-      return rateLimitResponse(endpointRateLimit.retryAfterSeconds);
+      logApiEvent({ route: "library-search", status: 429, durationMs: elapsedMs(startedAt) });
+      const response = rateLimitResponse(endpointRateLimit.retryAfterSeconds);
+      return response;
     }
 
     const url = new URL(request.url);
@@ -67,19 +75,49 @@ export async function GET(request: Request) {
     });
 
     const result = await searchRecipesFromSupabase({ query, category, page, pageSize, seed });
-    return NextResponse.json({
-      recipes: result.recipes,
-      source: "supabase",
-      pagination: {
-        total: result.total,
+    const response = NextResponse.json(
+      {
+        recipes: result.recipes,
+        source: "supabase",
+        pagination: {
+          total: result.total,
+          page: result.page,
+          pageSize: result.pageSize,
+          totalPages: result.totalPages,
+        },
+      },
+      { headers: SEARCH_CACHE_HEADERS },
+    );
+    logApiEvent({
+      route: "library-search",
+      status: 200,
+      durationMs: elapsedMs(startedAt),
+      metadata: {
+        hasQuery: Boolean(query),
+        category: category || "todas",
         page: result.page,
         pageSize: result.pageSize,
-        totalPages: result.totalPages,
+        total: result.total,
       },
     });
+    return response;
   } catch (error) {
     const validationResponse = validationErrorResponse(error);
-    if (validationResponse) return validationResponse;
+    if (validationResponse) {
+      logApiEvent({
+        route: "library-search",
+        status: validationResponse.status,
+        durationMs: elapsedMs(startedAt),
+        error,
+      });
+      return validationResponse;
+    }
+    logApiEvent({
+      route: "library-search",
+      status: 500,
+      durationMs: elapsedMs(startedAt),
+      error,
+    });
     return NextResponse.json(
       {
         recipes: [],
@@ -87,7 +125,7 @@ export async function GET(request: Request) {
         pagination: { total: 0, page: 1, pageSize: 12, totalPages: 1 },
         error: "Falha ao ler Supabase.",
       },
-      { status: 500 },
+      { status: 500, headers: { "Cache-Control": "no-store, max-age=0" } },
     );
   }
 }

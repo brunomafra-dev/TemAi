@@ -4,11 +4,13 @@ import {
   InputValidationError,
   validationErrorResponse,
 } from "@/lib/input-validation";
-import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
+import { consumePublicReadRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse } from "@/features/security/auth-user";
+import { elapsedMs, logApiEvent } from "@/lib/observability";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+const POPULAR_CACHE_HEADERS = {
+  "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+};
 
 function readLimit(value: string | null): number {
   if (!value) return 8;
@@ -24,25 +26,47 @@ function readLimit(value: string | null): number {
 }
 
 export async function GET(request: Request) {
+  const startedAt = Date.now();
   try {
-    const endpointRateLimit = await consumeAuthRateLimit({
+    const endpointRateLimit = await consumePublicReadRateLimit({
       route: "library-popular",
       request,
     });
     if (!endpointRateLimit.allowed) {
+      logApiEvent({ route: "library-popular", status: 429, durationMs: elapsedMs(startedAt) });
       return rateLimitResponse(endpointRateLimit.retryAfterSeconds);
     }
 
     const url = new URL(request.url);
     const limit = readLimit(url.searchParams.get("limit"));
     const fromSupabase = await getPopularRecipesFromSupabase(limit);
+    logApiEvent({
+      route: "library-popular",
+      status: 200,
+      durationMs: elapsedMs(startedAt),
+      metadata: { limit, count: fromSupabase.length },
+    });
     return NextResponse.json(
       { recipes: fromSupabase, source: "supabase" },
-      { headers: { "Cache-Control": "no-store, max-age=0" } },
+      { headers: POPULAR_CACHE_HEADERS },
     );
   } catch (error) {
     const validationResponse = validationErrorResponse(error);
-    if (validationResponse) return validationResponse;
+    if (validationResponse) {
+      logApiEvent({
+        route: "library-popular",
+        status: validationResponse.status,
+        durationMs: elapsedMs(startedAt),
+        error,
+      });
+      return validationResponse;
+    }
+    logApiEvent({
+      route: "library-popular",
+      status: 500,
+      durationMs: elapsedMs(startedAt),
+      error,
+    });
     return NextResponse.json(
       { recipes: [], source: "supabase", error: "Falha ao ler Supabase." },
       { status: 500, headers: { "Cache-Control": "no-store, max-age=0" } },

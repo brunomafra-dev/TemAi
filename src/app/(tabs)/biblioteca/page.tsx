@@ -26,9 +26,7 @@ function sanitizePage(value: string | null): number {
 }
 
 function createSeed(): string {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID().slice(0, 8)
-    : `${Date.now()}`;
+  return "temai-library-v1";
 }
 
 export default function LibraryPage() {

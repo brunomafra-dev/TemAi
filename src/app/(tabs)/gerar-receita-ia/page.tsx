@@ -837,7 +837,7 @@ function CreateRecipePageContent() {
               Plano free: {subscription.aiGenerationsUsedThisMonth}/{subscription.aiGenerationsLimitThisMonth} gerações neste mês.
             </p>
           ) : (
-            <p className="text-xs text-[#7A6D60]">Plano premium: gerações ilimitadas + áudio e foto.</p>
+            <p className="text-xs text-[#7A6D60]">Plano premium: uso livre com IA + áudio e foto.</p>
           )}
         </CardHeader>
         <CardContent className="space-y-4">

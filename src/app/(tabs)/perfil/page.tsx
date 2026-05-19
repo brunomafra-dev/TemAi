@@ -594,7 +594,7 @@ export default function ProfilePage() {
       return {
         from: "bot",
         text:
-          "Premium (R$ 24,90/mês) inclui: geração ilimitada com IA, uso de voz e imagem na IA, receitas autorais por voz e badges exclusivos. Se você usa o app todo dia, costuma compensar rápido.",
+          "Premium inclui uso livre com IA, voz e imagem na IA, receitas autorais por voz, publicação na Biblioteca e badges exclusivos. Planos: R$ 24,90/mês ou R$ 199,90/ano.",
         options: ["free-vs-premium", "cancelamento", "cobranca"],
       };
     }
@@ -607,7 +607,7 @@ export default function ProfilePage() {
       return {
         from: "bot",
         text:
-          "Free: 3 gerações IA por mês, somente texto e badges padrão. Premium: ilimitado, IA com voz/imagem, receita autoral por voz e badges premium.",
+          "Free: 3 gerações IA por mês, somente texto e badges padrão. Premium: uso livre com proteções anti-abuso, IA com voz/imagem, receita autoral por voz e badges premium.",
         options: ["beneficios", "cancelamento", "falar-humano"],
       };
     }
@@ -775,7 +775,8 @@ export default function ProfilePage() {
                 <div className="mt-2 space-y-1 text-xs text-[#6E6154]">
                   <p>Premium ativo até: {premiumUntil || "Não informado"}</p>
                   <p>Próxima renovação: {renewsAt || "Não informado"}</p>
-                  <p>Mensalidade: R$ 24,90/mês</p>
+                  <p>Plano mensal: R$ 24,90/mês</p>
+                  <p>Plano anual: R$ 199,90/ano</p>
                 </div>
               ) : (
                 <p className="mt-2 text-xs text-[#6E6154]">
@@ -785,13 +786,13 @@ export default function ProfilePage() {
             </div>
             <div className="rounded-2xl border border-[#E5D7BF] bg-white p-3">
               <p className="text-sm font-semibold text-[#5D5248]">Assinatura Premium</p>
-              <p className="mt-1 text-xs text-[#6A5E52]">Valor atual: R$ 24,90 por mês.</p>
+              <p className="mt-1 text-xs text-[#6A5E52]">Mensal por R$ 24,90 ou anual por R$ 199,90.</p>
             </div>
 
             <div className="rounded-2xl border border-[#E5D7BF] bg-white p-3">
               <p className="text-sm font-semibold text-[#5D5248]">Benefícios Premium</p>
               <ul className="mt-2 space-y-1 text-xs text-[#6A5E52]">
-                <li>• Geração de receitas ilimitadas com IA</li>
+                <li>• Uso livre de receitas com IA, com proteção anti-abuso</li>
                 <li>• Gerar receitas com IA por texto, áudio e foto</li>
                 <li>• Organizar receitas autorais com IA</li>
                 <li>• Adicionar ingredientes e preparo por voz</li>

@@ -1,5 +1,6 @@
 import "server-only";
 import type { InputMode } from "@/features/recipes/types";
+import { serverEnv } from "@/lib/env-server";
 import { getSupabaseServiceRoleClient } from "@/lib/supabase-admin";
 
 export const FREE_RECIPE_AI_MONTHLY_LIMIT = 3;
@@ -29,6 +30,12 @@ export class AiUsageError extends Error {
 function startOfCurrentMonthIso(): string {
   const now = new Date();
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+  return start.toISOString();
+}
+
+function startOfCurrentDayIso(): string {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
   return start.toISOString();
 }
 
@@ -63,6 +70,79 @@ function monthlyLimitFor(params: {
   return params.entitlement.isPremium ? PREMIUM_SUPPORT_AI_MONTHLY_LIMIT : FREE_SUPPORT_AI_MONTHLY_LIMIT;
 }
 
+async function enforceAiProtection(params: {
+  userId: string;
+  bucket: AiUsageBucket;
+  inputMode?: AiUsageInputMode;
+  entitlement: AiEntitlement;
+}): Promise<void> {
+  const mode = serverEnv.aiProtectionMode();
+  if (params.bucket !== "recipe_ai") return;
+
+  if (mode === "readonly") {
+    throw new AiUsageError(
+      "IA em modo de protecao temporario. A Biblioteca segue disponivel; tente gerar novamente em alguns minutos.",
+      503,
+    );
+  }
+
+  if (mode === "strict" && params.inputMode && params.inputMode !== "text" && params.inputMode !== "none") {
+    throw new AiUsageError(
+      "Modo de protecao ativo: gere por texto por enquanto para manter o app estavel.",
+      503,
+    );
+  }
+
+  if (!params.entitlement.isPremium) return;
+
+  const limit =
+    mode === "strict"
+      ? serverEnv.premiumRecipeAiStrictDailyLimit()
+      : serverEnv.premiumRecipeAiDailyLimit();
+  if (limit <= 0) return;
+
+  const supabase = getSupabaseServiceRoleClient();
+  const dayStart = startOfCurrentDayIso();
+  const [usageRes, generatedRecipeRes] = await Promise.all([
+    supabase
+      .from("ai_usage_events")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", params.userId)
+      .eq("bucket", params.bucket)
+      .gte("created_at", dayStart),
+    supabase
+      .from("ai_generated_recipes")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", params.userId)
+      .gte("created_at", dayStart),
+  ]);
+
+  if (usageRes.error || generatedRecipeRes.error) {
+    throw new AiUsageError("Nao foi possivel validar protecao de uso da IA agora.", 503);
+  }
+
+  if ((usageRes.count || 0) + (generatedRecipeRes.count || 0) >= limit) {
+    throw new AiUsageError(
+      "Uso livre protegido por hoje para manter o app estavel. Tente novamente amanha.",
+      429,
+    );
+  }
+}
+
+export async function assertRecipeAiGenerationAllowed(params: {
+  userId: string;
+  inputMode?: AiUsageInputMode;
+}): Promise<AiEntitlement> {
+  const entitlement = await getAiEntitlement(params.userId);
+  await enforceAiProtection({
+    userId: params.userId,
+    bucket: "recipe_ai",
+    inputMode: params.inputMode || "text",
+    entitlement,
+  });
+  return entitlement;
+}
+
 export async function consumeAiUsage(params: {
   userId: string;
   bucket: AiUsageBucket;
@@ -76,6 +156,12 @@ export async function consumeAiUsage(params: {
   limit: number;
 }> {
   const entitlement = await getAiEntitlement(params.userId);
+  await enforceAiProtection({
+    userId: params.userId,
+    bucket: params.bucket,
+    inputMode: params.inputMode || "none",
+    entitlement,
+  });
   const limit = monthlyLimitFor({ bucket: params.bucket, entitlement });
   const supabase = getSupabaseServiceRoleClient();
   const { data, error } = await supabase.rpc("consume_ai_usage_event", {

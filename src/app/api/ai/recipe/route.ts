@@ -13,7 +13,7 @@ import {
 } from "@/features/recipes/cooking-equipment";
 import { compactIngredientsForAi } from "@/features/recipes/helpers";
 import { getRecipeDifficulty, normalizePrepMinutesForRecipe } from "@/features/recipes/quality";
-import { aiUsageErrorResponse, consumeAiUsage } from "@/features/security/ai-usage";
+import { aiUsageErrorResponse, assertRecipeAiGenerationAllowed, consumeAiUsage } from "@/features/security/ai-usage";
 import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse, requireAuthUserId } from "@/features/security/auth-user";
 import { serverEnv } from "@/lib/env-server";
@@ -39,8 +39,8 @@ interface RecipePayload {
 }
 
 const RECIPE_FILTERS: readonly RecipeSuggestionFilter[] = ["all", "meal", "fit", "vegetarian", "dessert", "drink"];
-const MAX_RECIPE_INGREDIENT_PAYLOAD_ITEMS = 200;
-const MAX_RECIPE_INGREDIENT_ITEM_LENGTH = 300;
+const MAX_RECIPE_INGREDIENT_PAYLOAD_ITEMS = 80;
+const MAX_RECIPE_INGREDIENT_ITEM_LENGTH = 160;
 
 const inFlightRecipeRequests = new Map<string, Promise<Recipe>>();
 
@@ -305,7 +305,7 @@ export async function POST(request: Request) {
     }
 
     const payload = (await parseJsonObjectBody(request, {
-      maxBytes: 24 * 1024,
+      maxBytes: 64 * 1024,
       allowedKeys: ["suggestionId", "suggestionTitle", "ingredients", "includeNutrition", "recipeFilter", "cookingEquipment", "generationId"],
     })) as RecipePayload &
       Record<string, unknown>;
@@ -344,6 +344,11 @@ export async function POST(request: Request) {
       if (verifiedGenerationLog.normalizedIngredients.length) {
         ingredients = verifiedGenerationLog.normalizedIngredients;
       }
+    } else if (!ingredients.length) {
+      return NextResponse.json(
+        { message: "Ingredientes nao encontrados. Volte para sugestoes e gere a receita novamente." },
+        { status: 400 },
+      );
     }
 
     const recipeModel = serverEnv.openaiRecipeModel();
@@ -378,6 +383,8 @@ export async function POST(request: Request) {
         }).catch(() => undefined);
         return NextResponse.json(normalizedCachedRecipe);
       }
+
+      await assertRecipeAiGenerationAllowed({ userId, inputMode: "text" });
 
       const recipe = await generateWithInFlight(`${userId}:${cacheKey}`, () =>
         generateFullRecipeWithOpenAi({

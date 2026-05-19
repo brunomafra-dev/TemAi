@@ -1,0 +1,4 @@
+scenario,monthly_active_users,heavy_free_users,premium_monthly_subscribers,premium_annual_subscribers,free_ai_requests_per_month,premium_ai_requests_per_month,avg_ai_cost_brl,monthly_price_brl,annual_price_brl,store_fee_percent,revenuecat_fee_percent,gross_revenue_brl,store_fee_brl,revenuecat_fee_brl,ai_cost_brl,net_before_tax_brl
+base_launch,5000,1000,250,50,3,60,0.08,24.90,199.90,0.15,0.01,16220.00,2433.00,162.20,1380.00,12244.80
+strong_launch,20000,5000,1600,400,3,60,0.08,24.90,199.90,0.15,0.01,119800.00,17970.00,1198.00,10800.00,89832.00
+apple_standard_first_year,20000,5000,1600,400,3,60,0.08,24.90,199.90,0.30,0.01,119800.00,35940.00,1198.00,10800.00,71862.00

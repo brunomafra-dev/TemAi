@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { getSupabaseServiceRoleClient } from "@/lib/supabase-admin";
+import { serverEnv } from "@/lib/env-server";
 
 export const AUTH_RATE_LIMIT_MAX_ATTEMPTS = 5;
 export const AUTH_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
@@ -42,6 +43,14 @@ interface ConsumeRateLimitResult {
   key: string;
 }
 
+type MemoryRateLimitEntry = {
+  attempts: number;
+  expiresAt: number;
+};
+
+const memoryRateLimit = new Map<string, MemoryRateLimitEntry>();
+let nextMemoryCleanupAt = 0;
+
 function normalizeIdentifier(value?: string): string {
   return value?.trim().toLowerCase() || "-";
 }
@@ -66,6 +75,38 @@ function buildRateLimitKey(route: string, request: Request, identifier?: string)
   const rawKey = `${route}|${readIpFromRequest(request)}|${normalizeIdentifier(identifier)}`;
   const hash = createHash("sha256").update(rawKey).digest("hex");
   return `auth:${route}:${hash}`;
+}
+
+function consumeMemoryRateLimit(params: {
+  route: RateLimitedRoute;
+  request: Request;
+  identifier?: string;
+}): ConsumeRateLimitResult {
+  const key = buildRateLimitKey(params.route, params.request, params.identifier);
+  const config = RATE_LIMIT_CONFIG[params.route];
+  const now = Date.now();
+  if (now >= nextMemoryCleanupAt) {
+    memoryRateLimit.forEach((entry, entryKey) => {
+      if (entry.expiresAt <= now) memoryRateLimit.delete(entryKey);
+    });
+    nextMemoryCleanupAt = now + 60_000;
+  }
+
+  const current = memoryRateLimit.get(key);
+  const entry =
+    current && current.expiresAt > now
+      ? { attempts: current.attempts + 1, expiresAt: current.expiresAt }
+      : { attempts: 1, expiresAt: now + config.windowSeconds * 1000 };
+  memoryRateLimit.set(key, entry);
+
+  const allowed = entry.attempts <= config.maxAttempts;
+  return {
+    key,
+    allowed,
+    remaining: Math.max(config.maxAttempts - entry.attempts, 0),
+    retryAfterSeconds: allowed ? 0 : Math.max(1, Math.ceil((entry.expiresAt - now) / 1000)),
+    attempts: entry.attempts,
+  };
 }
 
 export async function consumeAuthRateLimit(params: {
@@ -100,6 +141,18 @@ export async function consumeAuthRateLimit(params: {
     retryAfterSeconds: Number(first.retry_after_seconds) || 0,
     attempts: Number(first.attempts) || 0,
   };
+}
+
+export async function consumePublicReadRateLimit(params: {
+  route: Extract<RateLimitedRoute, "library-search" | "library-popular" | "library-meal">;
+  request: Request;
+  identifier?: string;
+}): Promise<ConsumeRateLimitResult> {
+  if (serverEnv.publicReadRateLimitMode() === "supabase") {
+    return consumeAuthRateLimit(params);
+  }
+
+  return consumeMemoryRateLimit(params);
 }
 
 export async function resetAuthRateLimit(key: string): Promise<void> {

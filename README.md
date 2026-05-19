@@ -19,6 +19,17 @@ Isso esta implementado com duas rotas de API separadas:
 - `POST /api/ai/suggestions`
 - `POST /api/ai/recipe`
 
+## Escala de lancamento
+
+- A Biblioteca usa busca paginada no Supabase via RPC (`LIBRARY_SEARCH_ENGINE=rpc`) e fallback legado se a migration ainda nao estiver aplicada.
+- Rotas publicas de leitura usam cache curto e rate limit em memoria por instancia (`PUBLIC_READ_RATE_LIMIT_MODE=memory`) para evitar uma escrita no Supabase em todo request.
+- Popularidade usa a tabela `recipe_popularity_metrics`, atualizada quando views/ratings mudam e recalculavel pela funcao `refresh_recipe_popularity_metrics()`.
+- IA tem modo de protecao por env:
+  - `AI_PROTECTION_MODE=normal`: uso padrao.
+  - `AI_PROTECTION_MODE=strict`: bloqueia audio/foto temporariamente e reduz o limite diario anti-abuso do Premium.
+  - `AI_PROTECTION_MODE=readonly`: pausa geracao de IA e mantem a Biblioteca disponivel.
+- Premium deve ser comunicado como "uso livre", com protecoes anti-abuso e emergencia de custo no servidor.
+
 ## Paginas
 
 - `/` Home / Gerar receita
@@ -85,10 +96,22 @@ SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
 OPENAI_API_KEY=
 OPENAI_TRANSLATION_MODEL=gpt-4.1-mini
+OPENAI_TIMEOUT_MS=45000
+AI_PROTECTION_MODE=normal
+PREMIUM_RECIPE_AI_DAILY_LIMIT=80
+PREMIUM_RECIPE_AI_STRICT_DAILY_LIMIT=20
+LIBRARY_SEARCH_ENGINE=rpc
+PUBLIC_READ_RATE_LIMIT_MODE=memory
 ```
 
 Com isso, a biblioteca passa a ler primeiro da tabela `recipes_br` (PT-BR).  
 Se nao houver dados/config, o app cai para fallback automaticamente.
+
+## Mobile e assinaturas
+
+- Planos previstos: Premium mensal de R$ 24,90 e anual de R$ 199,90.
+- Apple/Google devem cobrar assinatura dentro dos apps por billing nativo das lojas.
+- RevenueCat e a recomendacao para acelerar recibos, restore, status premium e webhooks; o Supabase segue como fonte final do entitlement em `user_subscriptions`.
 
 ## Seguranca de segredos
 

@@ -60,6 +60,44 @@ function readOutputText(payload: unknown): string {
   );
 }
 
+function isRetryableOpenAiStatus(status: number): boolean {
+  return status === 408 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+async function fetchOpenAiWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const attempts = 2;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), serverEnv.openaiTimeoutMs());
+    try {
+      const response = await fetch(url, {
+        ...init,
+        signal: controller.signal,
+      });
+
+      if (attempt < attempts - 1 && isRetryableOpenAiStatus(response.status)) {
+        await response.body?.cancel().catch(() => undefined);
+        continue;
+      }
+
+      return response;
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new OpenAiGenerationError("IA demorou demais para responder. Tente novamente em instantes.", 504);
+      }
+
+      if (attempt >= attempts - 1) {
+        throw new OpenAiGenerationError("Falha temporaria ao chamar IA. Tente novamente em instantes.", 502);
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  throw new OpenAiGenerationError("Falha temporaria ao chamar IA.", 502);
+}
+
 async function callOpenAiJson(params: {
   model: string;
   prompt: string | Array<unknown>;
@@ -71,7 +109,7 @@ async function callOpenAiJson(params: {
     throw new OpenAiGenerationError("IA real ainda nao configurada. Adicione OPENAI_API_KEY e faca redeploy.", 503);
   }
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const response = await fetchOpenAiWithTimeout("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -124,7 +162,7 @@ async function callOpenAiText(params: {
     throw new OpenAiGenerationError("IA real ainda nao configurada. Adicione OPENAI_API_KEY e faca redeploy.", 503);
   }
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const response = await fetchOpenAiWithTimeout("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -303,7 +341,7 @@ export async function transcribeAudioWithOpenAi(
   formData.append("model", serverEnv.openaiAudioModel());
   formData.append("file", file);
 
-  const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+  const response = await fetchOpenAiWithTimeout("https://api.openai.com/v1/audio/transcriptions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
