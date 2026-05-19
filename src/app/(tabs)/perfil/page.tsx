@@ -1113,7 +1113,16 @@ export default function ProfilePage() {
           </div>
         );
       case "privacy":
-        return <Link href="/privacidade" className="text-sm font-semibold text-primary underline">Abrir Política de Privacidade</Link>;
+        return (
+          <div className="space-y-3">
+            <Link href="/privacidade" className="block text-sm font-semibold text-primary underline">
+              Abrir Política de Privacidade
+            </Link>
+            <Link href="/exclusao-de-conta" className="block text-sm font-semibold text-primary underline">
+              Ver exclusão de conta e dados
+            </Link>
+          </div>
+        );
       case "terms":
         return <Link href="/termos" className="text-sm font-semibold text-primary underline">Abrir Termos de Uso</Link>;
       case "logout":
@@ -1130,8 +1139,12 @@ export default function ProfilePage() {
           <div className="space-y-3">
             <p className="text-lg font-semibold text-[#4F4338]">Tem certeza que deseja excluir sua conta?</p>
             <p className="text-sm text-[#7A6D60]">
-              Essa ação remove sua conta do Supabase e apaga os dados locais deste dispositivo.
+              Essa ação remove sua conta e dados vinculados quando cabível, apaga dados locais deste dispositivo e pode
+              preservar registros restritos por obrigação legal, segurança, cobrança ou defesa de direitos.
             </p>
+            <Link href="/exclusao-de-conta" className="text-xs font-semibold text-primary underline">
+              Entender exclusão de conta e dados
+            </Link>
             {deleteAccountMessage ? (
               <p className="rounded-lg border border-[#E5D7BF] bg-white px-3 py-2 text-xs text-[#6A5E52]">
                 {deleteAccountMessage}

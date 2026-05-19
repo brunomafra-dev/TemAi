@@ -7,6 +7,7 @@ import {
   readRequiredString,
   validationErrorResponse,
 } from "@/lib/input-validation";
+import { LEGAL_PRIVACY_VERSION, LEGAL_TERMS_VERSION } from "@/lib/legal";
 
 interface RegisterPayload {
   name?: string;
@@ -178,6 +179,8 @@ export async function POST(request: Request) {
         unlocked_badges: ["estagiario"],
         accepted_terms_at: nowIso,
         accepted_privacy_at: nowIso,
+        accepted_terms_version: LEGAL_TERMS_VERSION,
+        accepted_privacy_version: LEGAL_PRIVACY_VERSION,
       },
       { onConflict: "id" },
     );

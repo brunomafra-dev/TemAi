@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { getSupabaseBrowserClient } from "@/lib/supabase-client";
 import { saveUserProfile, type UserProfile } from "@/features/profile/storage";
+import { LEGAL_PRIVACY_VERSION, LEGAL_TERMS_VERSION } from "@/lib/legal";
 
 type Mode = "login" | "register" | "forgot";
 
@@ -207,6 +208,8 @@ export default function AuthPage() {
       unlockedBadges: ["estagiario"],
       acceptedTermsAt: nowIso,
       acceptedPrivacyAt: nowIso,
+      acceptedTermsVersion: LEGAL_TERMS_VERSION,
+      acceptedPrivacyVersion: LEGAL_PRIVACY_VERSION,
     };
 
     saveUserProfile(profile);
@@ -385,7 +388,7 @@ export default function AuthPage() {
                 className="mt-0.5"
               />
               <span>
-                Li e concordo com os{" "}
+                Li e concordo com as versões vigentes dos{" "}
                 <Link href="/termos" className="font-semibold text-primary underline">
                   Termos de Uso
                 </Link>{" "}

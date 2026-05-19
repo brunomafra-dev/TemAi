@@ -37,6 +37,9 @@ Isso esta implementado com duas rotas de API separadas:
 - `/biblioteca`
 - `/perfil`
 - `/receita/[id]` Detalhe da receita
+- `/termos`
+- `/privacidade`
+- `/exclusao-de-conta`
 
 ## Estrutura inicial
 
@@ -112,6 +115,13 @@ Se nao houver dados/config, o app cai para fallback automaticamente.
 - Planos previstos: Premium mensal de R$ 24,90 e anual de R$ 199,90.
 - Apple/Google devem cobrar assinatura dentro dos apps por billing nativo das lojas.
 - RevenueCat e a recomendacao para acelerar recibos, restore, status premium e webhooks; o Supabase segue como fonte final do entitlement em `user_subscriptions`.
+
+## Juridico e LGPD
+
+- Termos, Politica de Privacidade e exclusao de conta ficam em rotas publicas.
+- O cadastro registra data e versao aceita dos Termos e da Politica no perfil do usuario.
+- O inventario operacional de dados, fornecedores, bases LGPD e checklist Apple/Google fica em `docs/legal-lgpd-data-map.md`.
+- Antes de publicar nas lojas, atualizar os textos com razao social, CNPJ, cidade/UF e dados da empresa aberta para operar o TemAI.
 
 ## Seguranca de segredos
 
