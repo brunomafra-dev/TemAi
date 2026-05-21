@@ -1,72 +1,88 @@
-# TemAi
+ TemAi
 
-App de receitas com IA, mobile-first, focado em simplicidade e velocidade.
+App mobile-first de receitas com IA que transforma ingredientes disponíveis em sugestões rápidas e receitas completas sob demanda.
+
+[Demo ativa](https://temaiapp.vercel.app)
+
+## Por que esse projeto existe
+
+Muita gente abre a geladeira, vê alguns ingredientes soltos e não sabe o que preparar. O TemAi nasceu para resolver esse momento simples, mas muito comum: decidir rápido o que cozinhar com o que já existe em casa.
+
+O foco do projeto é entregar uma experiência leve, prática e pensada para celular, usando IA apenas onde ela melhora o fluxo do usuário.
+
+## Solução
+
+O app usa um fluxo de IA em duas etapas:
+
+1. O usuário informa ingredientes, contexto ou preferências.
+2. A IA gera sugestões curtas primeiro.
+3. A receita completa só é criada quando o usuário escolhe uma sugestão.
+
+Essa decisão reduz custo, melhora velocidade e evita gerar receitas completas que talvez nunca sejam usadas.
+
+## Funcionalidades
+
+- Geração de sugestões de receitas por ingredientes.
+- Geração de receita completa sob demanda.
+- Biblioteca pública de receitas brasileiras.
+- Busca e listagem paginada com Supabase.
+- Perfil de usuário, receitas salvas e badges.
+- Páginas públicas de termos, privacidade e exclusão de conta.
+- Estrutura preparada para recursos premium e publicação mobile.
+- Rate limit, validação de entrada e proteção contra abuso de IA.
+- APK em `public/downloads/temai.apk` para distribuição Android fora das lojas.
 
 ## Stack
 
-- Next.js (App Router)
+- Next.js App Router
 - React
+- TypeScript
 - Tailwind CSS
-- Componentes no estilo shadcn/ui
+- Supabase
+- API Routes
+- Capacitor Android
 
-## Fluxo principal de IA (2 etapas)
-
-1. Gerar apenas 3 sugestoes leves com base nos ingredientes.
-2. Gerar receita completa somente quando o usuario escolhe uma sugestao.
-
-Isso esta implementado com duas rotas de API separadas:
-
-- `POST /api/ai/suggestions`
-- `POST /api/ai/recipe`
-
-## Escala de lancamento
-
-- A Biblioteca usa busca paginada no Supabase via RPC (`LIBRARY_SEARCH_ENGINE=rpc`) e fallback legado se a migration ainda nao estiver aplicada.
-- Rotas publicas de leitura usam cache curto e rate limit em memoria por instancia (`PUBLIC_READ_RATE_LIMIT_MODE=memory`) para evitar uma escrita no Supabase em todo request.
-- Popularidade usa a tabela `recipe_popularity_metrics`, atualizada quando views/ratings mudam e recalculavel pela funcao `refresh_recipe_popularity_metrics()`.
-- IA tem modo de protecao por env:
-  - `AI_PROTECTION_MODE=normal`: uso padrao.
-  - `AI_PROTECTION_MODE=strict`: bloqueia audio/foto temporariamente e reduz o limite diario anti-abuso do Premium.
-  - `AI_PROTECTION_MODE=readonly`: pausa geracao de IA e mantem a Biblioteca disponivel.
-- Premium deve ser comunicado como "uso livre", com protecoes anti-abuso e emergencia de custo no servidor.
-
-## Paginas
-
-- `/` Home / Gerar receita
-- `/minhas-receitas`
-- `/biblioteca`
-- `/perfil`
-- `/receita/[id]` Detalhe da receita
-- `/termos`
-- `/privacidade`
-- `/exclusao-de-conta`
-
-## Estrutura inicial
+## Arquitetura
 
 ```txt
 src/
   app/
     (tabs)/
-      page.tsx
-      minhas-receitas/page.tsx
-      biblioteca/page.tsx
-      perfil/page.tsx
-    receita/[id]/page.tsx
-    api/ai/suggestions/route.ts
-    api/ai/recipe/route.ts
+      gerar-receita-ia/
+      biblioteca/
+      minhas-receitas/
+      perfil/
+    api/
+      ai/suggestions/
+      ai/recipe/
+      library/
+      profile/
+  features/
+    recipes/
+    profile/
+    security/
+    community/
   components/
     navigation/
     recipes/
     ui/
-  features/recipes/
-    ai-generator.ts
-    library-recipes.ts
-    local-storage.ts
-    api-client.ts
-    types.ts
+supabase/
+  migrations/
+  seed/
+docs/
+  legal-lgpd-data-map.md
+  launch-scale-checklist.md
 ```
 
-## Rodar local
+## Decisões técnicas
+
+- As rotas `POST /api/ai/suggestions` e `POST /api/ai/recipe` separam sugestão leve de geração completa.
+- A biblioteca usa Supabase com busca paginada e fallback quando migrations ainda não estão aplicadas.
+- A popularidade de receitas usa métricas próprias para views, avaliações e ranking.
+- A camada de segurança centraliza validação de entrada, rate limit, autenticação e uso de IA.
+- O projeto mantém documentação de LGPD, checklist de escala e cuidados com publicação mobile.
+
+## Rodando localmente
 
 ```bash
 npm install
@@ -75,60 +91,56 @@ npm run dev
 
 Abra `http://localhost:3000`.
 
-## Biblioteca BR no Supabase (Passo 3)
-
-1. Execute as migrations:
-
-```bash
-supabase migration up
-```
-
-2. Rode seed inicial de receitas BR:
-
-```bash
-supabase db query < supabase/seed/recipes_br_seed.sql
-```
-
-3. Configure `.env.local`:
+Crie um arquivo `.env.local` com base nas variáveis usadas pelo projeto:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-SUPABASE_URL=...
-SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
-OPENAI_TRANSLATION_MODEL=gpt-4.1-mini
-OPENAI_TIMEOUT_MS=45000
 AI_PROTECTION_MODE=normal
-PREMIUM_RECIPE_AI_DAILY_LIMIT=80
-PREMIUM_RECIPE_AI_STRICT_DAILY_LIMIT=20
 LIBRARY_SEARCH_ENGINE=rpc
 PUBLIC_READ_RATE_LIMIT_MODE=memory
 ```
 
-Com isso, a biblioteca passa a ler primeiro da tabela `recipes_br` (PT-BR).  
-Se nao houver dados/config, o app cai para fallback automaticamente.
+## Supabase
 
-## Mobile e assinaturas
+Para usar a biblioteca BR e os recursos de perfil, execute as migrations e o seed:
 
-- Planos previstos: Premium mensal de R$ 24,90 e anual de R$ 199,90.
-- Apple/Google devem cobrar assinatura dentro dos apps por billing nativo das lojas.
-- RevenueCat e a recomendacao para acelerar recibos, restore, status premium e webhooks; o Supabase segue como fonte final do entitlement em `user_subscriptions`.
+```bash
+supabase migration up
+supabase db query < supabase/seed/recipes_br_seed.sql
+```
 
-## Juridico e LGPD
+Se o Supabase ou as variáveis não estiverem configurados, algumas áreas podem cair para fallback local ou ficar indisponíveis.
 
-- Termos, Politica de Privacidade e exclusao de conta ficam em rotas publicas.
-- O cadastro registra data e versao aceita dos Termos e da Politica no perfil do usuario.
-- O inventario operacional de dados, fornecedores, bases LGPD e checklist Apple/Google fica em `docs/legal-lgpd-data-map.md`.
-- Antes de publicar nas lojas, atualizar os textos com razao social, CNPJ, cidade/UF e dados da empresa aberta para operar o TemAI.
+## Limite de infraestrutura
 
-## Seguranca de segredos
+O projeto depende do plano gratuito do Supabase. Como o plano free limita a quantidade de projetos ativos, a demo pode alternar disponibilidade com outros projetos do portfólio.
+
+## Aprendizados
+
+- Separar IA em etapas deixa o produto mais rápido e barato.
+- Um app simples ainda precisa de decisões reais de arquitetura: dados, autenticação, segurança, LGPD e custo.
+- Documentação e demo são parte da entrega, não só detalhe visual.
+- Construir para mobile muda prioridades de navegação, texto e fluxo.
+
+## Próximos passos
+
+- Melhorar README com prints reais do app.
+- Evoluir a experiência premium.
+- Ampliar observabilidade de custos de IA.
+- Refinar biblioteca pública e ranking de receitas.
+- Preparar publicação mobile com checklist Apple/Google.
+
+## Segurança
 
 - Nunca commitar `.env.local`.
-- Chaves sensiveis ficam somente no backend (`SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`).
-- Variaveis `NEXT_PUBLIC_*` sao publicas por design e nao devem conter segredos.
-- Rode antes de push:
+- Chaves sensíveis devem ficar somente no backend.
+- Variáveis `NEXT_PUBLIC_*` são públicas por design.
+- Antes de pushar alterações sensíveis, rode:
 
 ```bash
 npm run security:scan-secrets
