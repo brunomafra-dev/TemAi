@@ -1,88 +1,117 @@
- TemAi
+<div align="center">
 
-App mobile-first de receitas com IA que transforma ingredientes disponíveis em sugestões rápidas e receitas completas sob demanda.
+# TemAi
 
-[Demo ativa](https://temaiapp.vercel.app)
+**Receitas com IA para transformar ingredientes disponíveis em sugestões práticas e receitas completas.**
 
-## Por que esse projeto existe
+![Next.js](https://img.shields.io/badge/Next.js-111827?style=for-the-badge&logo=nextdotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-111827?style=for-the-badge&logo=typescript&logoColor=60a5fa)
+![Supabase](https://img.shields.io/badge/Supabase-111827?style=for-the-badge&logo=supabase&logoColor=34d399)
+![IA Aplicada](https://img.shields.io/badge/IA_Aplicada-111827?style=for-the-badge&logo=openai&logoColor=facc15)
 
-Muita gente abre a geladeira, vê alguns ingredientes soltos e não sabe o que preparar. O TemAi nasceu para resolver esse momento simples, mas muito comum: decidir rápido o que cozinhar com o que já existe em casa.
+[Demo](https://temaiapp.vercel.app) · [Portfólio](https://www.brunomafra.website/pt)
 
-O foco do projeto é entregar uma experiência leve, prática e pensada para celular, usando IA apenas onde ela melhora o fluxo do usuário.
+</div>
 
-## Solução
+---
 
-O app usa um fluxo de IA em duas etapas:
+## Descrição do problema
 
-1. O usuário informa ingredientes, contexto ou preferências.
-2. A IA gera sugestões curtas primeiro.
-3. A receita completa só é criada quando o usuário escolhe uma sugestão.
+Decidir o que cozinhar com os ingredientes disponíveis costuma ser lento, repetitivo e cheio de fricção. A pessoa precisa lembrar receitas, adaptar quantidades, pensar em substituições e ainda transformar tudo em um passo a passo viável.
 
-Essa decisão reduz custo, melhora velocidade e evita gerar receitas completas que talvez nunca sejam usadas.
+O problema fica maior no celular: o fluxo precisa ser rápido, direto e confiável, sem exigir que o usuário escreva um briefing perfeito para conseguir uma ideia útil.
 
-## Funcionalidades
+## Solução proposta
 
-- Geração de sugestões de receitas por ingredientes.
-- Geração de receita completa sob demanda.
-- Biblioteca pública de receitas brasileiras.
-- Busca e listagem paginada com Supabase.
-- Perfil de usuário, receitas salvas e badges.
-- Páginas públicas de termos, privacidade e exclusão de conta.
-- Estrutura preparada para recursos premium e publicação mobile.
-- Rate limit, validação de entrada e proteção contra abuso de IA.
-- APK em `public/downloads/temai.apk` para distribuição Android fora das lojas.
+O TemAi propõe um fluxo mobile-first em duas etapas:
 
-## Stack
+1. O usuário informa ingredientes por texto ou contexto rápido.
+2. A IA gera sugestões leves primeiro e só cria a receita completa quando uma opção é escolhida.
 
-- Next.js App Router
-- React
-- TypeScript
-- Tailwind CSS
-- Supabase
-- API Routes
-- Capacitor Android
+Essa separação reduz custo, melhora a sensação de velocidade e evita gerar receitas longas antes de existir intenção real do usuário.
 
-## Arquitetura
+## Stack utilizada
+
+| Camada | Tecnologias |
+| --- | --- |
+| Frontend | Next.js App Router, React, TypeScript, Tailwind CSS |
+| Backend | API Routes, validação de entrada, rotas server-side |
+| Dados | Supabase, RPC, tabelas de receitas, perfis e métricas |
+| IA | Fluxo de sugestões e receita completa em endpoints separados |
+| Mobile | Capacitor Android, PWA e experiência mobile-first |
+
+## Arquitetura resumida
 
 ```txt
 src/
   app/
     (tabs)/
-      gerar-receita-ia/
-      biblioteca/
-      minhas-receitas/
-      perfil/
+      page.tsx
+      minhas-receitas/page.tsx
+      biblioteca/page.tsx
+      perfil/page.tsx
+    receita/[id]/page.tsx
     api/
-      ai/suggestions/
-      ai/recipe/
+      ai/suggestions/route.ts
+      ai/recipe/route.ts
       library/
-      profile/
-  features/
-    recipes/
-    profile/
-    security/
-    community/
+      support/
   components/
     navigation/
     recipes/
     ui/
+  features/
+    recipes/
+    security/
+  lib/
+    supabase-client.ts
+    supabase-admin.ts
 supabase/
   migrations/
   seed/
-docs/
-  legal-lgpd-data-map.md
-  launch-scale-checklist.md
+android/
 ```
 
-## Decisões técnicas
+## Screenshots
 
-- As rotas `POST /api/ai/suggestions` e `POST /api/ai/recipe` separam sugestão leve de geração completa.
-- A biblioteca usa Supabase com busca paginada e fallback quando migrations ainda não estão aplicadas.
-- A popularidade de receitas usa métricas próprias para views, avaliações e ranking.
-- A camada de segurança centraliza validação de entrada, rate limit, autenticação e uso de IA.
-- O projeto mantém documentação de LGPD, checklist de escala e cuidados com publicação mobile.
+| Tela | O que demonstrar |
+| --- | --- |
+| Home / Gerar receita | Entrada de ingredientes e sugestões iniciais da IA |
+| Receita completa | Ingredientes, preparo, porções e interações da receita |
+| Biblioteca | Busca, filtros e navegação por receitas públicas |
+| Perfil | Preferências, receitas salvas, suporte e dados da conta |
 
-## Rodando localmente
+> As capturas devem ser adicionadas em `docs/screenshots/` quando houver uma rodada visual final da demo pública.
+
+## Funcionalidades
+
+- Geração de sugestões com IA antes da receita completa.
+- Receita completa sob demanda a partir de uma sugestão escolhida.
+- Biblioteca de receitas com busca paginada no Supabase via RPC.
+- Página pública de detalhe de receita.
+- Perfil de usuário, receitas salvas e preferências.
+- Suporte a lista de compras, badges e elementos de comunidade.
+- Rotas públicas de termos, privacidade e exclusão de conta.
+- Modos de proteção de IA para controle de custo e disponibilidade.
+- Base preparada para assinatura Premium e distribuição mobile.
+
+## Roadmap
+
+- Adicionar screenshots reais da demo em `docs/screenshots/`.
+- Finalizar fluxo de billing nativo com Apple/Google ou RevenueCat.
+- Evoluir moderação, comentários e sinais de popularidade da biblioteca.
+- Melhorar onboarding para novos usuários.
+- Expandir entrada por foto/áudio respeitando limites de custo.
+
+## Aprendizados
+
+- IA em produto precisa de controle de custo, fallback e limites claros.
+- Separar sugestão e receita completa melhora performance percebida e reduz desperdício.
+- Produtos mobile-first exigem navegação simples e estados vazios bem resolvidos.
+- Funcionalidades públicas precisam de cache, rate limit e leitura segura.
+- Documentação jurídica e LGPD fazem parte da maturidade de produto.
+
+## Como executar
 
 ```bash
 npm install
@@ -91,7 +120,7 @@ npm run dev
 
 Abra `http://localhost:3000`.
 
-Crie um arquivo `.env.local` com base nas variáveis usadas pelo projeto:
+Crie `.env.local` com as variáveis necessárias:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
@@ -100,48 +129,28 @@ SUPABASE_URL=
 SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
+OPENAI_TRANSLATION_MODEL=gpt-4.1-mini
+OPENAI_TIMEOUT_MS=45000
 AI_PROTECTION_MODE=normal
+PREMIUM_RECIPE_AI_DAILY_LIMIT=80
+PREMIUM_RECIPE_AI_STRICT_DAILY_LIMIT=20
 LIBRARY_SEARCH_ENGINE=rpc
 PUBLIC_READ_RATE_LIMIT_MODE=memory
 ```
 
-## Supabase
-
-Para usar a biblioteca BR e os recursos de perfil, execute as migrations e o seed:
+Scripts úteis:
 
 ```bash
-supabase migration up
-supabase db query < supabase/seed/recipes_br_seed.sql
-```
-
-Se o Supabase ou as variáveis não estiverem configurados, algumas áreas podem cair para fallback local ou ficar indisponíveis.
-
-## Limite de infraestrutura
-
-O projeto depende do plano gratuito do Supabase. Como o plano free limita a quantidade de projetos ativos, a demo pode alternar disponibilidade com outros projetos do portfólio.
-
-## Aprendizados
-
-- Separar IA em etapas deixa o produto mais rápido e barato.
-- Um app simples ainda precisa de decisões reais de arquitetura: dados, autenticação, segurança, LGPD e custo.
-- Documentação e demo são parte da entrega, não só detalhe visual.
-- Construir para mobile muda prioridades de navegação, texto e fluxo.
-
-## Próximos passos
-
-- Melhorar README com prints reais do app.
-- Evoluir a experiência premium.
-- Ampliar observabilidade de custos de IA.
-- Refinar biblioteca pública e ranking de receitas.
-- Preparar publicação mobile com checklist Apple/Google.
-
-## Segurança
-
-- Nunca commitar `.env.local`.
-- Chaves sensíveis devem ficar somente no backend.
-- Variáveis `NEXT_PUBLIC_*` são públicas por design.
-- Antes de pushar alterações sensíveis, rode:
-
-```bash
+npm run build
+npm run lint
 npm run security:scan-secrets
+npm run cap:sync
 ```
+
+## Link para Demo
+
+https://temaiapp.vercel.app
+
+## Link para Portfólio
+
+https://www.brunomafra.website/pt
