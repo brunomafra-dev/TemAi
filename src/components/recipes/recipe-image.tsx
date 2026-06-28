@@ -3,13 +3,13 @@
 import Image, { type ImageProps } from "next/image";
 import { memo, useEffect, useMemo, useState } from "react";
 
-const RECIPE_PLACEHOLDER_SRC = "/images/recipe-placeholder.webp";
+const RECIPE_PLACEHOLDER_SRC =
+  "https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=1200&q=80";
 const FALLBACK_TIMEOUT_MS = 8000;
 
 const nextImageHosts = new Set([
   "images.unsplash.com",
   "images.pexels.com",
-  "www.receiteria.com.br",
   "static.itdg.com.br",
   "www.tudogostoso.com.br",
   "s2-receitas.glbimg.com",
@@ -45,6 +45,7 @@ function shouldBypassNextOptimizer(source: string): boolean {
 
   try {
     const url = new URL(source);
+    if (url.hostname === "www.receiteria.com.br") return true;
     return !nextImageHosts.has(url.hostname);
   } catch {
     return true;
