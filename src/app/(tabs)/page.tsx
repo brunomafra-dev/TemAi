@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { RecipeImage } from "@/components/recipes/recipe-image";
 import { RatingStars } from "@/components/recipes/rating-stars";
 import { BADGE_CATALOG } from "@/features/profile/badges";
 import {
@@ -156,7 +157,7 @@ type PopularRecipeEntry = {
   recipe: Recipe;
   ratingAverage: number;
   ratingCount: number;
-  image: string;
+  image?: string | null;
   author: string;
   viewCount: number;
 };
@@ -209,9 +210,13 @@ const PopularRecipeCard = memo(function PopularRecipeCard({ entry }: { entry: Po
       className="flex overflow-hidden rounded-[1.4rem] border border-[#E7DCCB] bg-[#FFFCF7] shadow-[0_16px_30px_-26px_rgba(42,30,23,0.75)]"
     >
       <div className="relative min-h-[122px] w-[40%] shrink-0 overflow-hidden">
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url(${entry.image})` }}
+        <RecipeImage
+          src={entry.image}
+          alt={entry.recipe.title}
+          fill
+          sizes="40vw"
+          className="absolute inset-0"
+          imageClassName="object-cover"
         />
         <div className="absolute inset-0 bg-[#2A1E17]/30" />
         <div className="absolute left-2 top-2 flex gap-1.5">
@@ -252,6 +257,24 @@ const PopularRecipeCard = memo(function PopularRecipeCard({ entry }: { entry: Po
 
 PopularRecipeCard.displayName = "PopularRecipeCard";
 
+function PopularRecipeSkeleton() {
+  return (
+    <div className="flex min-h-[122px] overflow-hidden rounded-[1.4rem] border border-[#E7DCCB] bg-[#FFFCF7] shadow-[0_16px_30px_-26px_rgba(42,30,23,0.75)]">
+      <div className="w-[40%] shrink-0 animate-pulse bg-[linear-gradient(110deg,#F1DEC4_0%,#FFF7EC_46%,#E7C9A5_100%)]" />
+      <div className="flex flex-1 flex-col justify-between p-3">
+        <div className="space-y-2">
+          <div className="h-4 w-4/5 rounded-full bg-[#E9D9C0]" />
+          <div className="h-3 w-1/2 rounded-full bg-[#EFE2CD]" />
+        </div>
+        <div className="space-y-2">
+          <div className="h-3 w-1/3 rounded-full bg-[#E9D9C0]" />
+          <div className="h-3 w-2/5 rounded-full bg-[#EFE2CD]" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function HomePage() {
   const router = useRouter();
   const profilePhotoInputRef = useRef<HTMLInputElement | null>(null);
@@ -270,6 +293,7 @@ export default function HomePage() {
   const [popularApiRecipes, setPopularApiRecipes] = useState<
     Array<PopularRecipeView & { category: string }>
   >([]);
+  const [isPopularLoading, setIsPopularLoading] = useState(true);
   const currentBadgeLabel =
     BADGE_CATALOG.find((badge) => badge.slug === profile.selectedBadge)?.label || "🌱 Estagiário";
   const usernameHandle = profile.username?.trim()
@@ -279,7 +303,10 @@ export default function HomePage() {
   useEffect(() => {
     let isMounted = true;
 
-    async function loadPopular() {
+    async function loadPopular(showLoading = false) {
+      if (showLoading && isMounted) {
+        setIsPopularLoading(true);
+      }
       try {
         const response = await fetch("/api/library/popular?limit=7");
         if (!response.ok) {
@@ -304,10 +331,14 @@ export default function HomePage() {
         if (isMounted) {
           setPopularApiRecipes([]);
         }
+      } finally {
+        if (isMounted) {
+          setIsPopularLoading(false);
+        }
       }
     }
 
-    void loadPopular();
+    void loadPopular(true);
     const refreshPopular = () => {
       void loadPopular();
     };
@@ -504,6 +535,8 @@ export default function HomePage() {
   }, [searchTerm]);
 
   const popularRecipes = useMemo(() => {
+    if (isPopularLoading) return [];
+
     const filteredApi = popularApiRecipes.filter((entry) => {
       if (!searchTerm.trim()) {
         return true;
@@ -521,14 +554,14 @@ export default function HomePage() {
         recipe: entry.recipe,
         ratingAverage: entry.ratingAverage,
         ratingCount: entry.ratingCount,
-        image: entry.recipe.imageUrl || ctaImage,
+        image: entry.recipe.imageUrl,
         author: entry.recipe.sourceLabel,
         viewCount: entry.viewCount,
       }));
 
     if (orderedFeatured.length > 0) return orderedFeatured;
     return fallbackPopularRecipes.slice(0, 5);
-  }, [fallbackPopularRecipes, popularApiRecipes, searchTerm]);
+  }, [fallbackPopularRecipes, isPopularLoading, popularApiRecipes, searchTerm]);
 
   return (
     <section className="space-y-6 pb-2">
@@ -697,9 +730,11 @@ export default function HomePage() {
         </div>
 
         <div className="space-y-3">
-          {popularRecipes.map((entry) => (
-            <PopularRecipeCard key={entry.recipe.id} entry={entry} />
-          ))}
+          {isPopularLoading
+            ? Array.from({ length: 3 }, (_, index) => <PopularRecipeSkeleton key={`popular-loading-${index}`} />)
+            : popularRecipes.map((entry) => (
+                <PopularRecipeCard key={entry.recipe.id} entry={entry} />
+              ))}
         </div>
       </section>
 

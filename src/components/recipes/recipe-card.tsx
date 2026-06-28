@@ -1,6 +1,6 @@
 import { memo } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { RecipeImage } from "@/components/recipes/recipe-image";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getRecipeDifficulty } from "@/features/recipes/quality";
@@ -18,29 +18,28 @@ export const RecipeCard = memo(function RecipeCard({ recipe, href, footerLabel }
   return (
     <Link href={href} className="block">
       <Card className="overflow-hidden border-[#E5D7C1] bg-[#FFFCF7] shadow-[0_20px_35px_-25px_rgba(42,30,23,0.7)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_42px_-24px_rgba(42,30,23,0.75)]">
-        {recipe.imageUrl ? (
-          <div className="relative h-44 overflow-hidden rounded-t-[1.5rem]">
-            <Image
-              src={recipe.imageUrl}
-              alt={recipe.title}
-              fill
-              sizes="(max-width: 768px) 100vw, 50vw"
-              className="object-cover transition duration-700 hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#2A1E17]/70 via-[#2A1E17]/20 to-transparent" />
-            <div className="absolute left-3 top-3 flex gap-1.5">
-              <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold text-white">
-                {recipe.prepMinutes} min
-              </span>
-              <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold text-white">
-                {recipe.servings} porções
-              </span>
-              <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold text-white">
-                {difficulty}
-              </span>
-            </div>
+        <div className="relative h-44 overflow-hidden rounded-t-[1.5rem]">
+          <RecipeImage
+            src={recipe.imageUrl}
+            alt={recipe.title}
+            fill
+            sizes="(max-width: 768px) 100vw, 50vw"
+            className="h-full w-full"
+            imageClassName="object-cover hover:scale-105"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#2A1E17]/70 via-[#2A1E17]/20 to-transparent" />
+          <div className="absolute left-3 top-3 flex gap-1.5">
+            <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold text-white">
+              {recipe.prepMinutes} min
+            </span>
+            <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold text-white">
+              {recipe.servings} porções
+            </span>
+            <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold text-white">
+              {difficulty}
+            </span>
           </div>
-        ) : null}
+        </div>
         <CardHeader className="pb-2">
           <CardTitle className="line-clamp-2 text-[1.02rem] text-[#2A1E17]">{recipe.title}</CardTitle>
           <CardDescription className="line-clamp-2 text-[#7A6D60]">{recipe.description}</CardDescription>

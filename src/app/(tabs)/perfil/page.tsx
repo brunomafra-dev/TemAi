@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { RecipeImage } from "@/components/recipes/recipe-image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -968,24 +969,14 @@ export default function ProfilePage() {
                     className="flex min-h-24 gap-3 rounded-2xl border border-[#E5D7BF] bg-white p-2 text-left shadow-[0_14px_30px_-24px_rgba(42,30,23,0.65)] transition hover:bg-[#FFF8EE]"
                     onClick={closeModal}
                   >
-                    <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#F2E4D0]">
-                      {item.imageUrl ? (
-                        <Image
-                          src={item.imageUrl}
-                          alt={item.title || "Receita salva"}
-                          fill
-                          sizes="80px"
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full flex-col items-center justify-center bg-[#EAD7BB] text-[#7A4A31]">
-                          <span className="text-2xl">🍽️</span>
-                          <span className="mt-0.5 text-xs font-bold">
-                            {(item.title || "T").slice(0, 1).toUpperCase()}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    <RecipeImage
+                      src={item.imageUrl}
+                      alt={item.title || "Receita salva"}
+                      fill
+                      sizes="80px"
+                      className="relative h-20 w-20 shrink-0 rounded-xl"
+                      imageClassName="object-cover"
+                    />
                     <div className="min-w-0 flex-1 py-1">
                       <div className="flex items-center gap-2">
                         <span className="rounded-full border border-[#E5D7BF] bg-[#FAF4EA] px-2 py-0.5 text-[10px] font-semibold text-[#7A4733]">
