@@ -38,10 +38,7 @@ function loadEnv(filePath) {
     if (index < 0) continue;
     const key = trimmed.slice(0, index).trim();
     let value = trimmed.slice(index + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
       value = value.slice(1, -1);
     }
     process.env[key] ||= value;
@@ -225,14 +222,19 @@ function validateRepair(original, repaired) {
   const next = {
     title: typeof repaired.title === "string" ? repaired.title.trim() : "",
     description: typeof repaired.description === "string" ? repaired.description.trim() : "",
-    ingredients: Array.isArray(repaired.ingredients) ? repaired.ingredients.map((item) => String(item).trim()) : [],
+    ingredients: Array.isArray(repaired.ingredients)
+      ? repaired.ingredients.map((item) => String(item).trim())
+      : [],
     steps: Array.isArray(repaired.steps) ? repaired.steps.map((item) => String(item).trim()) : [],
   };
 
   if (!next.title || !next.description || !next.ingredients.length || !next.steps.length) {
     throw new Error("Reparo deixou campos obrigatórios vazios.");
   }
-  if (next.ingredients.length !== original.ingredients.length || next.steps.length !== original.steps.length) {
+  if (
+    next.ingredients.length !== original.ingredients.length ||
+    next.steps.length !== original.steps.length
+  ) {
     throw new Error("Reparo alterou tamanho dos arrays.");
   }
 
@@ -265,8 +267,7 @@ async function repairWithOpenAi(recipe) {
           content: [
             {
               type: "input_text",
-              text:
-                "Você corrige textos de receitas em PT-BR quando acentos viraram '?'. Preserve exatamente o sentido, ingredientes, quantidades, ordem dos arrays e pontuação possível. Não reescreva estilo, não adicione informação e não remova itens. Retorne somente JSON válido.",
+              text: "Você corrige textos de receitas em PT-BR quando acentos viraram '?'. Preserve exatamente o sentido, ingredientes, quantidades, ordem dos arrays e pontuação possível. Não reescreva estilo, não adicione informação e não remova itens. Retorne somente JSON válido.",
             },
           ],
         },
@@ -324,9 +325,7 @@ for (const { recipe, score } of candidates) {
   try {
     console.log(`${apply ? "Reparando" : "Auditando"} ${recipe.slug} (score ${score})`);
     const localRepair = repairHtmlEntities(recipe);
-    const repaired = apply
-      ? validateRepair(recipe, localRepair || (await repairWithOpenAi(recipe)))
-      : null;
+    const repaired = apply ? validateRepair(recipe, localRepair || (await repairWithOpenAi(recipe))) : null;
     if (apply && repaired) {
       await updateRecipe(recipe.id, repaired);
     }

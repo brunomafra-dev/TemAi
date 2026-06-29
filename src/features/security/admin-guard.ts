@@ -3,10 +3,9 @@ import { NextResponse } from "next/server";
 import { serverEnv } from "@/lib/env-server";
 import { requireAuthUserId } from "@/features/security/auth-user";
 
-export async function requireAdminUserId(request: Request): Promise<
-  | { ok: true; userId: string }
-  | { ok: false; response: NextResponse }
-> {
+export async function requireAdminUserId(
+  request: Request,
+): Promise<{ ok: true; userId: string } | { ok: false; response: NextResponse }> {
   const userId = await requireAuthUserId(request);
   if (!userId) {
     return {

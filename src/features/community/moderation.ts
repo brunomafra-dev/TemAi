@@ -93,18 +93,13 @@ function isSupportedImageInput(imageUrl?: string | null): boolean {
   }
 }
 
-async function callModeration(params: {
-  text: string;
-  imageUrl?: string | null;
-}): Promise<ModerationResult> {
+async function callModeration(params: { text: string; imageUrl?: string | null }): Promise<ModerationResult> {
   const apiKey = serverEnv.openaiApiKey();
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY não configurada para moderação.");
   }
 
-  const input: Array<Record<string, unknown>> = [
-    { type: "text", text: params.text.slice(0, 12000) },
-  ];
+  const input: Array<Record<string, unknown>> = [{ type: "text", text: params.text.slice(0, 12000) }];
 
   if (isSupportedImageInput(params.imageUrl)) {
     input.push({
@@ -166,8 +161,7 @@ async function classifyFoodImage(imageUrl?: string | null): Promise<{
           content: [
             {
               type: "input_text",
-              text:
-                "Analise se a imagem é apropriada para uma receita culinária. Retorne apenas JSON válido: {\"foodRelated\":true,\"reason\":\"curto\"}. Marque false se for nudez, violência, conteúdo nojento, pessoa sem relação culinária, meme, print ou imagem que não ajude uma receita.",
+              text: 'Analise se a imagem é apropriada para uma receita culinária. Retorne apenas JSON válido: {"foodRelated":true,"reason":"curto"}. Marque false se for nudez, violência, conteúdo nojento, pessoa sem relação culinária, meme, print ou imagem que não ajude uma receita.',
             },
             { type: "input_image", image_url: imageUrl, detail: "low" },
           ],
@@ -192,9 +186,7 @@ async function classifyFoodImage(imageUrl?: string | null): Promise<{
 
 function localUnsafeReason(text: string): string {
   const normalized = normalizeForScan(text);
-  const matched = BLOCKED_TEXT_TERMS.find((term) =>
-    normalized.includes(normalizeForScan(term)),
-  );
+  const matched = BLOCKED_TEXT_TERMS.find((term) => normalized.includes(normalizeForScan(term)));
   return matched ? `Conteúdo impróprio detectado: ${matched}.` : "";
 }
 

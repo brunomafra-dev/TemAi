@@ -7,7 +7,9 @@ function normalize(value: string): string {
     .toLowerCase();
 }
 
-export function getRecipeDifficulty(recipe: Pick<Recipe, "prepMinutes" | "ingredients" | "steps">): RecipeDifficulty {
+export function getRecipeDifficulty(
+  recipe: Pick<Recipe, "prepMinutes" | "ingredients" | "steps">,
+): RecipeDifficulty {
   const ingredientCount = recipe.ingredients.length;
   const stepCount = recipe.steps.length;
 

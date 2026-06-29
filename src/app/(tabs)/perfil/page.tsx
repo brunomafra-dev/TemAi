@@ -16,8 +16,16 @@ import {
 } from "@/features/profile/badges-cloud";
 import { getNotificationPrefs, saveNotificationPrefs } from "@/features/profile/notifications-storage";
 import { prepareProfilePhoto } from "@/features/profile/photo";
-import { createSupportTicket, getMySupportTickets, type SupportTicket } from "@/features/profile/support-tickets";
-import { getSubscriptionState, syncSubscriptionFromCloud, type SubscriptionState } from "@/features/profile/subscription-storage";
+import {
+  createSupportTicket,
+  getMySupportTickets,
+  type SupportTicket,
+} from "@/features/profile/support-tickets";
+import {
+  getSubscriptionState,
+  syncSubscriptionFromCloud,
+  type SubscriptionState,
+} from "@/features/profile/subscription-storage";
 import {
   getUserProfile,
   saveUserProfile,
@@ -64,12 +72,7 @@ const notificationItems = [
 
 type SectionId = (typeof sections)[number]["id"];
 type SupportQuickOption =
-  | "beneficios"
-  | "free-vs-premium"
-  | "cancelamento"
-  | "cobranca"
-  | "login"
-  | "falar-humano";
+  "beneficios" | "free-vs-premium" | "cancelamento" | "cobranca" | "login" | "falar-humano";
 
 type SupportMessage = {
   from: "user" | "bot";
@@ -283,9 +286,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     let isMounted = true;
-    const handle = normalizeAuthorHandle(
-      profile.username || `${profile.firstName} ${profile.lastName}`,
-    );
+    const handle = normalizeAuthorHandle(profile.username || `${profile.firstName} ${profile.lastName}`);
     getAuthorBadgesFromCloud(handle)
       .then((badges) => {
         if (!isMounted) return;
@@ -594,8 +595,7 @@ export default function ProfilePage() {
     ) {
       return {
         from: "bot",
-        text:
-          "Premium inclui uso livre com IA, voz e imagem na IA, receitas autorais por voz, publicação na Biblioteca e badges exclusivos. Planos: R$ 24,90/mês ou R$ 199,90/ano.",
+        text: "Premium inclui uso livre com IA, voz e imagem na IA, receitas autorais por voz, publicação na Biblioteca e badges exclusivos. Planos: R$ 24,90/mês ou R$ 199,90/ano.",
         options: ["free-vs-premium", "cancelamento", "cobranca"],
       };
     }
@@ -607,16 +607,14 @@ export default function ProfilePage() {
     ) {
       return {
         from: "bot",
-        text:
-          "Free: 3 gerações IA por mês, somente texto e badges padrão. Premium: uso livre com proteções anti-abuso, IA com voz/imagem, receita autoral por voz e badges premium.",
+        text: "Free: 3 gerações IA por mês, somente texto e badges padrão. Premium: uso livre com proteções anti-abuso, IA com voz/imagem, receita autoral por voz e badges premium.",
         options: ["beneficios", "cancelamento", "falar-humano"],
       };
     }
     if (text.includes("cancelar") || text.includes("cancelamento")) {
       return {
         from: "bot",
-        text:
-          "Você pode cancelar quando quiser. O premium continua ativo até o fim do ciclo já pago. Na renovação seguinte, não será cobrado de novo.",
+        text: "Você pode cancelar quando quiser. O premium continua ativo até o fim do ciclo já pago. Na renovação seguinte, não será cobrado de novo.",
         options: ["cobranca", "falar-humano"],
       };
     }
@@ -629,31 +627,32 @@ export default function ProfilePage() {
     ) {
       return {
         from: "bot",
-        text:
-          "Para cobrança: confira o histórico na loja (Google Play/App Store). Se houver cobrança duplicada ou erro, envie email com print e data para Mafralabs@outlook.com.",
+        text: "Para cobrança: confira o histórico na loja (Google Play/App Store). Se houver cobrança duplicada ou erro, envie email com print e data para Mafralabs@outlook.com.",
         options: ["falar-humano", "cancelamento"],
       };
     }
-    if (text.includes("senha") || text.includes("login") || text.includes("email") || text.includes("conta")) {
+    if (
+      text.includes("senha") ||
+      text.includes("login") ||
+      text.includes("email") ||
+      text.includes("conta")
+    ) {
       return {
         from: "bot",
-        text:
-          "Se não consegue entrar, use 'esqueci minha senha' na tela de login. Confira também seu email de confirmação e pasta spam.",
+        text: "Se não consegue entrar, use 'esqueci minha senha' na tela de login. Confira também seu email de confirmação e pasta spam.",
         options: ["falar-humano", "cobranca"],
       };
     }
     if (text.includes("humano") || text.includes("atendente")) {
       return {
         from: "bot",
-        text:
-          "Perfeito. Para atendimento humano, envie para Mafralabs@outlook.com com: assunto, email da conta, print e descrição do problema.",
+        text: "Perfeito. Para atendimento humano, envie para Mafralabs@outlook.com com: assunto, email da conta, print e descrição do problema.",
         options: ["cobranca", "login"],
       };
     }
     return {
       from: "bot",
-      text:
-        "Posso te ajudar com benefícios do premium, diferença free vs premium, cobrança, cancelamento e login.",
+      text: "Posso te ajudar com benefícios do premium, diferença free vs premium, cobrança, cancelamento e login.",
       options: ["beneficios", "free-vs-premium", "cancelamento", "login"],
     };
   }
@@ -676,15 +675,21 @@ export default function ProfilePage() {
     setSupportMessages((current) => [...current, { from: "user", text: message }]);
     setSupportInput("");
     setSupportAgentThinking(true);
-    buildAuthHeaders().then((authHeaders) => fetch("/api/support/agent", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders },
-      body: JSON.stringify({ message }),
-    }))
+    buildAuthHeaders()
+      .then((authHeaders) =>
+        fetch("/api/support/agent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders },
+          body: JSON.stringify({ message }),
+        }),
+      )
       .then(async (response) => {
         const data = (await response.json().catch(() => ({}))) as { message?: string };
         if (!response.ok) throw new Error(data.message || "Falha no agente.");
-        setSupportMessages((current) => [...current, { from: "bot", text: data.message || replySupport(message).text }]);
+        setSupportMessages((current) => [
+          ...current,
+          { from: "bot", text: data.message || replySupport(message).text },
+        ]);
       })
       .catch(() => {
         const bot = replySupport(message);
@@ -781,7 +786,8 @@ export default function ProfilePage() {
                 </div>
               ) : (
                 <p className="mt-2 text-xs text-[#6E6154]">
-                  Uso mensal de IA: {subscription.aiGenerationsUsedThisMonth}/{subscription.aiGenerationsLimitThisMonth}
+                  Uso mensal de IA: {subscription.aiGenerationsUsedThisMonth}/
+                  {subscription.aiGenerationsLimitThisMonth}
                 </p>
               )}
             </div>
@@ -841,10 +847,24 @@ export default function ProfilePage() {
                 </span>
                 <span className="text-sm font-semibold text-[#5D5248]">Tocar para trocar foto</span>
               </button>
-              <input ref={editPhotoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+              <input
+                ref={editPhotoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePhotoUpload}
+              />
             </div>
-            <Input placeholder="Nome" value={workingProfile.firstName} onChange={(e) => setWorkingProfile((c) => ({ ...c, firstName: e.target.value }))} />
-            <Input placeholder="Sobrenome" value={workingProfile.lastName} onChange={(e) => setWorkingProfile((c) => ({ ...c, lastName: e.target.value }))} />
+            <Input
+              placeholder="Nome"
+              value={workingProfile.firstName}
+              onChange={(e) => setWorkingProfile((c) => ({ ...c, firstName: e.target.value }))}
+            />
+            <Input
+              placeholder="Sobrenome"
+              value={workingProfile.lastName}
+              onChange={(e) => setWorkingProfile((c) => ({ ...c, lastName: e.target.value }))}
+            />
             <div className="space-y-1">
               <Input
                 placeholder="@seuusername"
@@ -875,7 +895,9 @@ export default function ProfilePage() {
                 {profileMessage}
               </p>
             ) : null}
-            <Button className="w-full" onClick={() => void saveProfileChanges()}>Salvar alterações</Button>
+            <Button className="w-full" onClick={() => void saveProfileChanges()}>
+              Salvar alterações
+            </Button>
           </div>
         );
       case "shopping":
@@ -884,32 +906,99 @@ export default function ProfilePage() {
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-[#5D5248]">Lista de Compras</p>
               <div className="flex gap-2">
-                <Button variant="secondary" size="sm" onClick={selectAllShoppingItems}>Selecionar todos</Button>
-                <Button variant="secondary" size="sm" onClick={() => setShoppingItems(clearCheckedShoppingItems())}>Limpar concluídos</Button>
+                <Button variant="secondary" size="sm" onClick={selectAllShoppingItems}>
+                  Selecionar todos
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShoppingItems(clearCheckedShoppingItems())}
+                >
+                  Limpar concluídos
+                </Button>
               </div>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setShoppingMode("geral")} className={shoppingMode === "geral" ? "rounded-full border border-[#C66A3D] bg-[#F8E8E1] px-3 py-1 text-xs font-semibold text-[#7A4733]" : "rounded-full border border-[#E5D7BF] bg-white px-3 py-1 text-xs font-semibold text-[#6A5E52]"}>Geral</button>
-              <button onClick={() => setShoppingMode("por_receita")} className={shoppingMode === "por_receita" ? "rounded-full border border-[#C66A3D] bg-[#F8E8E1] px-3 py-1 text-xs font-semibold text-[#7A4733]" : "rounded-full border border-[#E5D7BF] bg-white px-3 py-1 text-xs font-semibold text-[#6A5E52]"}>Por receita</button>
+              <button
+                onClick={() => setShoppingMode("geral")}
+                className={
+                  shoppingMode === "geral"
+                    ? "rounded-full border border-[#C66A3D] bg-[#F8E8E1] px-3 py-1 text-xs font-semibold text-[#7A4733]"
+                    : "rounded-full border border-[#E5D7BF] bg-white px-3 py-1 text-xs font-semibold text-[#6A5E52]"
+                }
+              >
+                Geral
+              </button>
+              <button
+                onClick={() => setShoppingMode("por_receita")}
+                className={
+                  shoppingMode === "por_receita"
+                    ? "rounded-full border border-[#C66A3D] bg-[#F8E8E1] px-3 py-1 text-xs font-semibold text-[#7A4733]"
+                    : "rounded-full border border-[#E5D7BF] bg-white px-3 py-1 text-xs font-semibold text-[#6A5E52]"
+                }
+              >
+                Por receita
+              </button>
             </div>
             {shoppingMode === "por_receita" ? (
-              <select value={selectedRecipeFilter} onChange={(e) => setSelectedRecipeFilter(e.target.value)} className="h-10 w-full rounded-xl border border-[#E5D7BF] bg-white px-3 text-sm">
+              <select
+                value={selectedRecipeFilter}
+                onChange={(e) => setSelectedRecipeFilter(e.target.value)}
+                className="h-10 w-full rounded-xl border border-[#E5D7BF] bg-white px-3 text-sm"
+              >
                 <option value="all">Todas as receitas</option>
-                {shoppingRecipeOptions.map(([recipeId, recipeTitle]) => <option key={recipeId} value={recipeId}>{recipeTitle}</option>)}
+                {shoppingRecipeOptions.map(([recipeId, recipeTitle]) => (
+                  <option key={recipeId} value={recipeId}>
+                    {recipeTitle}
+                  </option>
+                ))}
               </select>
             ) : null}
             <div className="max-h-[45vh] space-y-2 overflow-auto pr-1">
-              {shoppingItems.length === 0 ? <p className="text-sm text-[#7A6D60]">Sua lista está vazia.</p> : shoppingMode === "geral" ? mergedShoppingItems.map((item) => (
-                <label key={item.name.toLowerCase()} className="flex items-center justify-between rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm">
-                  <span className={item.checked ? "line-through text-[#9A8D7E]" : "text-[#4F4338]"}>{item.name}</span>
-                  <input type="checkbox" checked={item.checked} onChange={() => toggleMergedItem(item.ids)} />
-                </label>
-              )) : filteredShoppingItems.map((item) => (
-                <div key={item.id} className="flex items-center justify-between rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm">
-                  <label className="flex items-center gap-2"><input type="checkbox" checked={item.checked} onChange={() => setShoppingItems(toggleShoppingItemChecked(item.id))} /><span className={item.checked ? "line-through text-[#9A8D7E]" : "text-[#4F4338]"}>{item.name}</span></label>
-                  <Button size="sm" variant="outline" onClick={() => setShoppingItems(removeShoppingItem(item.id))}>Remover</Button>
-                </div>
-              ))}
+              {shoppingItems.length === 0 ? (
+                <p className="text-sm text-[#7A6D60]">Sua lista está vazia.</p>
+              ) : shoppingMode === "geral" ? (
+                mergedShoppingItems.map((item) => (
+                  <label
+                    key={item.name.toLowerCase()}
+                    className="flex items-center justify-between rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm"
+                  >
+                    <span className={item.checked ? "line-through text-[#9A8D7E]" : "text-[#4F4338]"}>
+                      {item.name}
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={item.checked}
+                      onChange={() => toggleMergedItem(item.ids)}
+                    />
+                  </label>
+                ))
+              ) : (
+                filteredShoppingItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm"
+                  >
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={item.checked}
+                        onChange={() => setShoppingItems(toggleShoppingItemChecked(item.id))}
+                      />
+                      <span className={item.checked ? "line-through text-[#9A8D7E]" : "text-[#4F4338]"}>
+                        {item.name}
+                      </span>
+                    </label>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShoppingItems(removeShoppingItem(item.id))}
+                    >
+                      Remover
+                    </Button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         );
@@ -917,9 +1006,10 @@ export default function ProfilePage() {
         return (
           <div className="space-y-3">
             <p className="text-sm font-semibold text-[#5D5248]">Insígnias</p>
-              <p className="text-xs text-[#7A6D60]">
-                Toque para ativar. Insígnias de chef contam receitas aprovadas na Biblioteca; as Premium vêm do uso real do app.
-              </p>
+            <p className="text-xs text-[#7A6D60]">
+              Toque para ativar. Insígnias de chef contam receitas aprovadas na Biblioteca; as Premium vêm do
+              uso real do app.
+            </p>
             <div className="grid grid-cols-1 gap-2">
               {BADGE_CATALOG.map((badge) => {
                 const unlocked = unlockedBadges.includes(badge.slug);
@@ -952,7 +1042,12 @@ export default function ProfilePage() {
           <div className="space-y-2">
             <p className="text-sm font-semibold text-[#5D5248]">Receitas Autorais</p>
             <p className="text-sm text-[#7A6D60]">{myRecipes.length} receitas autorais.</p>
-            <Link href="/minhas-receitas" className="inline-flex rounded-full border border-[#C66A3D] bg-[#F8E8E1] px-4 py-2 text-xs font-semibold text-[#7A4733]">Abrir Minhas Receitas</Link>
+            <Link
+              href="/minhas-receitas"
+              className="inline-flex rounded-full border border-[#C66A3D] bg-[#F8E8E1] px-4 py-2 text-xs font-semibold text-[#7A4733]"
+            >
+              Abrir Minhas Receitas
+            </Link>
           </div>
         );
       case "saved":
@@ -1004,9 +1099,16 @@ export default function ProfilePage() {
           <div className="space-y-2">
             <p className="text-sm font-semibold text-[#5D5248]">Notificações</p>
             {notificationItems.map((item) => (
-              <label key={item.key} className="flex items-center justify-between rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm">
+              <label
+                key={item.key}
+                className="flex items-center justify-between rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm"
+              >
                 <span>{item.label}</span>
-                <input type="checkbox" checked={Boolean(notificationPrefs[item.key as keyof typeof notificationPrefs])} onChange={() => toggleNotification(item.key as keyof typeof notificationPrefs)} />
+                <input
+                  type="checkbox"
+                  checked={Boolean(notificationPrefs[item.key as keyof typeof notificationPrefs])}
+                  onChange={() => toggleNotification(item.key as keyof typeof notificationPrefs)}
+                />
               </label>
             ))}
           </div>
@@ -1048,9 +1150,7 @@ export default function ProfilePage() {
                   </div>
                 ))}
                 {supportAgentThinking ? (
-                  <p className="rounded-lg bg-white px-2 py-1 text-xs text-[#5E5348]">
-                    Agente pensando...
-                  </p>
+                  <p className="rounded-lg bg-white px-2 py-1 text-xs text-[#5E5348]">Agente pensando...</p>
                 ) : null}
               </div>
               <div className="mt-2 flex gap-2">
@@ -1065,7 +1165,9 @@ export default function ProfilePage() {
                     }
                   }}
                 />
-                <Button size="sm" onClick={sendSupportMessage}>Enviar</Button>
+                <Button size="sm" onClick={sendSupportMessage}>
+                  Enviar
+                </Button>
               </div>
               {supportTicketMessage ? (
                 <p className="mt-2 rounded-lg border border-[#E5D7BF] bg-[#FAF4EA] px-2 py-1 text-xs text-[#6A5E52]">
@@ -1074,16 +1176,19 @@ export default function ProfilePage() {
               ) : null}
             </div>
             <div className="rounded-xl border border-[#E5D7BF] bg-white p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#7A6D60]">Seus tickets recentes</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#7A6D60]">
+                Seus tickets recentes
+              </p>
               {supportTickets.length === 0 ? (
                 <p className="mt-2 text-xs text-[#7A6D60]">Nenhum ticket aberto ainda.</p>
               ) : (
                 <div className="mt-2 space-y-2">
                   {supportTickets.map((ticket) => (
-                    <div key={ticket.id} className="rounded-lg border border-[#EADFCC] bg-[#FAF5EC] px-2 py-1">
-                      <p className="text-xs font-semibold text-[#5E5348]">
-                        {ticket.subject}
-                      </p>
+                    <div
+                      key={ticket.id}
+                      className="rounded-lg border border-[#EADFCC] bg-[#FAF5EC] px-2 py-1"
+                    >
+                      <p className="text-xs font-semibold text-[#5E5348]">{ticket.subject}</p>
                       <p className="text-[11px] text-[#7A6D60]">
                         Protocolo: {ticket.id.slice(0, 8).toUpperCase()} • {statusLabel(ticket.status)}
                       </p>
@@ -1115,7 +1220,11 @@ export default function ProfilePage() {
           </div>
         );
       case "terms":
-        return <Link href="/termos" className="text-sm font-semibold text-primary underline">Abrir Termos de Uso</Link>;
+        return (
+          <Link href="/termos" className="text-sm font-semibold text-primary underline">
+            Abrir Termos de Uso
+          </Link>
+        );
       case "logout":
         return (
           <div className="space-y-3">
@@ -1130,8 +1239,9 @@ export default function ProfilePage() {
           <div className="space-y-3">
             <p className="text-lg font-semibold text-[#4F4338]">Tem certeza que deseja excluir sua conta?</p>
             <p className="text-sm text-[#7A6D60]">
-              Essa ação remove sua conta e dados vinculados quando cabível, apaga dados locais deste dispositivo e pode
-              preservar registros restritos por obrigação legal, segurança, cobrança ou defesa de direitos.
+              Essa ação remove sua conta e dados vinculados quando cabível, apaga dados locais deste
+              dispositivo e pode preservar registros restritos por obrigação legal, segurança, cobrança ou
+              defesa de direitos.
             </p>
             <Link href="/exclusao-de-conta" className="text-xs font-semibold text-primary underline">
               Entender exclusão de conta e dados
@@ -1142,7 +1252,14 @@ export default function ProfilePage() {
               </p>
             ) : null}
             <div className="flex gap-2">
-              <Button variant="secondary" className="flex-1" disabled={isDeletingAccount} onClick={closeModal}>Cancelar</Button>
+              <Button
+                variant="secondary"
+                className="flex-1"
+                disabled={isDeletingAccount}
+                onClick={closeModal}
+              >
+                Cancelar
+              </Button>
               <Button className="flex-1" disabled={isDeletingAccount} onClick={() => void deleteAccount()}>
                 {isDeletingAccount ? "Excluindo..." : "Excluir conta"}
               </Button>
@@ -1159,22 +1276,39 @@ export default function ProfilePage() {
       <header className="relative overflow-hidden rounded-[2rem] shadow-[0_20px_45px_-25px_rgba(42,30,23,0.55)]">
         <div
           className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: "url(https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=1700&q=80)" }}
+          style={{
+            backgroundImage:
+              "url(https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=1700&q=80)",
+          }}
         />
         <div className="absolute inset-0 bg-[#21160F]/76 backdrop-blur-[1.8px]" />
         <div className="relative z-10 px-5 pb-6 pt-7 text-[#FDF7EC]">
           <div className="flex items-center gap-3">
             {profile.photoDataUrl ? (
-              <Image src={profile.photoDataUrl} alt="Foto de perfil" width={56} height={56} sizes="56px" unoptimized className="h-14 w-14 rounded-full border border-white/35 object-cover" />
+              <Image
+                src={profile.photoDataUrl}
+                alt="Foto de perfil"
+                width={56}
+                height={56}
+                sizes="56px"
+                unoptimized
+                className="h-14 w-14 rounded-full border border-white/35 object-cover"
+              />
             ) : (
               <div className="flex h-14 w-14 items-center justify-center rounded-full border border-white/35 bg-white/15 text-xl font-semibold">
                 {profile.firstName.slice(0, 1).toUpperCase()}
               </div>
             )}
             <div>
-              <h1 className="font-display text-2xl">{profile.firstName} {profile.lastName}</h1>
+              <h1 className="font-display text-2xl">
+                {profile.firstName} {profile.lastName}
+              </h1>
               <p className="mt-0.5 text-xs text-[#E8DDCB]">{usernameHandle}</p>
-              <p className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${selectedBadge.colorClass}`}>{selectedBadge.label}</p>
+              <p
+                className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${selectedBadge.colorClass}`}
+              >
+                {selectedBadge.label}
+              </p>
             </div>
           </div>
         </div>
@@ -1183,11 +1317,7 @@ export default function ProfilePage() {
       <Card className="border-[#E5D7BF] bg-[#FFFCF7]">
         <CardContent className="space-y-2 pt-4">
           {sections.map((section) => (
-            <ProfileSectionButton
-              key={section.id}
-              section={section}
-              onOpen={openModal}
-            />
+            <ProfileSectionButton key={section.id} section={section} onOpen={openModal} />
           ))}
         </CardContent>
       </Card>
@@ -1201,17 +1331,19 @@ export default function ProfilePage() {
         >
           <div
             className={`flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col rounded-2xl bg-[#FFFCF7] shadow-2xl transition-all duration-200 ${
-              modalStage === "open" ? "translate-y-0 scale-100 opacity-100" : "translate-y-3 scale-95 opacity-0"
+              modalStage === "open"
+                ? "translate-y-0 scale-100 opacity-100"
+                : "translate-y-3 scale-95 opacity-0"
             }`}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between rounded-t-2xl border-b border-[#E5D7BF] bg-[#FFFCF7] px-5 py-4">
               <p className="text-sm font-semibold text-[#5D5248]">{activeModalTitle}</p>
-              <button className="text-xs font-semibold text-[#7A6D60]" onClick={closeModal}>← Voltar</button>
+              <button className="text-xs font-semibold text-[#7A6D60]" onClick={closeModal}>
+                ← Voltar
+              </button>
             </div>
-            <div className="overflow-y-auto px-5 py-4">
-              {renderModalBody()}
-            </div>
+            <div className="overflow-y-auto px-5 py-4">{renderModalBody()}</div>
           </div>
         </div>
       ) : null}

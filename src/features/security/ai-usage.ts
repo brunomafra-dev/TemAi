@@ -59,10 +59,7 @@ export async function getAiEntitlement(userId: string): Promise<AiEntitlement> {
   return { plan, status, isPremium };
 }
 
-function monthlyLimitFor(params: {
-  bucket: AiUsageBucket;
-  entitlement: AiEntitlement;
-}): number {
+function monthlyLimitFor(params: { bucket: AiUsageBucket; entitlement: AiEntitlement }): number {
   if (params.bucket === "recipe_ai") {
     return params.entitlement.isPremium ? -1 : FREE_RECIPE_AI_MONTHLY_LIMIT;
   }
@@ -96,9 +93,7 @@ async function enforceAiProtection(params: {
   if (!params.entitlement.isPremium) return;
 
   const limit =
-    mode === "strict"
-      ? serverEnv.premiumRecipeAiStrictDailyLimit()
-      : serverEnv.premiumRecipeAiDailyLimit();
+    mode === "strict" ? serverEnv.premiumRecipeAiStrictDailyLimit() : serverEnv.premiumRecipeAiDailyLimit();
   if (limit <= 0) return;
 
   const supabase = getSupabaseServiceRoleClient();

@@ -13,10 +13,7 @@ import {
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export async function POST(
-  request: Request,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const userId = await requireAuthUserId(request);
     if (!userId) {
@@ -64,10 +61,7 @@ export async function POST(
   }
 }
 
-export async function DELETE(
-  request: Request,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const userId = await requireAuthUserId(request);
     if (!userId) {

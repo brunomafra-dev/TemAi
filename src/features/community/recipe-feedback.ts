@@ -95,10 +95,7 @@ export async function getLibraryRecipeFeedback(params: {
 
   const supabase = getSupabaseServiceRoleClient();
   const [ratingsRes, commentsRes] = await Promise.all([
-    supabase
-      .from("recipe_ratings")
-      .select("rating,user_id")
-      .eq("recipe_id", recipe.id),
+    supabase.from("recipe_ratings").select("rating,user_id").eq("recipe_id", recipe.id),
     supabase
       .from("recipe_comments")
       .select("id,body,author_name,author_username,author_avatar_url,created_at,user_id")
@@ -111,9 +108,7 @@ export async function getLibraryRecipeFeedback(params: {
   const ratings = (ratingsRes.data || []) as RatingRow[];
   const sum = ratings.reduce((total, row) => total + Number(row.rating || 0), 0);
   const average = ratings.length > 0 ? sum / ratings.length : 0;
-  const userRatingRow = params.userId
-    ? ratings.find((row) => row.user_id === params.userId)
-    : undefined;
+  const userRatingRow = params.userId ? ratings.find((row) => row.user_id === params.userId) : undefined;
 
   return {
     averageRating: average > 0 ? Number((average * 2).toFixed(1)) : 0,
@@ -123,7 +118,9 @@ export async function getLibraryRecipeFeedback(params: {
   };
 }
 
-export async function getLibraryRecipePopularity(recipeIds: string[]): Promise<Map<string, LibraryRecipePopularity>> {
+export async function getLibraryRecipePopularity(
+  recipeIds: string[],
+): Promise<Map<string, LibraryRecipePopularity>> {
   const supabase = getSupabaseServiceRoleClient();
   const uniqueIds = Array.from(new Set(recipeIds.filter(Boolean)));
   const result = new Map<string, LibraryRecipePopularity>();
@@ -155,7 +152,8 @@ export async function getLibraryRecipePopularity(recipeIds: string[]): Promise<M
   uniqueIds.forEach((id) => {
     const ratings = ratingMap.get(id);
     result.set(id, {
-      ratingAverage: ratings && ratings.count > 0 ? Number((ratings.sum * 2 / ratings.count).toFixed(1)) : 0,
+      ratingAverage:
+        ratings && ratings.count > 0 ? Number(((ratings.sum * 2) / ratings.count).toFixed(1)) : 0,
       ratingCount: ratings?.count || 0,
       viewCount: viewMap.get(id) || 0,
     });
@@ -494,7 +492,9 @@ export async function reportLibraryRecipeComment(params: {
   const supabase = getSupabaseServiceRoleClient();
   const { data } = await supabase
     .from("recipe_comments")
-    .select("id,body,author_name,author_username,author_avatar_url,created_at,recipe_id,user_id,recipes_br!inner(id,slug,title,author_user_id,source_name,is_published,moderation_status)")
+    .select(
+      "id,body,author_name,author_username,author_avatar_url,created_at,recipe_id,user_id,recipes_br!inner(id,slug,title,author_user_id,source_name,is_published,moderation_status)",
+    )
     .eq("id", params.commentId)
     .eq("status", "visible")
     .eq("recipes_br.slug", params.recipeSlug)

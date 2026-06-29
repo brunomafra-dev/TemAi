@@ -10,7 +10,11 @@ interface SuggestionCardProps {
   onOpenRecipe: (suggestion: RecipeSuggestion) => void;
 }
 
-export const SuggestionCard = memo(function SuggestionCard({ suggestion, buttonLabel, onOpenRecipe }: SuggestionCardProps) {
+export const SuggestionCard = memo(function SuggestionCard({
+  suggestion,
+  buttonLabel,
+  onOpenRecipe,
+}: SuggestionCardProps) {
   return (
     <Card>
       <CardHeader>
@@ -24,9 +28,7 @@ export const SuggestionCard = memo(function SuggestionCard({ suggestion, buttonL
           ))}
         </div>
         {suggestion.missingIngredients.length > 0 ? (
-          <p className="text-xs text-muted-foreground">
-            Falta: {suggestion.missingIngredients.join(", ")}.
-          </p>
+          <p className="text-xs text-muted-foreground">Falta: {suggestion.missingIngredients.join(", ")}.</p>
         ) : (
           <p className="text-xs text-muted-foreground">Voce ja tem tudo para essa receita.</p>
         )}

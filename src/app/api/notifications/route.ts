@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  listUserNotifications,
-  markUserNotificationsRead,
-} from "@/features/community/notifications";
+import { listUserNotifications, markUserNotificationsRead } from "@/features/community/notifications";
 import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse, requireAuthUserId } from "@/features/security/auth-user";
 import {

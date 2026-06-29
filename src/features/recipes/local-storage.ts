@@ -1,10 +1,6 @@
 ﻿"use client";
 
-import {
-  AUTHORED_RECIPES_KEY,
-  SAVED_RECIPE_REFS_KEY,
-  SAVED_RECIPES_KEY,
-} from "@/features/recipes/constants";
+import { AUTHORED_RECIPES_KEY, SAVED_RECIPE_REFS_KEY, SAVED_RECIPES_KEY } from "@/features/recipes/constants";
 import type { Recipe, SavedRecipeRef } from "@/features/recipes/types";
 
 function hasWindow(): boolean {

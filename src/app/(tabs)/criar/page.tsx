@@ -11,7 +11,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { parseIngredientsText } from "@/features/recipes/helpers";
 import { buildAuthHeaders } from "@/features/recipes/api-client";
 import { getMyRecipes, removeMyRecipe, upsertMyRecipe } from "@/features/recipes/local-storage";
-import { getSubscriptionState, syncSubscriptionFromCloud, type SubscriptionState } from "@/features/profile/subscription-storage";
+import {
+  getSubscriptionState,
+  syncSubscriptionFromCloud,
+  type SubscriptionState,
+} from "@/features/profile/subscription-storage";
 import type { Recipe } from "@/features/recipes/types";
 import { slugify } from "@/lib/utils";
 
@@ -255,7 +259,7 @@ export default function CreatePage() {
     const voiceWindow = window as VoiceWindow;
     const SpeechRecognitionCtor =
       typeof window !== "undefined"
-        ? (voiceWindow.SpeechRecognition || voiceWindow.webkitSpeechRecognition || null)
+        ? voiceWindow.SpeechRecognition || voiceWindow.webkitSpeechRecognition || null
         : null;
 
     if (!SpeechRecognitionCtor) {
@@ -386,7 +390,8 @@ export default function CreatePage() {
             </Link>
           </div>
           <p className="mt-3 text-xs text-[#E6D7BF]">
-            Por voz: gravar áudio -&gt; transcrever -&gt; IA estrutura ingredientes e preparo -&gt; você revisa antes de salvar.
+            Por voz: gravar áudio -&gt; transcrever -&gt; IA estrutura ingredientes e preparo -&gt; você
+            revisa antes de salvar.
           </p>
         </div>
       </header>
@@ -394,9 +399,7 @@ export default function CreatePage() {
       <Card className="border-[#E5D7C1] bg-[#FFFCF7] shadow-[0_20px_35px_-25px_rgba(42,30,23,0.7)]">
         <CardHeader>
           <CardTitle className="font-display text-2xl text-[#2A1E17]">Nova receita</CardTitle>
-          <CardDescription>
-            Preencha título, ingredientes e modo de preparo no mesmo fluxo.
-          </CardDescription>
+          <CardDescription>Preencha título, ingredientes e modo de preparo no mesmo fluxo.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="rounded-2xl border border-[#EADFCC] bg-[#FFF9EF] p-4">
@@ -415,9 +418,7 @@ export default function CreatePage() {
 
           <div className="rounded-2xl border border-[#EADFCC] bg-[#FFF9EF] p-4">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8A7351]">
-                Receita
-              </p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8A7351]">Receita</p>
               <Button
                 type="button"
                 variant="outline"
@@ -457,7 +458,9 @@ export default function CreatePage() {
                     className="h-9 border-[#E5D7C1] bg-[#FFFCF7] text-xs"
                     onClick={() => startVoiceCapture("ingredients")}
                   >
-                    {voiceTarget === "ingredients" ? "Parar voz (ingredientes)" : "Adicionar ingredientes por voz"}
+                    {voiceTarget === "ingredients"
+                      ? "Parar voz (ingredientes)"
+                      : "Adicionar ingredientes por voz"}
                   </Button>
                 </div>
                 <div className="space-y-1">
@@ -481,9 +484,7 @@ export default function CreatePage() {
                     {voiceTarget === "steps" ? "Parar voz (preparo)" : "Adicionar preparo por voz"}
                   </Button>
                 </div>
-                {voiceMessage ? (
-                  <p className="text-xs font-medium text-[#7A6D60]">{voiceMessage}</p>
-                ) : null}
+                {voiceMessage ? <p className="text-xs font-medium text-[#7A6D60]">{voiceMessage}</p> : null}
                 <Button
                   type="button"
                   variant="outline"
@@ -547,7 +548,9 @@ export default function CreatePage() {
                 </div>
               ) : (
                 <div className="mt-3 rounded-2xl border border-dashed border-[#DECDAF] bg-[#FBF4E8] px-4 py-6 text-center">
-                  <p className="text-sm font-medium text-[#7B6A56]">Adicione uma foto para destacar sua receita</p>
+                  <p className="text-sm font-medium text-[#7B6A56]">
+                    Adicione uma foto para destacar sua receita
+                  </p>
                   <p className="mt-1 text-xs text-[#9B8B78]">Você pode anexar da galeria ou tirar na hora.</p>
                 </div>
               )}
@@ -572,7 +575,10 @@ export default function CreatePage() {
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Suas receitas</h2>
-          <Link href="/minhas-receitas" className="text-xs font-semibold uppercase tracking-wide text-[#8E7752]">
+          <Link
+            href="/minhas-receitas"
+            className="text-xs font-semibold uppercase tracking-wide text-[#8E7752]"
+          >
             Ver todas
           </Link>
         </div>
@@ -613,7 +619,8 @@ export default function CreatePage() {
             </p>
             {!isPremiumUser() ? (
               <p className="mt-2 rounded-xl border border-[#E5D7C1] bg-[#FAF5EC] px-3 py-2 text-xs text-[#6A5E52]">
-                No plano Free, a receita fica salva apenas em Minhas receitas. Publicar na Biblioteca é Premium.
+                No plano Free, a receita fica salva apenas em Minhas receitas. Publicar na Biblioteca é
+                Premium.
               </p>
             ) : null}
             <div className="mt-4 grid gap-2">

@@ -8,6 +8,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit --pretty",
+    "check": "npm run lint && npm run typecheck && npm run build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "cap:sync": "cap sync android",
     "cap:open": "cap open android",
     "cap:run": "cap run android",
@@ -30,6 +34,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "^16.2.4",
+    "prettier": "^3.9.3",
     "tailwindcss": "^4",
     "typescript": "^5"
   },

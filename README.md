@@ -32,13 +32,13 @@ Essa separação reduz custo, melhora a sensação de velocidade e evita gerar r
 
 ## Stack utilizada
 
-| Camada | Tecnologias |
-| --- | --- |
-| Frontend | Next.js App Router, React, TypeScript, Tailwind CSS |
-| Backend | API Routes, validação de entrada, rotas server-side |
-| Dados | Supabase, RPC, tabelas de receitas, perfis e métricas |
-| IA | Fluxo de sugestões e receita completa em endpoints separados |
-| Mobile | Capacitor Android, PWA e experiência mobile-first |
+| Camada   | Tecnologias                                                  |
+| -------- | ------------------------------------------------------------ |
+| Frontend | Next.js App Router, React, TypeScript, Tailwind CSS          |
+| Backend  | API Routes, validação de entrada, rotas server-side          |
+| Dados    | Supabase, RPC, tabelas de receitas, perfis e métricas        |
+| IA       | Fluxo de sugestões e receita completa em endpoints separados |
+| Mobile   | Capacitor Android, PWA e experiência mobile-first            |
 
 ## Arquitetura resumida
 
@@ -74,12 +74,12 @@ android/
 
 ## Screenshots
 
-| Tela | O que demonstrar |
-| --- | --- |
-| Home / Gerar receita | Entrada de ingredientes e sugestões iniciais da IA |
-| Receita completa | Ingredientes, preparo, porções e interações da receita |
-| Biblioteca | Busca, filtros e navegação por receitas públicas |
-| Perfil | Preferências, receitas salvas, suporte e dados da conta |
+| Tela                 | O que demonstrar                                        |
+| -------------------- | ------------------------------------------------------- |
+| Home / Gerar receita | Entrada de ingredientes e sugestões iniciais da IA      |
+| Receita completa     | Ingredientes, preparo, porções e interações da receita  |
+| Biblioteca           | Busca, filtros e navegação por receitas públicas        |
+| Perfil               | Preferências, receitas salvas, suporte e dados da conta |
 
 > As capturas devem ser adicionadas em `docs/screenshots/` quando houver uma rodada visual final da demo pública.
 
@@ -141,11 +141,32 @@ PUBLIC_READ_RATE_LIMIT_MODE=memory
 Scripts úteis:
 
 ```bash
+npm run check
 npm run build
 npm run lint
+npm run typecheck
+npm run format:check
 npm run security:scan-secrets
 npm run cap:sync
 ```
+
+## Qualidade e seguranÃ§a
+
+O repositÃ³rio inclui checks locais e CI para manter a base estÃ¡vel:
+
+- `npm run lint`: valida ESLint e regras do Next.js.
+- `npm run typecheck`: executa TypeScript sem emitir arquivos.
+- `npm run build`: valida o build de produÃ§Ã£o.
+- `npm run check`: roda lint, typecheck e build em sequÃªncia.
+- `npm run security:scan-secrets`: procura possÃ­veis segredos em arquivos versionados.
+
+AutomatizaÃ§Ãµes configuradas:
+
+- GitHub Actions CI em push/PR para `main`.
+- CodeQL para anÃ¡lise de JavaScript/TypeScript.
+- Dependabot para npm e GitHub Actions.
+
+Notas tÃ©cnicas e oportunidades de arquitetura ficam em `docs/engineering-audit.md`.
 
 ## Link para Demo
 

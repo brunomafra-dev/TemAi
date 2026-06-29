@@ -77,7 +77,8 @@ function rowToSavedRecipeRef(row: SavedRecipeRow): SavedRecipeRef | null {
     title: row.title || snapshot?.title || recipeId,
     description: row.description || snapshot?.description || "",
     imageUrl: row.image_url || snapshot?.imageUrl || undefined,
-    sourceLabel: row.source_label || snapshot?.sourceLabel || (sourceOrigin === "library" ? "Biblioteca" : "TemAi IA"),
+    sourceLabel:
+      row.source_label || snapshot?.sourceLabel || (sourceOrigin === "library" ? "Biblioteca" : "TemAi IA"),
     recipeSnapshot: snapshot,
     ingredientsSnapshot: row.ingredients_snapshot || snapshot?.ingredients || undefined,
     generationId: row.generation_id || undefined,
@@ -183,7 +184,8 @@ export async function POST(request: Request) {
       readOptionalString(payload, "sourceLabel", { fieldName: "Fonte", maxLength: 120 }) ||
       snapshot?.sourceLabel ||
       (sourceOrigin === "library" ? "Biblioteca" : "TemAi IA");
-    const ingredientsSnapshot = readOptionalStringArray(payload, "ingredientsSnapshot") || snapshot?.ingredients || [];
+    const ingredientsSnapshot =
+      readOptionalStringArray(payload, "ingredientsSnapshot") || snapshot?.ingredients || [];
     const cookingEquipment = Array.isArray(payload.cookingEquipment)
       ? normalizeCookingEquipment(payload.cookingEquipment)
       : null;

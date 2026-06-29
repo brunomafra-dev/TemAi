@@ -76,11 +76,7 @@ export default function MyRecipesPage() {
   return (
     <section className="space-y-5 pb-2">
       <header className="space-y-2">
-        <button
-          type="button"
-          onClick={goBack}
-          className="inline-flex text-sm font-semibold text-primary"
-        >
+        <button type="button" onClick={goBack} className="inline-flex text-sm font-semibold text-primary">
           ← Voltar
         </button>
         <h1 className="text-2xl font-semibold">Minhas receitas</h1>
@@ -125,7 +121,12 @@ export default function MyRecipesPage() {
               {publishErrorById[recipe.id] ? (
                 <p className="text-xs text-red-700">{publishErrorById[recipe.id]}</p>
               ) : null}
-              <Button variant="outline" size="sm" className="w-full" onClick={() => handleDeleteRecipe(recipe.id)}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => handleDeleteRecipe(recipe.id)}
+              >
                 Remover da lista
               </Button>
             </div>

@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  collectTudoGostosoRecipeUrls,
-  importRecipeFromUrl,
-} from "@/features/recipes/import-from-url";
+import { collectTudoGostosoRecipeUrls, importRecipeFromUrl } from "@/features/recipes/import-from-url";
 import { upsertImportedRecipeToSupabase } from "@/features/recipes/supabase-library";
 import {
   parseJsonObjectBody,
@@ -40,8 +37,7 @@ export async function POST(request: Request) {
     const payload = (await parseJsonObjectBody(request, {
       maxBytes: 8 * 1024,
       allowedKeys: ["source", "count", "minRating"],
-    })) as ImportBatchPayload &
-      Record<string, unknown>;
+    })) as ImportBatchPayload & Record<string, unknown>;
     const source = readOptionalEnum(payload, "source", ["tudogostoso"] as const, "tudogostoso", "Fonte");
     const requestedCount = readOptionalNumber(payload, "count", {
       fieldName: "Quantidade",
@@ -66,7 +62,10 @@ export async function POST(request: Request) {
     );
     const urls = await collectTudoGostosoRecipeUrls(count * 6);
     if (!urls.length) {
-      return NextResponse.json({ message: "Não foi possível localizar URLs de receitas para importar." }, { status: 500 });
+      return NextResponse.json(
+        { message: "Não foi possível localizar URLs de receitas para importar." },
+        { status: 500 },
+      );
     }
 
     const imported: Array<{ slug: string; title: string; sourceUrl: string }> = [];

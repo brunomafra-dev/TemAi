@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
 import { consumeAuthRateLimit, resetAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { getSupabaseAnonServerClient } from "@/lib/supabase-admin";
-import {
-  parseJsonObjectBody,
-  readRequiredString,
-  validationErrorResponse,
-} from "@/lib/input-validation";
+import { parseJsonObjectBody, readRequiredString, validationErrorResponse } from "@/lib/input-validation";
 
 interface LoginPayload {
   email?: string;
@@ -40,8 +36,7 @@ export async function POST(request: Request) {
     const payload = (await parseJsonObjectBody(request, {
       maxBytes: 8 * 1024,
       allowedKeys: ["email", "password"],
-    })) as LoginPayload &
-      Record<string, unknown>;
+    })) as LoginPayload & Record<string, unknown>;
     const email = readRequiredString(payload, "email", {
       fieldName: "Email",
       minLength: 6,

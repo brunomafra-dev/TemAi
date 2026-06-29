@@ -3,11 +3,7 @@ import { isOpenAiGenerationError, polishAuthorRecipeWithOpenAi } from "@/feature
 import { aiUsageErrorResponse, consumeAiUsage, getAiEntitlement } from "@/features/security/ai-usage";
 import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse, requireAuthUserId } from "@/features/security/auth-user";
-import {
-  parseJsonObjectBody,
-  readRequiredString,
-  validationErrorResponse,
-} from "@/lib/input-validation";
+import { parseJsonObjectBody, readRequiredString, validationErrorResponse } from "@/lib/input-validation";
 
 export async function POST(request: Request) {
   try {
@@ -53,9 +49,7 @@ export async function POST(request: Request) {
       maxLength: 8000,
     });
     const description =
-      typeof payload.description === "string"
-        ? payload.description.trim().slice(0, 500)
-        : "";
+      typeof payload.description === "string" ? payload.description.trim().slice(0, 500) : "";
 
     await consumeAiUsage({
       userId,

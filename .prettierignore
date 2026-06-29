@@ -1,0 +1,12 @@
+.next/
+android/
+node_modules/
+out/
+build/
+coverage/
+public/downloads/
+supabase/.temp/
+package-lock.json
+next-env.d.ts
+*.tsbuildinfo
+.env*

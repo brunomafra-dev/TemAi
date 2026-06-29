@@ -6,7 +6,12 @@ import {
   isOpenAiGenerationError,
   transcribeAudioWithOpenAi,
 } from "@/features/recipes/openai-generator";
-import type { InputMode, RecipeSuggestion, RecipeSuggestionFilter, SuggestionsResponse } from "@/features/recipes/types";
+import type {
+  InputMode,
+  RecipeSuggestion,
+  RecipeSuggestionFilter,
+  SuggestionsResponse,
+} from "@/features/recipes/types";
 import type { CookingEquipment } from "@/features/recipes/types";
 import {
   COOKING_EQUIPMENT_VALUES,
@@ -43,7 +48,14 @@ const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 15 * 1024 * 1024;
 const MAX_MULTIPART_BYTES = 16 * 1024 * 1024;
 const MAX_INGREDIENTS_TEXT_LENGTH = 8000;
-const RECIPE_FILTERS: readonly RecipeSuggestionFilter[] = ["all", "meal", "fit", "vegetarian", "dessert", "drink"];
+const RECIPE_FILTERS: readonly RecipeSuggestionFilter[] = [
+  "all",
+  "meal",
+  "fit",
+  "vegetarian",
+  "dessert",
+  "drink",
+];
 const TITLE_STOP_WORDS = new Set([
   "a",
   "as",
@@ -64,21 +76,37 @@ const TITLE_STOP_WORDS = new Set([
   "caseira",
   "caseiro",
 ]);
-const MEAT_TERMS = /\b(carne|frango|peixe|atum|sardinha|camarao|camar[aã]o|bacon|calabresa|linguica|lingui[cç]a|presunto|peru|porco|boi|costela|salmao|salm[aã]o|bacalhau|tilapia|til[aá]pia|lombo|picanha)\b/i;
+const MEAT_TERMS =
+  /\b(carne|frango|peixe|atum|sardinha|camarao|camar[aã]o|bacon|calabresa|linguica|lingui[cç]a|presunto|peru|porco|boi|costela|salmao|salm[aã]o|bacalhau|tilapia|til[aá]pia|lombo|picanha)\b/i;
 
 async function readSuggestionsInput(request: Request): Promise<SuggestionsPayload & { file?: File }> {
   const contentType = request.headers.get("content-type")?.toLowerCase() || "";
   if (!contentType.includes("multipart/form-data")) {
     return (await parseJsonObjectBody(request, {
       maxBytes: 16 * 1024,
-      allowedKeys: ["ingredientsText", "inputMode", "recipeFilter", "cookingEquipment", "excludedSuggestionTitles"],
+      allowedKeys: [
+        "ingredientsText",
+        "inputMode",
+        "recipeFilter",
+        "cookingEquipment",
+        "excludedSuggestionTitles",
+      ],
     })) as SuggestionsPayload;
   }
 
   assertRequestContentLength(request, MAX_MULTIPART_BYTES);
   const form = await request.formData();
   for (const key of form.keys()) {
-    if (!["ingredientsText", "inputMode", "recipeFilter", "cookingEquipment", "excludedSuggestionTitles", "file"].includes(key)) {
+    if (
+      ![
+        "ingredientsText",
+        "inputMode",
+        "recipeFilter",
+        "cookingEquipment",
+        "excludedSuggestionTitles",
+        "file",
+      ].includes(key)
+    ) {
       throw new InputValidationError(`Campo inesperado: ${key}.`);
     }
   }
@@ -90,7 +118,10 @@ async function readSuggestionsInput(request: Request): Promise<SuggestionsPayloa
   const rawCookingEquipment = String(form.get("cookingEquipment") || "").trim();
   const rawExcludedSuggestionTitles = String(form.get("excludedSuggestionTitles") || "").trim();
   if (rawIngredientsText.length > MAX_INGREDIENTS_TEXT_LENGTH) {
-    throw new InputValidationError("Texto de ingredientes muito grande. Resuma a lista e tente novamente.", 413);
+    throw new InputValidationError(
+      "Texto de ingredientes muito grande. Resuma a lista e tente novamente.",
+      413,
+    );
   }
   if (!/^(text|audio|photo)$/i.test(rawInputMode)) {
     throw new InputValidationError("Modo de entrada malformado.");
@@ -112,7 +143,10 @@ function validateUpload(file: File, inputMode: InputMode): NextResponse | null {
       return NextResponse.json({ message: "Envie um arquivo de imagem válido." }, { status: 415 });
     }
     if (file.size > MAX_PHOTO_BYTES) {
-      return NextResponse.json({ message: "Foto muito grande. Envie uma imagem de até 8 MB." }, { status: 413 });
+      return NextResponse.json(
+        { message: "Foto muito grande. Envie uma imagem de até 8 MB." },
+        { status: 413 },
+      );
     }
   }
 
@@ -121,7 +155,10 @@ function validateUpload(file: File, inputMode: InputMode): NextResponse | null {
       return NextResponse.json({ message: "Envie um arquivo de áudio válido." }, { status: 415 });
     }
     if (file.size > MAX_AUDIO_BYTES) {
-      return NextResponse.json({ message: "Áudio muito grande. Envie um arquivo de até 15 MB." }, { status: 413 });
+      return NextResponse.json(
+        { message: "Áudio muito grande. Envie um arquivo de até 15 MB." },
+        { status: 413 },
+      );
     }
   }
 
@@ -210,7 +247,10 @@ function normalizeIdKey(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function suggestionMatchesFilter(suggestion: RecipeSuggestion, recipeFilter: RecipeSuggestionFilter): boolean {
+function suggestionMatchesFilter(
+  suggestion: RecipeSuggestion,
+  recipeFilter: RecipeSuggestionFilter,
+): boolean {
   if (recipeFilter !== "vegetarian") return true;
   const searchable = [
     suggestion.title,
@@ -226,16 +266,15 @@ function filterDuplicateSuggestions(params: {
   excludedSuggestionTitles: string[];
   recipeFilter: RecipeSuggestionFilter;
 }): { response: SuggestionsResponse; removedCount: number } {
-  const seenTitleKeys = new Set(
-    params.excludedSuggestionTitles.map(normalizeTitleKey).filter(Boolean),
-  );
+  const seenTitleKeys = new Set(params.excludedSuggestionTitles.map(normalizeTitleKey).filter(Boolean));
   const seenIdKeys = new Set<string>();
   let removedCount = 0;
 
   function keepUnique(suggestion: RecipeSuggestion): boolean {
     const titleKey = normalizeTitleKey(suggestion.title);
     const idKey = normalizeIdKey(suggestion.id);
-    const isDuplicate = Boolean(titleKey && seenTitleKeys.has(titleKey)) || Boolean(idKey && seenIdKeys.has(idKey));
+    const isDuplicate =
+      Boolean(titleKey && seenTitleKeys.has(titleKey)) || Boolean(idKey && seenIdKeys.has(idKey));
     const matchesFilter = suggestionMatchesFilter(suggestion, params.recipeFilter);
 
     if (isDuplicate || !matchesFilter) {
@@ -290,7 +329,7 @@ async function persistSuggestionLog(params: {
       error instanceof Error
         ? error.message.toLowerCase()
         : typeof (error as { message?: unknown })?.message === "string"
-          ? ((error as { message: string }).message).toLowerCase()
+          ? (error as { message: string }).message.toLowerCase()
           : "";
     if (!message.includes("cooking_equipment")) {
       return undefined;
@@ -354,10 +393,7 @@ export async function POST(request: Request) {
 
     const entitlement = await getAiEntitlement(userId);
     if (!entitlement.isPremium && inputMode !== "text") {
-      return NextResponse.json(
-        { message: "Plano free permite IA apenas por texto." },
-        { status: 403 },
-      );
+      return NextResponse.json({ message: "Plano free permite IA apenas por texto." }, { status: 403 });
     }
 
     let ingredientsText = payload.ingredientsText || "";
@@ -367,7 +403,12 @@ export async function POST(request: Request) {
       if (payload.file) {
         const uploadError = validateUpload(payload.file, inputMode);
         if (uploadError) return uploadError;
-        const usage = await consumeAiUsage({ userId, bucket: "recipe_ai", feature: "suggestions", inputMode });
+        const usage = await consumeAiUsage({
+          userId,
+          bucket: "recipe_ai",
+          feature: "suggestions",
+          inputMode,
+        });
         usageEventId = usage.eventId;
         const typedIngredientsText = ingredientsText.trim();
         const transcribedIngredientsText = await transcribeAudioWithOpenAi(payload.file, {
@@ -384,9 +425,17 @@ export async function POST(request: Request) {
         });
         ingredients = compactIngredientsForAi(parseIngredientsText(ingredientsText));
         if (!ingredients.length) {
-          return NextResponse.json({ message: "Não foi possível identificar ingredientes válidos." }, { status: 400 });
+          return NextResponse.json(
+            { message: "Não foi possível identificar ingredientes válidos." },
+            { status: 400 },
+          );
         }
-        const usage = await consumeAiUsage({ userId, bucket: "recipe_ai", feature: "suggestions", inputMode });
+        const usage = await consumeAiUsage({
+          userId,
+          bucket: "recipe_ai",
+          feature: "suggestions",
+          inputMode,
+        });
         usageEventId = usage.eventId;
       }
     } else if (inputMode === "photo") {
@@ -407,7 +456,9 @@ export async function POST(request: Request) {
           detail: "high",
         });
       }
-      ingredients = compactIngredientsForAi(uniqueIngredients([...photoIngredients, ...parseIngredientsText(ingredientsText)]));
+      ingredients = compactIngredientsForAi(
+        uniqueIngredients([...photoIngredients, ...parseIngredientsText(ingredientsText)]),
+      );
       ingredientsText = ingredients.join(", ");
     } else {
       ingredientsText = readRequiredString(payload as Record<string, unknown>, "ingredientsText", {
@@ -417,7 +468,10 @@ export async function POST(request: Request) {
       });
       ingredients = compactIngredientsForAi(parseIngredientsText(ingredientsText));
       if (!ingredients.length) {
-        return NextResponse.json({ message: "Não foi possível identificar ingredientes válidos." }, { status: 400 });
+        return NextResponse.json(
+          { message: "Não foi possível identificar ingredientes válidos." },
+          { status: 400 },
+        );
       }
       const usage = await consumeAiUsage({ userId, bucket: "recipe_ai", feature: "suggestions", inputMode });
       usageEventId = usage.eventId;
@@ -425,7 +479,10 @@ export async function POST(request: Request) {
 
     if (!ingredients.length) {
       await refundAiUsageEvent(userId, usageEventId).catch(() => undefined);
-      return NextResponse.json({ message: "Não foi possível identificar ingredientes válidos." }, { status: 400 });
+      return NextResponse.json(
+        { message: "Não foi possível identificar ingredientes válidos." },
+        { status: 400 },
+      );
     }
 
     const rawResponse = await generateRecipeSuggestionsWithOpenAi(ingredients, {

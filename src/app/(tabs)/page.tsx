@@ -43,48 +43,49 @@ const categories = [
   {
     id: "principais",
     label: "Principais",
-    image:
-      "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=500&q=80",
+    image: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=500&q=80",
   },
   {
     id: "veggie",
     label: "Veggie",
-    image:
-      "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=500&q=80",
+    image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=500&q=80",
   },
   {
     id: "massas",
     label: "Massas",
-    image:
-      "https://images.unsplash.com/photo-1612874742237-6526221588e3?auto=format&fit=crop&w=500&q=80",
+    image: "https://images.unsplash.com/photo-1612874742237-6526221588e3?auto=format&fit=crop&w=500&q=80",
   },
   {
     id: "kids",
     label: "Kids",
-    image:
-      "https://gastronomiacarioca.zonasul.com.br/wp-content/uploads/2020/10/comida_crianca_zonasul.jpg",
+    image: "https://gastronomiacarioca.zonasul.com.br/wp-content/uploads/2020/10/comida_crianca_zonasul.jpg",
   },
   {
     id: "sobremesas",
     label: "Sobremesas",
-    image:
-      "https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?auto=format&fit=crop&w=500&q=80",
+    image: "https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?auto=format&fit=crop&w=500&q=80",
   },
   {
     id: "lanches",
     label: "Lanches",
-    image:
-      "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=500&q=80",
+    image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=500&q=80",
   },
   {
     id: "bebidas",
     label: "Bebidas",
-    image:
-      "https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=500&q=80",
+    image: "https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=500&q=80",
   },
 ];
 
-const popularCategories = ["principais", "veggie", "massas", "kids", "sobremesas", "lanches", "bebidas"] as const;
+const popularCategories = [
+  "principais",
+  "veggie",
+  "massas",
+  "kids",
+  "sobremesas",
+  "lanches",
+  "bebidas",
+] as const;
 type Category = (typeof categories)[number];
 
 const libraryMetaById: Record<
@@ -102,8 +103,7 @@ const libraryMetaById: Record<
     category: "massas",
     ratingAverage: 0,
     ratingCount: 0,
-    image:
-      "https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=900&q=80",
+    image: "https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=900&q=80",
     author: "Chef Amanda",
     viewCount: 0,
   },
@@ -111,8 +111,7 @@ const libraryMetaById: Record<
     category: "fit",
     ratingAverage: 0,
     ratingCount: 0,
-    image:
-      "https://images.unsplash.com/photo-1510693206972-df098062cb71?auto=format&fit=crop&w=900&q=80",
+    image: "https://images.unsplash.com/photo-1510693206972-df098062cb71?auto=format&fit=crop&w=900&q=80",
     author: "TemAi Test Kitchen",
     viewCount: 0,
   },
@@ -120,8 +119,7 @@ const libraryMetaById: Record<
     category: "principais",
     ratingAverage: 0,
     ratingCount: 0,
-    image:
-      "https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=900&q=80",
+    image: "https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=900&q=80",
     author: "Chef Lucas",
     viewCount: 0,
   },
@@ -129,8 +127,7 @@ const libraryMetaById: Record<
     category: "fit",
     ratingAverage: 0,
     ratingCount: 0,
-    image:
-      "https://images.unsplash.com/photo-1604909052743-94e838986d24?auto=format&fit=crop&w=900&q=80",
+    image: "https://images.unsplash.com/photo-1604909052743-94e838986d24?auto=format&fit=crop&w=900&q=80",
     author: "Marta Fit",
     viewCount: 0,
   },
@@ -138,8 +135,7 @@ const libraryMetaById: Record<
     category: "sobremesas",
     ratingAverage: 0,
     ratingCount: 0,
-    image:
-      "https://images.unsplash.com/photo-1603532648955-039310d9ed75?auto=format&fit=crop&w=900&q=80",
+    image: "https://images.unsplash.com/photo-1603532648955-039310d9ed75?auto=format&fit=crop&w=900&q=80",
     author: "Cozinha da Nina",
     viewCount: 0,
   },
@@ -147,8 +143,7 @@ const libraryMetaById: Record<
     category: "veggie",
     ratingAverage: 0,
     ratingCount: 0,
-    image:
-      "https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=900&q=80",
+    image: "https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=900&q=80",
     author: "Verde & Sabor",
     viewCount: 0,
   },
@@ -173,10 +168,7 @@ const CategoryButton = memo(function CategoryButton({
   onSelect: (categoryId: string) => void;
 }) {
   return (
-    <button
-      onClick={() => onSelect(category.id)}
-      className="flex min-w-[76px] flex-col items-center gap-2"
-    >
+    <button onClick={() => onSelect(category.id)} className="flex min-w-[76px] flex-col items-center gap-2">
       <span
         className={cn(
           "relative block h-[62px] w-[62px] overflow-hidden rounded-full border-2 shadow-sm transition",
@@ -188,12 +180,7 @@ const CategoryButton = memo(function CategoryButton({
           style={{ backgroundImage: `url(${category.image})` }}
         />
       </span>
-      <span
-        className={cn(
-          "text-xs font-semibold",
-          isActive ? "text-[#7E633A]" : "text-[#6E6258]",
-        )}
-      >
+      <span className={cn("text-xs font-semibold", isActive ? "text-[#7E633A]" : "text-[#6E6258]")}>
         {category.label}
       </span>
     </button>
@@ -238,9 +225,7 @@ const PopularRecipeCard = memo(function PopularRecipeCard({ entry }: { entry: Po
       </div>
       <div className="flex flex-1 flex-col justify-between p-3">
         <div>
-          <p className="line-clamp-2 text-sm font-semibold text-[#2A1E17]">
-            {entry.recipe.title}
-          </p>
+          <p className="line-clamp-2 text-sm font-semibold text-[#2A1E17]">{entry.recipe.title}</p>
           <p className="mt-1 text-xs text-[#7E7366]">por {entry.author}</p>
         </div>
         <div className="space-y-1">
@@ -293,9 +278,9 @@ export default function HomePage() {
   const [notificationMessage, setNotificationMessage] = useState("");
   const [isShoppingOpen, setIsShoppingOpen] = useState(false);
   const [shoppingItems, setShoppingItems] = useState<ShoppingListItem[]>([]);
-  const [popularApiRecipes, setPopularApiRecipes] = useState<
-    Array<PopularRecipeView & { category: string }>
-  >([]);
+  const [popularApiRecipes, setPopularApiRecipes] = useState<Array<PopularRecipeView & { category: string }>>(
+    [],
+  );
   const [isPopularLoading, setIsPopularLoading] = useState(true);
   const currentBadgeLabel =
     BADGE_CATALOG.find((badge) => badge.slug === profile.selectedBadge)?.label || "🌱 Estagiário";
@@ -418,15 +403,21 @@ export default function HomePage() {
     setIsGeneratorMenuOpen(false);
   }, []);
 
-  const redirectToCreate = useCallback((mode: "text" | "audio" | "photo") => {
-    setIsGeneratorMenuOpen(false);
-    router.push(`/gerar-receita-ia?mode=${mode}`);
-  }, [router]);
+  const redirectToCreate = useCallback(
+    (mode: "text" | "audio" | "photo") => {
+      setIsGeneratorMenuOpen(false);
+      router.push(`/gerar-receita-ia?mode=${mode}`);
+    },
+    [router],
+  );
 
-  const selectLibraryCategory = useCallback((categoryId: string) => {
-    setSelectedCategory(categoryId);
-    router.push(`/biblioteca?category=${encodeURIComponent(categoryId)}`);
-  }, [router]);
+  const selectLibraryCategory = useCallback(
+    (categoryId: string) => {
+      setSelectedCategory(categoryId);
+      router.push(`/biblioteca?category=${encodeURIComponent(categoryId)}`);
+    },
+    [router],
+  );
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -511,8 +502,7 @@ export default function HomePage() {
         category: "principais",
         ratingAverage: 0,
         ratingCount: 0,
-        image:
-          "https://images.unsplash.com/photo-1482049016688-2d3e1b311543?auto=format&fit=crop&w=900&q=80",
+        image: "https://images.unsplash.com/photo-1482049016688-2d3e1b311543?auto=format&fit=crop&w=900&q=80",
         author: recipe.sourceLabel,
         viewCount: 0,
       };
@@ -552,15 +542,14 @@ export default function HomePage() {
       );
     });
 
-    const orderedFeatured = filteredApi
-      .map((entry) => ({
-        recipe: entry.recipe,
-        ratingAverage: entry.ratingAverage,
-        ratingCount: entry.ratingCount,
-        image: entry.recipe.imageUrl || getRecipeImageFallback(entry.recipe),
-        author: entry.recipe.sourceLabel,
-        viewCount: entry.viewCount,
-      }));
+    const orderedFeatured = filteredApi.map((entry) => ({
+      recipe: entry.recipe,
+      ratingAverage: entry.ratingAverage,
+      ratingCount: entry.ratingCount,
+      image: entry.recipe.imageUrl || getRecipeImageFallback(entry.recipe),
+      author: entry.recipe.sourceLabel,
+      viewCount: entry.viewCount,
+    }));
 
     if (orderedFeatured.length > 0) return orderedFeatured;
     return fallbackPopularRecipes.slice(0, 5);
@@ -724,20 +713,17 @@ export default function HomePage() {
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Receitas populares</h3>
-          <Link
-            href="/biblioteca"
-            className="text-xs font-semibold uppercase tracking-wide text-[#8E7752]"
-          >
+          <Link href="/biblioteca" className="text-xs font-semibold uppercase tracking-wide text-[#8E7752]">
             Ver todas
           </Link>
         </div>
 
         <div className="space-y-3">
           {isPopularLoading
-            ? Array.from({ length: 3 }, (_, index) => <PopularRecipeSkeleton key={`popular-loading-${index}`} />)
-            : popularRecipes.map((entry) => (
-                <PopularRecipeCard key={entry.recipe.id} entry={entry} />
-              ))}
+            ? Array.from({ length: 3 }, (_, index) => (
+                <PopularRecipeSkeleton key={`popular-loading-${index}`} />
+              ))
+            : popularRecipes.map((entry) => <PopularRecipeCard key={entry.recipe.id} entry={entry} />)}
         </div>
       </section>
 
@@ -827,11 +813,7 @@ export default function HomePage() {
                   );
 
                   return item.href ? (
-                    <Link
-                      key={item.id}
-                      href={item.href}
-                      onClick={() => setIsNotificationsOpen(false)}
-                    >
+                    <Link key={item.id} href={item.href} onClick={() => setIsNotificationsOpen(false)}>
                       {content}
                     </Link>
                   ) : (
@@ -910,5 +892,3 @@ export default function HomePage() {
     </section>
   );
 }
-
-

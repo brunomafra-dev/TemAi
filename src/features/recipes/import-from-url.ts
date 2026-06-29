@@ -63,7 +63,7 @@ function decodeHtmlEntities(value: string): string {
     "&Otilde;": "\u00D5",
     "&Uacute;": "\u00DA",
     "&Uuml;": "\u00DC",
-    "&Ccedil;": "\u00C7"
+    "&Ccedil;": "\u00C7",
   };
 
   for (let i = 0; i < 3; i += 1) {
@@ -104,7 +104,10 @@ function textDamageScore(value: string): number {
 async function readResponseText(response: Response): Promise<string> {
   const buffer = await response.arrayBuffer();
   const contentType = response.headers.get("content-type") || "";
-  const charset = contentType.match(/charset=([^;\s]+)/i)?.[1]?.trim().toLowerCase();
+  const charset = contentType
+    .match(/charset=([^;\s]+)/i)?.[1]
+    ?.trim()
+    .toLowerCase();
 
   const utf8 = new TextDecoder("utf-8").decode(buffer);
   if (charset && charset !== "utf-8" && charset !== "utf8") {
@@ -143,7 +146,8 @@ function extractImageFromHtml(html: string): string | undefined {
 function isRecipeType(type: unknown): boolean {
   if (!type) return false;
   if (typeof type === "string") return type.toLowerCase() === "recipe";
-  if (Array.isArray(type)) return type.some((item) => typeof item === "string" && item.toLowerCase() === "recipe");
+  if (Array.isArray(type))
+    return type.some((item) => typeof item === "string" && item.toLowerCase() === "recipe");
   return false;
 }
 
@@ -174,8 +178,14 @@ function extractInstructions(instructions: RecipeJsonLd["recipeInstructions"]): 
 
 function inferCategory(title: string, ingredients: string[]): ImportedRecipeDraft["category"] {
   const text = `${title} ${ingredients.join(" ")}`.toLowerCase();
-  if (/(suco|smoothie|vitamina|drink|coquetel|caipirinha|cha|cafe|refrigerante|limonada)/.test(text)) return "bebidas";
-  if (/(lanche|sanduiche|sanduíche|hamburguer|hambúrguer|wrap|tostex|toast|hot dog|cachorro-quente|esfirra)/.test(text)) return "lanches";
+  if (/(suco|smoothie|vitamina|drink|coquetel|caipirinha|cha|cafe|refrigerante|limonada)/.test(text))
+    return "bebidas";
+  if (
+    /(lanche|sanduiche|sanduíche|hamburguer|hambúrguer|wrap|tostex|toast|hot dog|cachorro-quente|esfirra)/.test(
+      text,
+    )
+  )
+    return "lanches";
   if (/(bolo|mousse|pudim|sobremesa|chocolate|brigadeiro|torta doce)/.test(text)) return "sobremesas";
   if (/(massa|macarrao|spaghetti|penne|lasanha|nhoque|ravioli)/.test(text)) return "massas";
   if (/(vegetar|vegano|salada|abobrinha|berinjela|cenoura|brocolis)/.test(text)) return "veggie";
@@ -310,9 +320,7 @@ function extractLocEntries(xml: string): string[] {
 export async function collectTudoGostosoRecipeUrls(targetCount: number): Promise<string[]> {
   const root = "https://www.tudogostoso.com.br/sitemap.xml";
   const indexXml = await fetchXml(root);
-  const sitemapUrls = extractLocEntries(indexXml).filter((url) =>
-    /sitemap/i.test(url),
-  );
+  const sitemapUrls = extractLocEntries(indexXml).filter((url) => /sitemap/i.test(url));
 
   const recipeUrls: string[] = [];
   for (const sitemapUrl of sitemapUrls) {
@@ -337,6 +345,3 @@ export async function collectTudoGostosoRecipeUrls(targetCount: number): Promise
 
   return recipeUrls.slice(0, targetCount);
 }
-
-
-

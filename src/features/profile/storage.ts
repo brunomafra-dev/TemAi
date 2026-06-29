@@ -1,10 +1,7 @@
 "use client";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase-client";
-import {
-  DEFAULT_COOKING_EQUIPMENT,
-  normalizeCookingEquipment,
-} from "@/features/recipes/cooking-equipment";
+import { DEFAULT_COOKING_EQUIPMENT, normalizeCookingEquipment } from "@/features/recipes/cooking-equipment";
 import type { CookingEquipment } from "@/features/recipes/types";
 import { LEGAL_PRIVACY_VERSION, LEGAL_TERMS_VERSION } from "@/lib/legal";
 
@@ -64,8 +61,7 @@ export function getUserProfile(): UserProfile {
       username: parsed.username?.trim() || "",
       photoDataUrl: parsed.photoDataUrl?.trim() || "",
       cookingEquipment: normalizeCookingEquipment(parsed.cookingEquipment),
-      selectedBadge:
-        parsed.selectedBadge?.trim() || defaultProfile.selectedBadge,
+      selectedBadge: parsed.selectedBadge?.trim() || defaultProfile.selectedBadge,
       unlockedBadges:
         Array.isArray(parsed.unlockedBadges) && parsed.unlockedBadges.length > 0
           ? parsed.unlockedBadges.filter((item): item is string => typeof item === "string")
@@ -119,7 +115,9 @@ export async function syncUserProfileFromCloud(): Promise<UserProfile | null> {
 
   const { data, error } = await client
     .from("profiles")
-    .select("first_name,last_name,username,avatar_url,cooking_equipment,selected_badge,unlocked_badges,accepted_terms_at,accepted_privacy_at,accepted_terms_version,accepted_privacy_version")
+    .select(
+      "first_name,last_name,username,avatar_url,cooking_equipment,selected_badge,unlocked_badges,accepted_terms_at,accepted_privacy_at,accepted_terms_version,accepted_privacy_version",
+    )
     .eq("id", userId)
     .single();
 
@@ -168,7 +166,9 @@ function mapProfileSaveError(error: { code?: string; message?: string }): SaveUs
   };
 }
 
-export async function saveUserProfileToCloudDetailed(profile: UserProfile): Promise<SaveUserProfileToCloudResult> {
+export async function saveUserProfileToCloudDetailed(
+  profile: UserProfile,
+): Promise<SaveUserProfileToCloudResult> {
   const client = getSupabaseBrowserClient();
   if (!client) {
     return {
@@ -199,7 +199,8 @@ export async function saveUserProfileToCloudDetailed(profile: UserProfile): Prom
     unlocked_badges: normalized.unlockedBadges,
     accepted_terms_at: normalized.acceptedTermsAt,
     accepted_privacy_at: normalized.acceptedPrivacyAt,
-    accepted_terms_version: normalized.acceptedTermsVersion || (normalized.acceptedTermsAt ? LEGAL_TERMS_VERSION : null),
+    accepted_terms_version:
+      normalized.acceptedTermsVersion || (normalized.acceptedTermsAt ? LEGAL_TERMS_VERSION : null),
     accepted_privacy_version:
       normalized.acceptedPrivacyVersion || (normalized.acceptedPrivacyAt ? LEGAL_PRIVACY_VERSION : null),
   };

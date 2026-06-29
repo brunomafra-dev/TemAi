@@ -3,13 +3,7 @@ export type RecipeSuggestionFilter = "all" | "meal" | "fit" | "vegetarian" | "de
 export type CookingEquipment = "stove" | "oven" | "air_fryer" | "microwave" | "blender";
 export type RecipeDifficulty = "Fácil" | "Médio" | "Avançado";
 export type LibraryCategory =
-  | "principais"
-  | "veggie"
-  | "massas"
-  | "kids"
-  | "sobremesas"
-  | "bebidas"
-  | "lanches";
+  "principais" | "veggie" | "massas" | "kids" | "sobremesas" | "bebidas" | "lanches";
 
 export type RecipeOrigin = "ai" | "library" | "manual";
 

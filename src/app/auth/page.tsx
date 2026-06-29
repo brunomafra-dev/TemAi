@@ -240,8 +240,7 @@ export default function AuthPage() {
 
     setIsSubmitting(true);
     setMessage("");
-    const redirectTo =
-      typeof window !== "undefined" ? `${window.location.origin}/auth/reset-password` : "";
+    const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/auth/reset-password` : "";
     const response = await fetch("/api/auth/forgot-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -265,8 +264,7 @@ export default function AuthPage() {
       return;
     }
     setMessage(
-      data.message ||
-        "Enviamos um link para redefinir sua senha. Confira também Spam/Lixo eletrônico.",
+      data.message || "Enviamos um link para redefinir sua senha. Confira também Spam/Lixo eletrônico.",
     );
   }
 
@@ -331,11 +329,7 @@ export default function AuthPage() {
 
           {mode === "register" ? (
             <>
-              <Input
-                placeholder="Seu nome"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-              />
+              <Input placeholder="Seu nome" value={name} onChange={(event) => setName(event.target.value)} />
               <div className="space-y-1">
                 <Input
                   placeholder="@seuusername"
@@ -405,13 +399,11 @@ export default function AuthPage() {
             className="w-full"
             disabled={isSubmitting}
             onClick={() =>
-              void (
-                mode === "login"
-                  ? handleLogin()
-                  : mode === "register"
-                    ? handleRegister()
-                    : handleForgotPassword()
-              )
+              void (mode === "login"
+                ? handleLogin()
+                : mode === "register"
+                  ? handleRegister()
+                  : handleForgotPassword())
             }
           >
             {isSubmitting

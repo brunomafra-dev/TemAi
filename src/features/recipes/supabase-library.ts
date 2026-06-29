@@ -77,7 +77,7 @@ function decodeHtmlEntities(value: string): string {
     "&Otilde;": "\u00D5",
     "&Uacute;": "\u00DA",
     "&Uuml;": "\u00DC",
-    "&Ccedil;": "\u00C7"
+    "&Ccedil;": "\u00C7",
   };
 
   for (let i = 0; i < 3; i += 1) {
@@ -182,8 +182,7 @@ function tokenizeSearchText(value: string): string[] {
 function tokenMatches(queryToken: string, fieldTokens: string[]): boolean {
   return fieldTokens.some(
     (fieldToken) =>
-      fieldToken === queryToken ||
-      (queryToken.length >= 4 && fieldToken.startsWith(queryToken)),
+      fieldToken === queryToken || (queryToken.length >= 4 && fieldToken.startsWith(queryToken)),
   );
 }
 
@@ -366,7 +365,12 @@ async function searchRecipesLegacyFromSupabase(params: {
     : mapped.map((recipe) => ({ recipe, searchScore: 0 }));
   const safe =
     category === "veggie"
-      ? searched.filter((entry) => !hasAnimalProtein(`${entry.recipe.title} ${entry.recipe.description} ${entry.recipe.ingredients.join(" ")}`))
+      ? searched.filter(
+          (entry) =>
+            !hasAnimalProtein(
+              `${entry.recipe.title} ${entry.recipe.description} ${entry.recipe.ingredients.join(" ")}`,
+            ),
+        )
       : searched;
 
   const ranked = safe
@@ -375,7 +379,9 @@ async function searchRecipesLegacyFromSupabase(params: {
       searchScore: entry.searchScore,
       rank: hashString(`${seed}:${entry.recipe.id}`),
     }))
-    .sort((a, b) => b.searchScore - a.searchScore || a.rank - b.rank || a.recipe.id.localeCompare(b.recipe.id))
+    .sort(
+      (a, b) => b.searchScore - a.searchScore || a.rank - b.rank || a.recipe.id.localeCompare(b.recipe.id),
+    )
     .map((entry) => entry.recipe);
 
   const total = ranked.length;
@@ -397,12 +403,7 @@ function hashString(value: string): number {
   let hash = 2166136261;
   for (let i = 0; i < value.length; i += 1) {
     hash ^= value.charCodeAt(i);
-    hash +=
-      (hash << 1) +
-      (hash << 4) +
-      (hash << 7) +
-      (hash << 8) +
-      (hash << 24);
+    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
   }
   return hash >>> 0;
 }
@@ -440,13 +441,15 @@ export async function getRecipesBySlugsFromSupabase(slugs: readonly string[]): P
   return safeSlugs.map((slug) => recipesById.get(slug)).filter((recipe): recipe is Recipe => Boolean(recipe));
 }
 
-export async function getPopularRecipesFromSupabase(limit = 8): Promise<Array<{
-  recipe: Recipe;
-  ratingAverage: number;
-  ratingCount: number;
-  viewCount: number;
-  rating: number;
-}>> {
+export async function getPopularRecipesFromSupabase(limit = 8): Promise<
+  Array<{
+    recipe: Recipe;
+    ratingAverage: number;
+    ratingCount: number;
+    viewCount: number;
+    rating: number;
+  }>
+> {
   if (!canUseSupabase()) {
     return [];
   }
@@ -558,5 +561,3 @@ export async function refreshAuthorBadgesInSupabase(authorHandle: string): Promi
     throw new Error(`Falha ao atualizar badges do autor: ${errorText}`);
   }
 }
-
-

@@ -15,7 +15,17 @@ const CATEGORY_IMAGES: Record<string, string> = {
 
 const KEYWORD_IMAGES: Array<{ terms: string[]; image: string }> = [
   {
-    terms: ["pao de parmesao", "pão de parmesão", "pao de queijo", "pão de queijo", "parmesao", "parmesão", "pao", "pão", "bread"],
+    terms: [
+      "pao de parmesao",
+      "pão de parmesão",
+      "pao de queijo",
+      "pão de queijo",
+      "parmesao",
+      "parmesão",
+      "pao",
+      "pão",
+      "bread",
+    ],
     image: "https://images.unsplash.com/photo-1600628421055-4d30de868b8f?auto=format&fit=crop&w=1200&q=80",
   },
   {

@@ -25,7 +25,9 @@ function errorName(error: unknown): string | undefined {
   return "UnknownError";
 }
 
-function sanitizeMetadata(metadata?: ApiLogParams["metadata"]): Record<string, string | number | boolean | null> | undefined {
+function sanitizeMetadata(
+  metadata?: ApiLogParams["metadata"],
+): Record<string, string | number | boolean | null> | undefined {
   if (!metadata) return undefined;
   return Object.fromEntries(
     Object.entries(metadata)

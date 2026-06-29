@@ -13,7 +13,11 @@ import {
 } from "@/features/recipes/cooking-equipment";
 import { compactIngredientsForAi } from "@/features/recipes/helpers";
 import { getRecipeDifficulty, normalizePrepMinutesForRecipe } from "@/features/recipes/quality";
-import { aiUsageErrorResponse, assertRecipeAiGenerationAllowed, consumeAiUsage } from "@/features/security/ai-usage";
+import {
+  aiUsageErrorResponse,
+  assertRecipeAiGenerationAllowed,
+  consumeAiUsage,
+} from "@/features/security/ai-usage";
 import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse, requireAuthUserId } from "@/features/security/auth-user";
 import { serverEnv } from "@/lib/env-server";
@@ -38,7 +42,14 @@ interface RecipePayload {
   generationId?: string;
 }
 
-const RECIPE_FILTERS: readonly RecipeSuggestionFilter[] = ["all", "meal", "fit", "vegetarian", "dessert", "drink"];
+const RECIPE_FILTERS: readonly RecipeSuggestionFilter[] = [
+  "all",
+  "meal",
+  "fit",
+  "vegetarian",
+  "dessert",
+  "drink",
+];
 const MAX_RECIPE_INGREDIENT_PAYLOAD_ITEMS = 80;
 const MAX_RECIPE_INGREDIENT_ITEM_LENGTH = 160;
 
@@ -184,7 +195,9 @@ async function readVerifiedGenerationLog(params: {
 
   return {
     normalizedIngredients: Array.isArray(log.normalized_ingredients)
-      ? compactIngredientsForAi(log.normalized_ingredients.filter((item): item is string => typeof item === "string"))
+      ? compactIngredientsForAi(
+          log.normalized_ingredients.filter((item): item is string => typeof item === "string"),
+        )
       : [],
   };
 }
@@ -249,10 +262,9 @@ async function persistGeneratedRecipeCache(params: {
     recipe: withRecipeQuality(params.recipe),
   };
 
-  const { error } = await supabase.from("ai_generated_recipes").upsert(
-    insertPayload,
-    { onConflict: "user_id,generation_log_id,suggestion_id,include_nutrition" },
-  );
+  const { error } = await supabase
+    .from("ai_generated_recipes")
+    .upsert(insertPayload, { onConflict: "user_id,generation_log_id,suggestion_id,include_nutrition" });
 
   if (error) {
     await supabase.from("ai_generated_recipes").upsert(
@@ -306,9 +318,16 @@ export async function POST(request: Request) {
 
     const payload = (await parseJsonObjectBody(request, {
       maxBytes: 64 * 1024,
-      allowedKeys: ["suggestionId", "suggestionTitle", "ingredients", "includeNutrition", "recipeFilter", "cookingEquipment", "generationId"],
-    })) as RecipePayload &
-      Record<string, unknown>;
+      allowedKeys: [
+        "suggestionId",
+        "suggestionTitle",
+        "ingredients",
+        "includeNutrition",
+        "recipeFilter",
+        "cookingEquipment",
+        "generationId",
+      ],
+    })) as RecipePayload & Record<string, unknown>;
     const suggestionId = readRequiredString(payload, "suggestionId", {
       fieldName: "ID de sugestao",
       minLength: 3,

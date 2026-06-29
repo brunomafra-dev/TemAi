@@ -3,11 +3,7 @@ import { answerSupportWithOpenAi, isOpenAiGenerationError } from "@/features/rec
 import { aiUsageErrorResponse, consumeAiUsage } from "@/features/security/ai-usage";
 import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse, requireAuthUserId } from "@/features/security/auth-user";
-import {
-  parseJsonObjectBody,
-  readRequiredString,
-  validationErrorResponse,
-} from "@/lib/input-validation";
+import { parseJsonObjectBody, readRequiredString, validationErrorResponse } from "@/lib/input-validation";
 
 export async function POST(request: Request) {
   try {

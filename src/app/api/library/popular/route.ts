@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPopularRecipesFromSupabase } from "@/features/recipes/supabase-library";
-import {
-  InputValidationError,
-  validationErrorResponse,
-} from "@/lib/input-validation";
+import { InputValidationError, validationErrorResponse } from "@/lib/input-validation";
 import { consumePublicReadRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse } from "@/features/security/auth-user";
 import { elapsedMs, logApiEvent } from "@/lib/observability";

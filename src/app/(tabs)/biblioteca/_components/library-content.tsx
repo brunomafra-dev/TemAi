@@ -228,7 +228,6 @@ export default function LibraryContent() {
           </div>
         </div>
       ) : null}
-
     </section>
   );
 }

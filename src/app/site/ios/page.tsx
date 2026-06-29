@@ -46,7 +46,9 @@ function PhoneMock({ title, active }: { title: string; active?: boolean }) {
           <div className="rounded-2xl bg-[#F2E7D6] p-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-[#5B4A40]">temaiapp.vercel.app</span>
-              <span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-[#8A7366]">Seguro</span>
+              <span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-[#8A7366]">
+                Seguro
+              </span>
             </div>
             <div className="mt-3 h-20 rounded-[1.3rem] bg-[linear-gradient(135deg,#D87143,#F4BE85)]" />
             <div className="mt-3 h-3 w-3/4 rounded-full bg-white/75" />
@@ -95,7 +97,8 @@ export default function IosInstallGuidePage() {
               Instale o TemAi no iPhone em menos de um minuto
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-8 text-[#61534A]">
-              Enquanto a versão da Apple Store não chega, você pode usar o TemAi como app no iPhone. O atalho fica na tela inicial e abre como experiência dedicada.
+              Enquanto a versão da Apple Store não chega, você pode usar o TemAi como app no iPhone. O atalho
+              fica na tela inicial e abre como experiência dedicada.
             </p>
 
             <div className="mt-8 grid gap-4">

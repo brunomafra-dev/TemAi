@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import { moderateCommunityText } from "@/features/community/moderation";
-import {
-  deleteLibraryRecipeComment,
-  updateLibraryRecipeComment,
-} from "@/features/community/recipe-feedback";
+import { deleteLibraryRecipeComment, updateLibraryRecipeComment } from "@/features/community/recipe-feedback";
 import { consumeAuthRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse, requireAuthUserId } from "@/features/security/auth-user";
 import {
@@ -33,10 +30,7 @@ async function readParams(context: { params: Promise<{ id: string; commentId: st
   };
 }
 
-export async function PUT(
-  request: Request,
-  context: { params: Promise<{ id: string; commentId: string }> },
-) {
+export async function PUT(request: Request, context: { params: Promise<{ id: string; commentId: string }> }) {
   try {
     const userId = await requireAuthUserId(request);
     if (!userId) {

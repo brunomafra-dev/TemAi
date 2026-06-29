@@ -44,10 +44,7 @@ function assertNoUnsafeControlChars(value: string, fieldName: string): void {
   }
 }
 
-export async function parseJsonObjectBody(
-  request: Request,
-  options?: ParseJsonOptions,
-): Promise<JsonObject> {
+export async function parseJsonObjectBody(request: Request, options?: ParseJsonOptions): Promise<JsonObject> {
   const maxBytes = options?.maxBytes ?? DEFAULT_MAX_BODY_BYTES;
   const contentType = request.headers.get("content-type")?.toLowerCase() || "";
   if (contentType && !contentType.includes("application/json")) {
@@ -215,11 +212,7 @@ export function readOptionalNumber(
   return value;
 }
 
-export function readOptionalBoolean(
-  input: JsonObject,
-  key: string,
-  defaultValue = false,
-): boolean {
+export function readOptionalBoolean(input: JsonObject, key: string, defaultValue = false): boolean {
   const raw = input[key];
   if (raw === undefined || raw === null) return defaultValue;
   if (typeof raw !== "boolean") {

@@ -42,7 +42,12 @@ import {
   setUserRecipeRating,
 } from "@/features/recipes/ratings-storage";
 import { getRecipeDifficulty } from "@/features/recipes/quality";
-import type { CookingEquipment, Recipe, RecipeSuggestionFilter, SavedRecipeRef } from "@/features/recipes/types";
+import type {
+  CookingEquipment,
+  Recipe,
+  RecipeSuggestionFilter,
+  SavedRecipeRef,
+} from "@/features/recipes/types";
 import { normalizeCookingEquipment } from "@/features/recipes/cooking-equipment";
 import { parseIngredientsText } from "@/features/recipes/helpers";
 import { slugify } from "@/lib/utils";
@@ -177,7 +182,10 @@ function formatScaledValue(value: number): string {
     if (Math.abs(value - 0.25) < 0.05) return "1/4";
     if (Math.abs(value - 0.75) < 0.05) return "3/4";
   }
-  return value.toFixed(2).replace(/\.?0+$/, "").replace(".", ",");
+  return value
+    .toFixed(2)
+    .replace(/\.?0+$/, "")
+    .replace(".", ",");
 }
 
 function inflectUnit(unitRaw: string, quantity: number): string {
@@ -334,10 +342,7 @@ export default function RecipeDetailsPage() {
     () => parseCookingEquipmentQuery(searchParams.get("equipment")),
     [searchParams],
   );
-  const recipeFilter = useMemo(
-    () => parseRecipeFilterQuery(searchParams.get("filter")),
-    [searchParams],
-  );
+  const recipeFilter = useMemo(() => parseRecipeFilterQuery(searchParams.get("filter")), [searchParams]);
   const suggestionTitle = searchParams.get("title") || undefined;
   const shouldIncludeNutrition = searchParams.get("nutrition") === "1";
   const generationId = searchParams.get("generationId") || undefined;
@@ -428,11 +433,11 @@ export default function RecipeDetailsPage() {
           }
 
           const data = (await response.json()) as { recipe: Recipe };
-        if (isMounted) {
-          setRecipe(data.recipe);
-          setIsSaved(isRecipeSaved(data.recipe.id));
-          setUserRating(getUserRecipeRating(data.recipe.id));
-        }
+          if (isMounted) {
+            setRecipe(data.recipe);
+            setIsSaved(isRecipeSaved(data.recipe.id));
+            setUserRating(getUserRecipeRating(data.recipe.id));
+          }
         } catch (error) {
           if (isMounted) {
             const fallbackRecipe = LIBRARY_RECIPES.find((item) => item.id === recipeId) ?? null;
@@ -545,9 +550,7 @@ export default function RecipeDetailsPage() {
         }
       } catch (error) {
         if (isMounted) {
-          setErrorMessage(
-            error instanceof Error ? error.message : "Não foi possível gerar a receita.",
-          );
+          setErrorMessage(error instanceof Error ? error.message : "Não foi possível gerar a receita.");
         }
       } finally {
         if (isMounted) {
@@ -561,14 +564,21 @@ export default function RecipeDetailsPage() {
     return () => {
       isMounted = false;
     };
-  }, [cookingEquipment, generationId, ingredientList, origin, recipeFilter, recipeId, shouldIncludeNutrition, suggestionTitle]);
+  }, [
+    cookingEquipment,
+    generationId,
+    ingredientList,
+    origin,
+    recipeFilter,
+    recipeId,
+    shouldIncludeNutrition,
+    suggestionTitle,
+  ]);
 
   useEffect(() => {
     if (!isShoppingOpen) return;
     setOwnedIngredients((current) =>
-      Object.fromEntries(
-        scaledIngredients.map((ingredient) => [ingredient, Boolean(current[ingredient])]),
-      ),
+      Object.fromEntries(scaledIngredients.map((ingredient) => [ingredient, Boolean(current[ingredient])])),
     );
   }, [isShoppingOpen, scaledIngredients]);
 
@@ -612,9 +622,12 @@ export default function RecipeDetailsPage() {
       imageUrl: currentRecipe.imageUrl,
       sourceLabel: currentRecipe.sourceLabel,
       recipeSnapshot: currentRecipe,
-      ingredientsSnapshot: sourceOrigin === "ai"
-        ? (ingredientList.length ? ingredientList : currentRecipe.ingredients)
-        : currentRecipe.ingredients,
+      ingredientsSnapshot:
+        sourceOrigin === "ai"
+          ? ingredientList.length
+            ? ingredientList
+            : currentRecipe.ingredients
+          : currentRecipe.ingredients,
       generationId,
       cookingEquipment,
       sourceSuggestionId: sourceOrigin === "ai" ? recipeId : undefined,
@@ -873,9 +886,7 @@ export default function RecipeDetailsPage() {
 
   function openShoppingSelector() {
     if (!recipe) return;
-    setOwnedIngredients(
-      Object.fromEntries(scaledIngredients.map((ingredient) => [ingredient, false])),
-    );
+    setOwnedIngredients(Object.fromEntries(scaledIngredients.map((ingredient) => [ingredient, false])));
     setShoppingMessage("");
     setIsShoppingOpen(true);
   }
@@ -945,8 +956,7 @@ export default function RecipeDetailsPage() {
     const nextSteps = normalizeList(mapSteps(touchStepsText));
     const stepDiff = symmetricDiffCount(baseSteps, nextSteps);
     const stepsChanged =
-      stepDiff >= 2 &&
-      stepDiff / Math.max(baseSteps.length, nextSteps.length || 1) >= 0.25;
+      stepDiff >= 2 && stepDiff / Math.max(baseSteps.length, nextSteps.length || 1) >= 0.25;
 
     return {
       hasNewTitle,
@@ -1072,13 +1082,12 @@ export default function RecipeDetailsPage() {
                 </div>
               </div>
               <div>
-                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#7A6D60]">
-                  Avaliação
-                </p>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#7A6D60]">Avaliação</p>
                 {origin === "library" ? (
                   libraryFeedback && libraryFeedback.ratingCount > 0 ? (
                     <p className="mb-2 rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] px-3 py-2 text-xs font-semibold text-[#6A5E52]">
-                      Média {libraryFeedback.averageRating.toFixed(1)}/10 com {libraryFeedback.ratingCount} avaliação(ões).
+                      Média {libraryFeedback.averageRating.toFixed(1)}/10 com {libraryFeedback.ratingCount}{" "}
+                      avaliação(ões).
                     </p>
                   ) : (
                     <p className="mb-2 rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] px-3 py-2 text-xs font-semibold text-[#6A5E52]">
@@ -1090,9 +1099,7 @@ export default function RecipeDetailsPage() {
                   <div>
                     <RatingStars readonly value={userRating || libraryFeedback?.averageRating || 0} />
                     {userRating > 0 ? (
-                      <p className="mt-1 text-xs font-semibold text-[#7A6D60]">
-                        Sua nota: {userRating}/10
-                      </p>
+                      <p className="mt-1 text-xs font-semibold text-[#7A6D60]">Sua nota: {userRating}/10</p>
                     ) : null}
                   </div>
                   <Button
@@ -1119,11 +1126,20 @@ export default function RecipeDetailsPage() {
                     Receita autoral
                   </Button>
                 ) : isSaved ? (
-                  <Button variant="secondary" className="w-full" onClick={() => void handleUnsaveRecipe()} disabled={isSyncingSavedRecipe}>
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => void handleUnsaveRecipe()}
+                    disabled={isSyncingSavedRecipe}
+                  >
                     {isSyncingSavedRecipe ? "Sincronizando..." : "Remover dos salvos"}
                   </Button>
                 ) : (
-                  <Button className="w-full" onClick={() => void handleSaveRecipe()} disabled={isSyncingSavedRecipe}>
+                  <Button
+                    className="w-full"
+                    onClick={() => void handleSaveRecipe()}
+                    disabled={isSyncingSavedRecipe}
+                  >
                     {isSyncingSavedRecipe ? "Salvando..." : "Salvar receita"}
                   </Button>
                 )}
@@ -1139,11 +1155,7 @@ export default function RecipeDetailsPage() {
                   {savedRecipeMessage}
                 </p>
               ) : null}
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={openShoppingSelector}
-              >
+              <Button variant="outline" className="w-full" onClick={openShoppingSelector}>
                 Adicionar à lista de compras
               </Button>
               {isShoppingOpen ? (
@@ -1250,153 +1262,162 @@ export default function RecipeDetailsPage() {
                 <div className="space-y-2">
                   {publicComments.length ? (
                     <>
-                    {visibleComments.map((comment) => (
-                      <div key={comment.id} className="space-y-3 rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] p-3">
-                        <div className="flex items-center gap-2">
-                          <span className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#EAD7BB] text-xs font-bold text-[#7A4A31]">
-                            {comment.authorAvatarUrl ? (
-                              <Image
-                                src={comment.authorAvatarUrl}
-                                alt={comment.authorName}
-                                fill
-                                unoptimized
-                                className="object-cover"
+                      {visibleComments.map((comment) => (
+                        <div
+                          key={comment.id}
+                          className="space-y-3 rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] p-3"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#EAD7BB] text-xs font-bold text-[#7A4A31]">
+                              {comment.authorAvatarUrl ? (
+                                <Image
+                                  src={comment.authorAvatarUrl}
+                                  alt={comment.authorName}
+                                  fill
+                                  unoptimized
+                                  className="object-cover"
+                                />
+                              ) : (
+                                comment.authorName.slice(0, 1).toUpperCase()
+                              )}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-[#4F4338]">
+                                {comment.authorName}
+                              </p>
+                              {comment.authorUsername ? (
+                                <p className="text-xs text-[#8A7A69]">@{comment.authorUsername}</p>
+                              ) : null}
+                            </div>
+                          </div>
+                          {editingCommentId === comment.id ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={editingCommentText}
+                                onChange={(event) => setEditingCommentText(event.target.value)}
+                                className="min-h-[84px] w-full rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm"
                               />
-                            ) : (
-                              comment.authorName.slice(0, 1).toUpperCase()
-                            )}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-[#4F4338]">{comment.authorName}</p>
-                            {comment.authorUsername ? (
-                              <p className="text-xs text-[#8A7A69]">@{comment.authorUsername}</p>
-                            ) : null}
-                          </div>
-                        </div>
-                        {editingCommentId === comment.id ? (
-                          <div className="space-y-2">
-                            <textarea
-                              value={editingCommentText}
-                              onChange={(event) => setEditingCommentText(event.target.value)}
-                              className="min-h-[84px] w-full rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm"
-                            />
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                              <Button
-                                className="w-full"
-                                onClick={() => void submitCommentEdit(comment.id)}
-                                disabled={isMutatingComment}
-                              >
-                                {isMutatingComment ? "Salvando..." : "Salvar edição"}
-                              </Button>
-                              <Button
-                                variant="secondary"
-                                className="w-full"
-                                onClick={() => {
-                                  setEditingCommentId("");
-                                  setEditingCommentText("");
-                                }}
-                                disabled={isMutatingComment}
-                              >
-                                Cancelar
-                              </Button>
+                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                <Button
+                                  className="w-full"
+                                  onClick={() => void submitCommentEdit(comment.id)}
+                                  disabled={isMutatingComment}
+                                >
+                                  {isMutatingComment ? "Salvando..." : "Salvar edição"}
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  className="w-full"
+                                  onClick={() => {
+                                    setEditingCommentId("");
+                                    setEditingCommentText("");
+                                  }}
+                                  disabled={isMutatingComment}
+                                >
+                                  Cancelar
+                                </Button>
+                              </div>
                             </div>
-                          </div>
-                        ) : (
-                          <p className="mt-2 text-sm leading-relaxed text-[#5D5248]">{comment.body}</p>
-                        )}
-                        <div className="flex flex-wrap items-center gap-3 border-t border-[#E5D7BF] pt-2">
-                          {comment.isMine ? (
-                            <>
-                              <button
-                                type="button"
-                                className="text-xs font-semibold text-[#7A6D60]"
-                                onClick={() => startEditComment(comment.id, comment.body)}
-                                disabled={isMutatingComment}
-                              >
-                                Editar
-                              </button>
-                              <button
-                                type="button"
-                                className="text-xs font-semibold text-[#9A4635]"
-                                onClick={() => void deleteComment(comment.id)}
-                                disabled={isMutatingComment}
-                              >
-                                Excluir
-                              </button>
-                            </>
                           ) : (
-                            <>
-                              <button
-                                type="button"
-                                className="text-xs font-semibold text-[#7A6D60]"
-                                onClick={() => hideComment(comment.id)}
-                              >
-                                Ocultar
-                              </button>
-                              <button
-                                type="button"
-                                className="text-xs font-semibold text-[#9A4635]"
-                                onClick={() => {
-                                  setReportingCommentId((current) => (current === comment.id ? "" : comment.id));
-                                  setCommentReportReason("inappropriate");
-                                  setCommentReportDetail("");
-                                }}
-                              >
-                                Denunciar
-                              </button>
-                            </>
+                            <p className="mt-2 text-sm leading-relaxed text-[#5D5248]">{comment.body}</p>
                           )}
-                        </div>
-                        {reportingCommentId === comment.id ? (
-                          <div className="space-y-2 rounded-2xl border border-[#E5D7BF] bg-white p-3">
-                            <select
-                              value={commentReportReason}
-                              onChange={(event) => setCommentReportReason(event.target.value)}
-                              className="h-10 w-full rounded-xl border border-[#E5D7BF] bg-white px-3 text-sm"
-                            >
-                              {commentReportOptions.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                            <textarea
-                              value={commentReportDetail}
-                              onChange={(event) => setCommentReportDetail(event.target.value)}
-                              placeholder="Conte o problema, se quiser."
-                              className="min-h-[72px] w-full rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm"
-                            />
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                              <Button
-                                variant="outline"
-                                className="w-full"
-                                onClick={() => void submitCommentReport(comment.id)}
-                                disabled={isReportingComment}
-                              >
-                                {isReportingComment ? "Enviando..." : "Enviar denúncia"}
-                              </Button>
-                              <Button
-                                variant="secondary"
-                                className="w-full"
-                                onClick={() => setReportingCommentId("")}
-                                disabled={isReportingComment}
-                              >
-                                Cancelar
-                              </Button>
-                            </div>
+                          <div className="flex flex-wrap items-center gap-3 border-t border-[#E5D7BF] pt-2">
+                            {comment.isMine ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="text-xs font-semibold text-[#7A6D60]"
+                                  onClick={() => startEditComment(comment.id, comment.body)}
+                                  disabled={isMutatingComment}
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  type="button"
+                                  className="text-xs font-semibold text-[#9A4635]"
+                                  onClick={() => void deleteComment(comment.id)}
+                                  disabled={isMutatingComment}
+                                >
+                                  Excluir
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  className="text-xs font-semibold text-[#7A6D60]"
+                                  onClick={() => hideComment(comment.id)}
+                                >
+                                  Ocultar
+                                </button>
+                                <button
+                                  type="button"
+                                  className="text-xs font-semibold text-[#9A4635]"
+                                  onClick={() => {
+                                    setReportingCommentId((current) =>
+                                      current === comment.id ? "" : comment.id,
+                                    );
+                                    setCommentReportReason("inappropriate");
+                                    setCommentReportDetail("");
+                                  }}
+                                >
+                                  Denunciar
+                                </button>
+                              </>
+                            )}
                           </div>
-                        ) : null}
-                      </div>
-                    ))}
-                    {hasMoreComments ? (
-                      <Button
-                        variant="secondary"
-                        className="w-full"
-                        onClick={() => setVisibleCommentCount((current) => current + INITIAL_VISIBLE_COMMENTS)}
-                      >
-                        Ver mais comentários
-                      </Button>
-                    ) : null}
+                          {reportingCommentId === comment.id ? (
+                            <div className="space-y-2 rounded-2xl border border-[#E5D7BF] bg-white p-3">
+                              <select
+                                value={commentReportReason}
+                                onChange={(event) => setCommentReportReason(event.target.value)}
+                                className="h-10 w-full rounded-xl border border-[#E5D7BF] bg-white px-3 text-sm"
+                              >
+                                {commentReportOptions.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <textarea
+                                value={commentReportDetail}
+                                onChange={(event) => setCommentReportDetail(event.target.value)}
+                                placeholder="Conte o problema, se quiser."
+                                className="min-h-[72px] w-full rounded-xl border border-[#E5D7BF] bg-white px-3 py-2 text-sm"
+                              />
+                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                <Button
+                                  variant="outline"
+                                  className="w-full"
+                                  onClick={() => void submitCommentReport(comment.id)}
+                                  disabled={isReportingComment}
+                                >
+                                  {isReportingComment ? "Enviando..." : "Enviar denúncia"}
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  className="w-full"
+                                  onClick={() => setReportingCommentId("")}
+                                  disabled={isReportingComment}
+                                >
+                                  Cancelar
+                                </Button>
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      ))}
+                      {hasMoreComments ? (
+                        <Button
+                          variant="secondary"
+                          className="w-full"
+                          onClick={() =>
+                            setVisibleCommentCount((current) => current + INITIAL_VISIBLE_COMMENTS)
+                          }
+                        >
+                          Ver mais comentários
+                        </Button>
+                      ) : null}
                     </>
                   ) : (
                     <p className="rounded-2xl border border-[#E5D7BF] bg-[#FFFCF7] px-3 py-4 text-sm text-[#6A5E52]">
@@ -1519,9 +1540,7 @@ export default function RecipeDetailsPage() {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[#E5D7BF] px-4 py-3">
-              <p className="text-sm font-semibold text-[#5D5248]">
-                Transforme em receita autoral
-              </p>
+              <p className="text-sm font-semibold text-[#5D5248]">Transforme em receita autoral</p>
               <button className="text-xs font-semibold text-[#7A6D60]" onClick={closeTouchEditor}>
                 ← Voltar
               </button>
@@ -1553,31 +1572,25 @@ export default function RecipeDetailsPage() {
               />
 
               <div className="mt-3 grid gap-1 rounded-xl border border-[#E5D7BF] bg-[#FAF4EA] p-2 text-xs">
-              <p>{touchValidation.hasNewTitle ? "✅" : "❌"} Novo título relevante</p>
-              <p>{touchValidation.hasNewImage ? "✅" : "❌"} Nova imagem obrigatória</p>
-              <p>{touchValidation.ingredientsChanged ? "✅" : "❌"} Ingredientes mudaram de forma válida</p>
-              <p>{touchValidation.stepsChanged ? "✅" : "❌"} Preparo mudou de forma válida</p>
+                <p>{touchValidation.hasNewTitle ? "✅" : "❌"} Novo título relevante</p>
+                <p>{touchValidation.hasNewImage ? "✅" : "❌"} Nova imagem obrigatória</p>
+                <p>{touchValidation.ingredientsChanged ? "✅" : "❌"} Ingredientes mudaram de forma válida</p>
+                <p>{touchValidation.stepsChanged ? "✅" : "❌"} Preparo mudou de forma válida</p>
               </div>
 
               <div className="mt-3 flex gap-2">
-              <Button
-                className="flex-1"
-                disabled={!touchValidation.canCreate}
-                onClick={createAuthoredFromTouch}
-              >
-                Criar receita autoral
-              </Button>
-              <Button
-                variant="secondary"
-                className="flex-1"
-                onClick={closeTouchEditor}
-              >
-                Cancelar
-              </Button>
+                <Button
+                  className="flex-1"
+                  disabled={!touchValidation.canCreate}
+                  onClick={createAuthoredFromTouch}
+                >
+                  Criar receita autoral
+                </Button>
+                <Button variant="secondary" className="flex-1" onClick={closeTouchEditor}>
+                  Cancelar
+                </Button>
               </div>
-              {touchError ? (
-                <p className="mt-2 text-xs font-semibold text-red-700">{touchError}</p>
-              ) : null}
+              {touchError ? <p className="mt-2 text-xs font-semibold text-red-700">{touchError}</p> : null}
             </div>
           </div>
         </div>

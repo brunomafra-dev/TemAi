@@ -50,13 +50,7 @@ export async function POST(
       maxBytes: 6 * 1024,
       allowedKeys: ["reason", "detail"],
     });
-    const reason = readOptionalEnum(
-      payload,
-      "reason",
-      commentReportReasons,
-      "inappropriate",
-      "Motivo",
-    );
+    const reason = readOptionalEnum(payload, "reason", commentReportReasons, "inappropriate", "Motivo");
     const detail = readOptionalString(payload, "detail", {
       fieldName: "Detalhe",
       maxLength: 600,

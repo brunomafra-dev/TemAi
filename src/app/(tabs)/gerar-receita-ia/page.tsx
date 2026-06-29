@@ -126,7 +126,14 @@ function isValidMode(value: string | null): value is InputMode {
 }
 
 function isValidRecipeFilter(value: unknown): value is RecipeSuggestionFilter {
-  return value === "all" || value === "meal" || value === "fit" || value === "vegetarian" || value === "dessert" || value === "drink";
+  return (
+    value === "all" ||
+    value === "meal" ||
+    value === "fit" ||
+    value === "vegetarian" ||
+    value === "dessert" ||
+    value === "drink"
+  );
 }
 
 function normalizeSuggestionKey(value: string): string {
@@ -201,7 +208,9 @@ function appendUniqueSuggestions(params: {
 }): GeneratedSuggestion[] {
   const base = [...params.blocked, ...params.current];
   const seenIds = new Set(base.map((suggestion) => suggestion.id));
-  const seenTitles = new Set(base.map((suggestion) => normalizeSuggestionKey(suggestion.title)).filter(Boolean));
+  const seenTitles = new Set(
+    base.map((suggestion) => normalizeSuggestionKey(suggestion.title)).filter(Boolean),
+  );
   const additions = params.next.filter((suggestion) => {
     const titleKey = normalizeSuggestionKey(suggestion.title);
     if (seenIds.has(suggestion.id) || (titleKey && seenTitles.has(titleKey))) return false;
@@ -258,10 +267,7 @@ function readCachedSuggestions(): CachedSuggestionsState | null {
 
 function writeCachedSuggestions(state: Omit<CachedSuggestionsState, "savedAt">): void {
   if (typeof window === "undefined") return;
-  window.sessionStorage.setItem(
-    AI_SUGGESTIONS_CACHE_KEY,
-    JSON.stringify({ ...state, savedAt: Date.now() }),
-  );
+  window.sessionStorage.setItem(AI_SUGGESTIONS_CACHE_KEY, JSON.stringify({ ...state, savedAt: Date.now() }));
 }
 
 function CreateRecipePageContent() {
@@ -495,7 +501,9 @@ function CreateRecipePageContent() {
     }
 
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      setErrorMessage("Microfone indisponível neste aparelho. Use o microfone do teclado no campo de ingredientes.");
+      setErrorMessage(
+        "Microfone indisponível neste aparelho. Use o microfone do teclado no campo de ingredientes.",
+      );
       return;
     }
 
@@ -515,7 +523,10 @@ function CreateRecipePageContent() {
         ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/aac"].find((type) =>
           MediaRecorder.isTypeSupported(type),
         ) || "";
-      const recorder = new MediaRecorder(stream, preferredMimeType ? { mimeType: preferredMimeType } : undefined);
+      const recorder = new MediaRecorder(
+        stream,
+        preferredMimeType ? { mimeType: preferredMimeType } : undefined,
+      );
 
       audioChunksRef.current = [];
       recorder.ondataavailable = (event) => {
@@ -768,28 +779,31 @@ function CreateRecipePageContent() {
     }
   }
 
-  const openRecipe = useCallback((suggestion: RecipeSuggestion, generationId?: string) => {
-    const params = new URLSearchParams();
-    params.set("origin", "ai");
-    params.set("title", suggestion.title);
-    params.set("equipment", cookingEquipment.join(","));
-    params.set("filter", recipeFilter);
+  const openRecipe = useCallback(
+    (suggestion: RecipeSuggestion, generationId?: string) => {
+      const params = new URLSearchParams();
+      params.set("origin", "ai");
+      params.set("title", suggestion.title);
+      params.set("equipment", cookingEquipment.join(","));
+      params.set("filter", recipeFilter);
 
-    if (includeNutritionEstimate) {
-      params.set("nutrition", "1");
-    }
-
-    if (generationId) {
-      params.set("generationId", generationId);
-    } else {
-      const ingredientsQuery = compactIngredientsForAi(response?.normalizedIngredients ?? []).join(",");
-      if (ingredientsQuery) {
-        params.set("ingredients", ingredientsQuery);
+      if (includeNutritionEstimate) {
+        params.set("nutrition", "1");
       }
-    }
 
-    router.push(`/receita/${suggestion.id}?${params.toString()}`);
-  }, [cookingEquipment, includeNutritionEstimate, recipeFilter, response?.normalizedIngredients, router]);
+      if (generationId) {
+        params.set("generationId", generationId);
+      } else {
+        const ingredientsQuery = compactIngredientsForAi(response?.normalizedIngredients ?? []).join(",");
+        if (ingredientsQuery) {
+          params.set("ingredients", ingredientsQuery);
+        }
+      }
+
+      router.push(`/receita/${suggestion.id}?${params.toString()}`);
+    },
+    [cookingEquipment, includeNutritionEstimate, recipeFilter, response?.normalizedIngredients, router],
+  );
 
   const pickFromCamera = useCallback(() => {
     cameraInputRef.current?.click();
@@ -831,10 +845,13 @@ function CreateRecipePageContent() {
       <Card className="border-[#E5D7C1] bg-[#FFFCF7]">
         <CardHeader>
           <CardTitle>Gerar receita com IA</CardTitle>
-          <CardDescription>Fluxo em duas etapas: sugestões primeiro, receita completa depois.</CardDescription>
+          <CardDescription>
+            Fluxo em duas etapas: sugestões primeiro, receita completa depois.
+          </CardDescription>
           {!isPremium ? (
             <p className="text-xs text-[#7A6D60]">
-              Plano free: {subscription.aiGenerationsUsedThisMonth}/{subscription.aiGenerationsLimitThisMonth} gerações neste mês.
+              Plano free: {subscription.aiGenerationsUsedThisMonth}/{subscription.aiGenerationsLimitThisMonth}{" "}
+              gerações neste mês.
             </p>
           ) : (
             <p className="text-xs text-[#7A6D60]">Plano premium: uso livre com IA + áudio e foto.</p>
@@ -934,11 +951,7 @@ function CreateRecipePageContent() {
                 <button
                   type="button"
                   onClick={
-                    isListening
-                      ? stopVoiceCapture
-                      : isRecordingAudio
-                        ? stopAudioRecording
-                        : startVoiceCapture
+                    isListening ? stopVoiceCapture : isRecordingAudio ? stopAudioRecording : startVoiceCapture
                   }
                   className={cn(
                     "flex h-14 w-14 shrink-0 items-center justify-center rounded-full border text-2xl shadow-sm transition",
@@ -955,11 +968,7 @@ function CreateRecipePageContent() {
                 type="button"
                 variant={isAudioCaptureActive ? "default" : "secondary"}
                 onClick={
-                  isListening
-                    ? stopVoiceCapture
-                    : isRecordingAudio
-                      ? stopAudioRecording
-                      : startVoiceCapture
+                  isListening ? stopVoiceCapture : isRecordingAudio ? stopAudioRecording : startVoiceCapture
                 }
                 className="h-11 w-full rounded-2xl"
               >
@@ -991,7 +1000,9 @@ function CreateRecipePageContent() {
 
           {mode === "photo" ? (
             <div className="space-y-2">
-              <label className="block text-xs font-semibold uppercase tracking-wide text-[#8C775A]">Foto</label>
+              <label className="block text-xs font-semibold uppercase tracking-wide text-[#8C775A]">
+                Foto
+              </label>
               <div className="flex gap-2">
                 <button
                   onClick={() => setIsPhotoPickerOpen(true)}
@@ -1001,7 +1012,9 @@ function CreateRecipePageContent() {
                 </button>
               </div>
               <p className="text-xs text-[#7A6D60]">A foto já basta; o texto abaixo é só complemento.</p>
-              {selectedPhotoName ? <p className="text-xs text-[#7A6D60]">Imagem: {selectedPhotoName}</p> : null}
+              {selectedPhotoName ? (
+                <p className="text-xs text-[#7A6D60]">Imagem: {selectedPhotoName}</p>
+              ) : null}
               <input
                 ref={cameraInputRef}
                 type="file"
@@ -1021,7 +1034,9 @@ function CreateRecipePageContent() {
           ) : null}
 
           <div className="space-y-2">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-[#8C775A]">{ingredientsFieldLabel}</label>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-[#8C775A]">
+              {ingredientsFieldLabel}
+            </label>
             <Textarea
               value={ingredientsText}
               onChange={(event) => setIngredientsText(event.target.value)}
@@ -1119,7 +1134,9 @@ function CreateRecipePageContent() {
             </CardHeader>
             <CardContent className="space-y-3">
               {response.alsoCanMake.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nada por enquanto. Tente adicionar mais ingredientes.</p>
+                <p className="text-sm text-muted-foreground">
+                  Nada por enquanto. Tente adicionar mais ingredientes.
+                </p>
               ) : (
                 response.alsoCanMake.map((suggestion) => (
                   <button
@@ -1128,7 +1145,9 @@ function CreateRecipePageContent() {
                     onClick={() => openRecipe(suggestion, response.generationId)}
                   >
                     <p className="text-sm font-semibold">{suggestion.title}</p>
-                    <p className="text-xs text-[#7A6D60]">Precisa de: {suggestion.missingIngredients.join(", ")}</p>
+                    <p className="text-xs text-[#7A6D60]">
+                      Precisa de: {suggestion.missingIngredients.join(", ")}
+                    </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {suggestion.matchedIngredients.slice(0, 3).map((ingredient) => (
                         <Badge key={`also-${suggestion.id}-${ingredient}`}>tem {ingredient}</Badge>
@@ -1153,7 +1172,10 @@ function CreateRecipePageContent() {
           >
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-xl font-semibold text-[#2A1E17]">Selecionar foto</h3>
-              <button onClick={() => setIsPhotoPickerOpen(false)} className="text-xs font-semibold text-[#7A6D60]">
+              <button
+                onClick={() => setIsPhotoPickerOpen(false)}
+                className="text-xs font-semibold text-[#7A6D60]"
+              >
                 ← Voltar
               </button>
             </div>

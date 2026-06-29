@@ -32,8 +32,7 @@ export async function POST(request: Request) {
     const payload = (await parseJsonObjectBody(request, {
       maxBytes: 8 * 1024,
       allowedKeys: ["url"],
-    })) as ImportPayload &
-      Record<string, unknown>;
+    })) as ImportPayload & Record<string, unknown>;
     const url = readRequiredString(payload, "url", {
       fieldName: "URL",
       minLength: 8,

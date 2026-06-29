@@ -61,7 +61,9 @@ function readOutputText(payload: unknown): string {
 }
 
 function isRetryableOpenAiStatus(status: number): boolean {
-  return status === 408 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+  return (
+    status === 408 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504
+  );
 }
 
 async function fetchOpenAiWithTimeout(url: string, init: RequestInit): Promise<Response> {
@@ -84,7 +86,10 @@ async function fetchOpenAiWithTimeout(url: string, init: RequestInit): Promise<R
       return response;
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        throw new OpenAiGenerationError("IA demorou demais para responder. Tente novamente em instantes.", 504);
+        throw new OpenAiGenerationError(
+          "IA demorou demais para responder. Tente novamente em instantes.",
+          504,
+        );
       }
 
       if (attempt >= attempts - 1) {
@@ -106,7 +111,10 @@ async function callOpenAiJson(params: {
 }): Promise<unknown> {
   const apiKey = serverEnv.openaiApiKey();
   if (!apiKey) {
-    throw new OpenAiGenerationError("IA real ainda nao configurada. Adicione OPENAI_API_KEY e faca redeploy.", 503);
+    throw new OpenAiGenerationError(
+      "IA real ainda nao configurada. Adicione OPENAI_API_KEY e faca redeploy.",
+      503,
+    );
   }
 
   const response = await fetchOpenAiWithTimeout("https://api.openai.com/v1/responses", {
@@ -159,7 +167,10 @@ async function callOpenAiText(params: {
 }): Promise<string> {
   const apiKey = serverEnv.openaiApiKey();
   if (!apiKey) {
-    throw new OpenAiGenerationError("IA real ainda nao configurada. Adicione OPENAI_API_KEY e faca redeploy.", 503);
+    throw new OpenAiGenerationError(
+      "IA real ainda nao configurada. Adicione OPENAI_API_KEY e faca redeploy.",
+      503,
+    );
   }
 
   const response = await fetchOpenAiWithTimeout("https://api.openai.com/v1/responses", {
@@ -243,7 +254,9 @@ function cookingEquipmentInstruction(cookingEquipment: CookingEquipment[]): stri
       ? "Air fryer disponivel: pode adaptar receitas com temperatura e tempo quando fizer sentido."
       : "Air fryer nao disponivel: nao dependa dela.",
     hasMicrowave ? "Micro-ondas disponivel para preparos rapidos." : "Micro-ondas nao disponivel.",
-    hasBlender ? "Liquidificador disponivel para massas, cremes e bebidas." : "Liquidificador nao disponivel.",
+    hasBlender
+      ? "Liquidificador disponivel para massas, cremes e bebidas."
+      : "Liquidificador nao disponivel.",
     "Fritura comum pode ser feita no fogao em panela ou frigideira quando fizer sentido; nao cite fritadeira industrial.",
   ].join("\n");
 }
@@ -319,10 +332,14 @@ Regras:
 
   return {
     suggestions: Array.isArray(parsed.suggestions)
-      ? parsed.suggestions.slice(0, 3).map((item, index) => normalizeSuggestion(item, `ai-sugestao-${index + 1}`))
+      ? parsed.suggestions
+          .slice(0, 3)
+          .map((item, index) => normalizeSuggestion(item, `ai-sugestao-${index + 1}`))
       : [],
     alsoCanMake: Array.isArray(parsed.alsoCanMake)
-      ? parsed.alsoCanMake.slice(0, 3).map((item, index) => normalizeSuggestion(item, `ai-extra-${index + 1}`))
+      ? parsed.alsoCanMake
+          .slice(0, 3)
+          .map((item, index) => normalizeSuggestion(item, `ai-extra-${index + 1}`))
       : [],
     normalizedIngredients,
   };
@@ -334,7 +351,10 @@ export async function transcribeAudioWithOpenAi(
 ): Promise<string> {
   const apiKey = serverEnv.openaiApiKey();
   if (!apiKey) {
-    throw new OpenAiGenerationError("IA real ainda nao configurada. Adicione OPENAI_API_KEY e faca redeploy.", 503);
+    throw new OpenAiGenerationError(
+      "IA real ainda nao configurada. Adicione OPENAI_API_KEY e faca redeploy.",
+      503,
+    );
   }
 
   const formData = new FormData();
@@ -349,11 +369,19 @@ export async function transcribeAudioWithOpenAi(
     body: formData,
   });
 
-  const payload = (await response.json().catch(() => ({}))) as { text?: string; error?: { message?: string } };
+  const payload = (await response.json().catch(() => ({}))) as {
+    text?: string;
+    error?: { message?: string };
+  };
   if (!response.ok) {
     const message = payload.error?.message || "Falha ao transcrever audio.";
     const normalized = message.toLowerCase();
-    if (response.status === 402 || response.status === 429 || normalized.includes("quota") || normalized.includes("billing")) {
+    if (
+      response.status === 402 ||
+      response.status === 429 ||
+      normalized.includes("quota") ||
+      normalized.includes("billing")
+    ) {
       throw new OpenAiGenerationError("IA indisponível: verifique créditos/billing da OpenAI.", 402);
     }
     throw new OpenAiGenerationError(message, response.status);
@@ -390,8 +418,7 @@ export async function identifyIngredientsFromPhotoWithOpenAi(
         content: [
           {
             type: "input_text",
-            text:
-              "Identifique ingredientes visiveis nesta foto para gerar receitas. Retorne apenas JSON valido no formato {\"ingredients\":[\"ingrediente\"]}. Use nomes simples em portugues brasileiro.",
+            text: 'Identifique ingredientes visiveis nesta foto para gerar receitas. Retorne apenas JSON valido no formato {"ingredients":["ingrediente"]}. Use nomes simples em portugues brasileiro.',
           },
           { type: "input_image", image_url: dataUrl, detail },
         ],
@@ -481,8 +508,10 @@ Regras:
 
   const recipe: Recipe = {
     id: typeof parsed.id === "string" && parsed.id.trim() ? parsed.id.trim() : "receita-ia",
-    title: typeof parsed.title === "string" && parsed.title.trim() ? parsed.title.trim() : params.suggestionTitle,
-    description: typeof parsed.description === "string" ? parsed.description.trim() : "Receita criada pela IA.",
+    title:
+      typeof parsed.title === "string" && parsed.title.trim() ? parsed.title.trim() : params.suggestionTitle,
+    description:
+      typeof parsed.description === "string" ? parsed.description.trim() : "Receita criada pela IA.",
     ingredients: Array.isArray(parsed.ingredients)
       ? parsed.ingredients.filter((entry): entry is string => typeof entry === "string")
       : params.ingredients,
@@ -515,7 +544,13 @@ export async function polishAuthorRecipeWithOpenAi(params: {
   ingredientsText: string;
   stepsText: string;
   userId?: string;
-}): Promise<{ description: string; ingredientsText: string; stepsText: string; prepMinutes: number; servings: number }> {
+}): Promise<{
+  description: string;
+  ingredientsText: string;
+  stepsText: string;
+  prepMinutes: number;
+  servings: number;
+}> {
   const parsed = (await callOpenAiJson({
     model: serverEnv.openaiAuthorRecipeModel(),
     prompt: `
@@ -543,11 +578,18 @@ Retorne apenas JSON valido:
       feature: "author_recipe",
       inputMode: "text",
     },
-  })) as Partial<{ description: string; ingredientsText: string; stepsText: string; prepMinutes: number; servings: number }>;
+  })) as Partial<{
+    description: string;
+    ingredientsText: string;
+    stepsText: string;
+    prepMinutes: number;
+    servings: number;
+  }>;
 
   return {
     description: typeof parsed.description === "string" ? parsed.description : params.description,
-    ingredientsText: typeof parsed.ingredientsText === "string" ? parsed.ingredientsText : params.ingredientsText,
+    ingredientsText:
+      typeof parsed.ingredientsText === "string" ? parsed.ingredientsText : params.ingredientsText,
     stepsText: typeof parsed.stepsText === "string" ? parsed.stepsText : params.stepsText,
     prepMinutes: typeof parsed.prepMinutes === "number" ? parsed.prepMinutes : 20,
     servings: typeof parsed.servings === "number" ? parsed.servings : 2,

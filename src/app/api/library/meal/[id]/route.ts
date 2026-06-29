@@ -2,20 +2,14 @@ import { NextResponse } from "next/server";
 import { consumePublicReadRateLimit } from "@/features/security/auth-rate-limit";
 import { rateLimitResponse } from "@/features/security/auth-user";
 import { getRecipeBySlugFromSupabase } from "@/features/recipes/supabase-library";
-import {
-  sanitizePathParam,
-  validationErrorResponse,
-} from "@/lib/input-validation";
+import { sanitizePathParam, validationErrorResponse } from "@/lib/input-validation";
 import { elapsedMs, logApiEvent } from "@/lib/observability";
 
 const MEAL_CACHE_HEADERS = {
   "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
 };
 
-export async function GET(
-  request: Request,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const startedAt = Date.now();
 
   try {

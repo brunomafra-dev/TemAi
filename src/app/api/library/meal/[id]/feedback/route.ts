@@ -16,10 +16,7 @@ async function readOptionalUserId(request: Request): Promise<string | undefined>
   return userRes.data.user?.id || undefined;
 }
 
-export async function GET(
-  request: Request,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const params = await context.params;
     const recipeSlug = sanitizePathParam(params.id, {

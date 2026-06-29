@@ -65,9 +65,7 @@ export function addShoppingItemsFromRecipe(params: {
 
 export function toggleShoppingItemChecked(itemId: string): ShoppingListItem[] {
   const current = getShoppingListItems();
-  const next = current.map((item) =>
-    item.id === itemId ? { ...item, checked: !item.checked } : item,
-  );
+  const next = current.map((item) => (item.id === itemId ? { ...item, checked: !item.checked } : item));
   saveShoppingListItems(next);
   return next;
 }

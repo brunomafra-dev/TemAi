@@ -58,7 +58,8 @@ function LibraryPageContent() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const nav = window.performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    const nav = window.performance.getEntriesByType("navigation")[0] as
+      PerformanceNavigationTiming | undefined;
     if (nav?.type === "reload") {
       setSeed(createSeed());
     }
@@ -133,15 +134,18 @@ function LibraryPageContent() {
     return [...pages].sort((a, b) => a - b);
   }, [page, totalPages]);
 
-  const buildRecipeHref = useCallback((recipeId: string): string => {
-    const params = new URLSearchParams();
-    params.set("origin", "library");
-    if (search.trim()) params.set("q", search.trim());
-    params.set("category", selectedFilter);
-    params.set("page", String(page));
-    params.set("seed", seed);
-    return `/receita/${recipeId}?${params.toString()}`;
-  }, [page, search, seed, selectedFilter]);
+  const buildRecipeHref = useCallback(
+    (recipeId: string): string => {
+      const params = new URLSearchParams();
+      params.set("origin", "library");
+      if (search.trim()) params.set("q", search.trim());
+      params.set("category", selectedFilter);
+      params.set("page", String(page));
+      params.set("seed", seed);
+      return `/receita/${recipeId}?${params.toString()}`;
+    },
+    [page, search, seed, selectedFilter],
+  );
 
   return (
     <section className="space-y-5 pb-2">

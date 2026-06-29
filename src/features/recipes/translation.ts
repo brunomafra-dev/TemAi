@@ -211,7 +211,10 @@ function finalize(value: string): string {
   return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 }
 
-export async function translateToPortuguese(value: string, mode: TranslationMode = "general"): Promise<string> {
+export async function translateToPortuguese(
+  value: string,
+  mode: TranslationMode = "general",
+): Promise<string> {
   const normalized = decodeHtmlEntities(value.trim());
   if (!shouldTranslate(normalized)) return normalized;
 

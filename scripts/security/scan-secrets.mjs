@@ -10,11 +10,7 @@ const checks = [
   { name: "Hardcoded service-role env", regex: /\bSUPABASE_SERVICE_ROLE_KEY\s*=\s*[^\s#]+/g },
 ];
 
-const allowlistPatterns = [
-  /^README\.md$/,
-  /^\.env\.example$/,
-  /^package-lock\.json$/,
-];
+const allowlistPatterns = [/^README\.md$/, /^\.env\.example$/, /^package-lock\.json$/];
 
 const filesRaw = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" });
 const files = filesRaw.split("\0").filter(Boolean);

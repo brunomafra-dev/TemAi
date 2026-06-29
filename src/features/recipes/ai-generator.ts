@@ -148,10 +148,16 @@ interface NutritionMacro {
 }
 
 const nutritionKeywordMap: Array<{ regex: RegExp; macro: NutritionMacro }> = [
-  { regex: /\b(frango|peito de frango)\b/i, macro: { caloriesKcal: 165, proteinG: 31, carbsG: 0, fatG: 3.6 } },
+  {
+    regex: /\b(frango|peito de frango)\b/i,
+    macro: { caloriesKcal: 165, proteinG: 31, carbsG: 0, fatG: 3.6 },
+  },
   { regex: /\b(ovo|ovos)\b/i, macro: { caloriesKcal: 78, proteinG: 6.3, carbsG: 0.6, fatG: 5.3 } },
   { regex: /\b(arroz)\b/i, macro: { caloriesKcal: 130, proteinG: 2.7, carbsG: 28, fatG: 0.3 } },
-  { regex: /\b(macarrao|massa|spaghetti|penne)\b/i, macro: { caloriesKcal: 157, proteinG: 5.8, carbsG: 30.9, fatG: 0.9 } },
+  {
+    regex: /\b(macarrao|massa|spaghetti|penne)\b/i,
+    macro: { caloriesKcal: 157, proteinG: 5.8, carbsG: 30.9, fatG: 0.9 },
+  },
   { regex: /\b(queijo)\b/i, macro: { caloriesKcal: 113, proteinG: 7, carbsG: 0.9, fatG: 9 } },
   { regex: /\b(atum)\b/i, macro: { caloriesKcal: 132, proteinG: 28, carbsG: 0, fatG: 1 } },
   { regex: /\b(lentilha|grao de bico)\b/i, macro: { caloriesKcal: 116, proteinG: 9, carbsG: 20, fatG: 0.4 } },
@@ -159,7 +165,10 @@ const nutritionKeywordMap: Array<{ regex: RegExp; macro: NutritionMacro }> = [
   { regex: /\b(aveia)\b/i, macro: { caloriesKcal: 389, proteinG: 16.9, carbsG: 66.3, fatG: 6.9 } },
   { regex: /\b(creme de leite)\b/i, macro: { caloriesKcal: 340, proteinG: 2.1, carbsG: 3, fatG: 35 } },
   { regex: /\b(mostarda)\b/i, macro: { caloriesKcal: 66, proteinG: 3.7, carbsG: 5.8, fatG: 4.4 } },
-  { regex: /\b(tomate|cebola|cenoura|alho)\b/i, macro: { caloriesKcal: 30, proteinG: 1, carbsG: 6, fatG: 0.2 } },
+  {
+    regex: /\b(tomate|cebola|cenoura|alho)\b/i,
+    macro: { caloriesKcal: 30, proteinG: 1, carbsG: 6, fatG: 0.2 },
+  },
 ];
 
 function round1(value: number): number {
@@ -189,7 +198,10 @@ function estimateNutritionPerServing(ingredients: string[], servings: number): N
   };
 }
 
-function scoreTemplate(template: RecipeTemplate, normalizedIngredients: string[]): {
+function scoreTemplate(
+  template: RecipeTemplate,
+  normalizedIngredients: string[],
+): {
   suggestion: RecipeSuggestion;
   score: number;
 } {
@@ -217,8 +229,10 @@ function scoreTemplate(template: RecipeTemplate, normalizedIngredients: string[]
 export function generateRecipeSuggestions(ingredients: string[]): SuggestionsResponse {
   const normalizedIngredients = uniqueIngredients(ingredients);
 
-  const ranked = AI_TEMPLATES.map((template) => scoreTemplate(template, normalizedIngredients))
-    .sort((a, b) => b.score - a.score || a.suggestion.missingIngredients.length - b.suggestion.missingIngredients.length);
+  const ranked = AI_TEMPLATES.map((template) => scoreTemplate(template, normalizedIngredients)).sort(
+    (a, b) =>
+      b.score - a.score || a.suggestion.missingIngredients.length - b.suggestion.missingIngredients.length,
+  );
 
   const suggestions = ranked.slice(0, 3).map((item) => item.suggestion);
 
@@ -254,9 +268,7 @@ export function generateFullRecipe(
       id: suggestionId,
       title: "Receita personalizada",
       description: "Receita sugerida pelo TemAi a partir dos seus ingredientes.",
-      ingredients: normalizedIngredients.length
-        ? normalizedIngredients
-        : ["sal", "alho", "azeite"],
+      ingredients: normalizedIngredients.length ? normalizedIngredients : ["sal", "alho", "azeite"],
       steps: [
         "Separe todos os ingredientes em uma bancada limpa.",
         "Aquece uma panela com um fio de azeite e inicie os refogados.",
@@ -288,10 +300,7 @@ export function generateFullRecipe(
     title: template.title,
     description: template.description,
     ingredients: combinedIngredients,
-    steps: [
-      ...template.baseSteps,
-      "Finalize provando e ajustando o tempero de acordo com o seu gosto.",
-    ],
+    steps: [...template.baseSteps, "Finalize provando e ajustando o tempero de acordo com o seu gosto."],
     prepMinutes: template.prepMinutes,
     servings: template.servings,
     sourceLabel: "TemAi IA",

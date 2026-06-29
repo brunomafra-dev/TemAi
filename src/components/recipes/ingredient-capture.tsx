@@ -46,8 +46,7 @@ export function IngredientCapture({
       <CardHeader>
         <CardTitle>O que voce tem em casa?</CardTitle>
         <CardDescription>
-          Informe ingredientes por texto, audio ou foto. Na V1, usamos a descricao para gerar com
-          velocidade.
+          Informe ingredientes por texto, audio ou foto. Na V1, usamos a descricao para gerar com velocidade.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

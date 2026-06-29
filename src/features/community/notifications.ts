@@ -66,7 +66,10 @@ export async function createUserNotification(params: {
   });
 }
 
-export async function listUserNotifications(userId: string, limit = 20): Promise<{
+export async function listUserNotifications(
+  userId: string,
+  limit = 20,
+): Promise<{
   notifications: UserNotification[];
   unreadCount: number;
 }> {

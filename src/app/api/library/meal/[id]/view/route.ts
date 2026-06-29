@@ -21,10 +21,7 @@ async function readOptionalUserId(request: Request): Promise<string | undefined>
   return userRes.data.user?.id || undefined;
 }
 
-export async function POST(
-  request: Request,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const params = await context.params;
     const recipeSlug = sanitizePathParam(params.id, {
@@ -58,9 +55,12 @@ export async function POST(
       return NextResponse.json({ message: "Receita não encontrada." }, { status: 404 });
     }
 
-    return NextResponse.json({ ok: true }, {
-      headers: { "Cache-Control": "no-store, max-age=0" },
-    });
+    return NextResponse.json(
+      { ok: true },
+      {
+        headers: { "Cache-Control": "no-store, max-age=0" },
+      },
+    );
   } catch (error) {
     const validationResponse = validationErrorResponse(error);
     if (validationResponse) return validationResponse;

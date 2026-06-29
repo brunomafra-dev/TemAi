@@ -30,9 +30,7 @@ export async function buildAuthHeaders(): Promise<Record<string, string>> {
   return { Authorization: `Bearer ${token}` };
 }
 
-export async function fetchAiSuggestions(
-  body: SuggestionRequestBody,
-): Promise<SuggestionsResponse> {
+export async function fetchAiSuggestions(body: SuggestionRequestBody): Promise<SuggestionsResponse> {
   const authHeaders = await buildAuthHeaders();
   const hasFile = Boolean(body.file);
   const requestBody = hasFile ? new FormData() : JSON.stringify(body);
@@ -147,7 +145,10 @@ export async function fetchLibraryRecipeFeedback(recipeId: string): Promise<Libr
   return parseResponse(response);
 }
 
-export async function saveLibraryRecipeRating(recipeId: string, rating: number): Promise<LibraryRecipeFeedback> {
+export async function saveLibraryRecipeRating(
+  recipeId: string,
+  rating: number,
+): Promise<LibraryRecipeFeedback> {
   const authHeaders = await buildAuthHeaders();
   const response = await fetch(`/api/library/meal/${encodeURIComponent(recipeId)}/rating`, {
     method: "POST",
@@ -173,7 +174,10 @@ export async function deleteLibraryRecipeRating(recipeId: string): Promise<Libra
   return feedback;
 }
 
-export async function postLibraryRecipeComment(recipeId: string, body: string): Promise<LibraryRecipeFeedback> {
+export async function postLibraryRecipeComment(
+  recipeId: string,
+  body: string,
+): Promise<LibraryRecipeFeedback> {
   const authHeaders = await buildAuthHeaders();
   const response = await fetch(`/api/library/meal/${encodeURIComponent(recipeId)}/comments`, {
     method: "POST",

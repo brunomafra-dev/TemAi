@@ -81,8 +81,7 @@ export async function POST(request: Request) {
     const payload = (await parseJsonObjectBody(request, {
       maxBytes: 16 * 1024,
       allowedKeys: ["name", "username", "email", "password", "acceptedTerms", "redirectTo"],
-    })) as RegisterPayload &
-      Record<string, unknown>;
+    })) as RegisterPayload & Record<string, unknown>;
     const email = readRequiredString(payload, "email", {
       fieldName: "Email",
       minLength: 6,
