@@ -21,6 +21,7 @@ const nextImageHosts = new Set([
 type RecipeImageProps = Omit<ImageProps, "src" | "alt" | "onLoad" | "onError"> & {
   src?: string | null;
   alt: string;
+  fallbackSrc?: string;
   imageClassName?: string;
   overlayClassName?: string;
   showIllustrativeOverlay?: boolean;
@@ -55,6 +56,7 @@ function shouldBypassNextOptimizer(source: string): boolean {
 export const RecipeImage = memo(function RecipeImage({
   src,
   alt,
+  fallbackSrc,
   className = "",
   imageClassName = "",
   overlayClassName = "",
@@ -66,7 +68,11 @@ export const RecipeImage = memo(function RecipeImage({
   ...props
 }: RecipeImageProps) {
   const initialSource = useMemo(() => normalizeRecipeImageSource(src), [src]);
-  const normalizedSource = initialSource || RECIPE_PLACEHOLDER_SRC;
+  const fallbackSource = useMemo(
+    () => normalizeRecipeImageSource(fallbackSrc) || RECIPE_PLACEHOLDER_SRC,
+    [fallbackSrc],
+  );
+  const normalizedSource = initialSource || fallbackSource;
 
   return (
     <RecipeImageState
@@ -83,6 +89,7 @@ export const RecipeImage = memo(function RecipeImage({
       decoding={decoding}
       sizes={sizes}
       startsAsFallback={!initialSource}
+      fallbackSrc={fallbackSource}
     />
   );
 });
@@ -106,6 +113,7 @@ function RecipeImageState({
   decoding = "async",
   sizes = "(max-width: 768px) 100vw, 50vw",
   startsAsFallback,
+  fallbackSrc = RECIPE_PLACEHOLDER_SRC,
   ...props
 }: RecipeImageStateProps) {
   const [activeSource, setActiveSource] = useState(src);
@@ -117,13 +125,13 @@ function RecipeImageState({
     if (isLoaded || isFallback) return;
 
     const timer = window.setTimeout(() => {
-      setActiveSource(RECIPE_PLACEHOLDER_SRC);
+      setActiveSource(fallbackSrc);
       setIsFallback(true);
       setIsLoaded(false);
     }, FALLBACK_TIMEOUT_MS);
 
     return () => window.clearTimeout(timer);
-  }, [isFallback, isLoaded, activeSource]);
+  }, [fallbackSrc, isFallback, isLoaded, activeSource]);
 
   const useCssFallback = isFallback && placeholderFailed;
   const unoptimized = shouldBypassNextOptimizer(activeSource);
@@ -157,12 +165,12 @@ function RecipeImageState({
           className={`transition duration-700 ${isLoaded ? "opacity-100" : "opacity-0"} ${imageClassName}`}
           onLoad={() => setIsLoaded(true)}
           onError={() => {
-            if (activeSource === RECIPE_PLACEHOLDER_SRC) {
+            if (activeSource === fallbackSrc || activeSource === RECIPE_PLACEHOLDER_SRC) {
               setPlaceholderFailed(true);
               setIsLoaded(true);
               return;
             }
-            setActiveSource(RECIPE_PLACEHOLDER_SRC);
+            setActiveSource(fallbackSrc);
             setIsFallback(true);
             setIsLoaded(false);
           }}

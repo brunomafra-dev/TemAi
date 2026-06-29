@@ -3,6 +3,7 @@ import Link from "next/link";
 import { RecipeImage } from "@/components/recipes/recipe-image";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getRecipeImageFallback } from "@/features/recipes/image-fallbacks";
 import { getRecipeDifficulty } from "@/features/recipes/quality";
 import type { Recipe } from "@/features/recipes/types";
 
@@ -21,11 +22,13 @@ export const RecipeCard = memo(function RecipeCard({ recipe, href, footerLabel }
         <div className="relative h-44 overflow-hidden rounded-t-[1.5rem]">
           <RecipeImage
             src={recipe.imageUrl}
+            fallbackSrc={getRecipeImageFallback(recipe)}
             alt={recipe.title}
             fill
             sizes="(max-width: 768px) 100vw, 50vw"
             className="h-full w-full"
             imageClassName="object-cover hover:scale-105"
+            showIllustrativeOverlay={false}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#2A1E17]/70 via-[#2A1E17]/20 to-transparent" />
           <div className="absolute left-3 top-3 flex gap-1.5">

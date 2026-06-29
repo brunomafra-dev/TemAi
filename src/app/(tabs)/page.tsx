@@ -7,6 +7,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RecipeImage } from "@/components/recipes/recipe-image";
 import { RatingStars } from "@/components/recipes/rating-stars";
 import { BADGE_CATALOG } from "@/features/profile/badges";
+import { getRecipeImageFallback } from "@/features/recipes/image-fallbacks";
 import {
   getUserProfile,
   saveUserProfile,
@@ -212,11 +213,13 @@ const PopularRecipeCard = memo(function PopularRecipeCard({ entry }: { entry: Po
       <div className="relative min-h-[122px] w-[40%] shrink-0 overflow-hidden">
         <RecipeImage
           src={entry.image}
+          fallbackSrc={getRecipeImageFallback(entry.recipe)}
           alt={entry.recipe.title}
           fill
           sizes="40vw"
           className="absolute inset-0"
           imageClassName="object-cover"
+          showIllustrativeOverlay={false}
         />
         <div className="absolute inset-0 bg-[#2A1E17]/30" />
         <div className="absolute left-2 top-2 flex gap-1.5">
@@ -554,7 +557,7 @@ export default function HomePage() {
         recipe: entry.recipe,
         ratingAverage: entry.ratingAverage,
         ratingCount: entry.ratingCount,
-        image: entry.recipe.imageUrl,
+        image: entry.recipe.imageUrl || getRecipeImageFallback(entry.recipe),
         author: entry.recipe.sourceLabel,
         viewCount: entry.viewCount,
       }));
