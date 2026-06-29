@@ -35,6 +35,9 @@ function normalizeRecipeImageSource(value?: string | null): string | null {
   try {
     const url = new URL(source);
     if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    if (url.hostname === "www.receiteria.com.br") {
+      return null;
+    }
     return url.toString();
   } catch {
     return null;
@@ -162,7 +165,7 @@ function RecipeImageState({
           loading={priority ? undefined : loading || "lazy"}
           decoding={decoding}
           unoptimized={unoptimized}
-          className={`transition duration-700 ${isLoaded ? "opacity-100" : "opacity-0"} ${imageClassName}`}
+          className={`transition duration-700 ${imageClassName}`}
           onLoad={() => setIsLoaded(true)}
           onError={() => {
             if (activeSource === fallbackSrc || activeSource === RECIPE_PLACEHOLDER_SRC) {

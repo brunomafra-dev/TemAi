@@ -217,7 +217,7 @@ const PopularRecipeCard = memo(function PopularRecipeCard({ entry }: { entry: Po
           alt={entry.recipe.title}
           fill
           sizes="40vw"
-          className="absolute inset-0"
+          className="h-[122px] w-full"
           imageClassName="object-cover"
           showIllustrativeOverlay={false}
         />

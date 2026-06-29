@@ -15,6 +15,22 @@ const CATEGORY_IMAGES: Record<string, string> = {
 
 const KEYWORD_IMAGES: Array<{ terms: string[]; image: string }> = [
   {
+    terms: ["pao de parmesao", "pão de parmesão", "pao de queijo", "pão de queijo", "parmesao", "parmesão", "pao", "pão", "bread"],
+    image: "https://images.unsplash.com/photo-1600628421055-4d30de868b8f?auto=format&fit=crop&w=1200&q=80",
+  },
+  {
+    terms: ["chai", "cha verde", "chá verde", "tea cake"],
+    image: "https://images.unsplash.com/photo-1519915028121-7d3463d20b13?auto=format&fit=crop&w=1200&q=80",
+  },
+  {
+    terms: ["batata", "potato"],
+    image: "https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=1200&q=80",
+  },
+  {
+    terms: ["brigadeiro", "palha italiana", "docinho", "torrone", "amendoim"],
+    image: "https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=1200&q=80",
+  },
+  {
     terms: ["avocado", "abacate", "toast", "torrada"],
     image: "https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=1200&q=80",
   },
