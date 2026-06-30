@@ -546,7 +546,7 @@ export default function HomePage() {
       recipe: entry.recipe,
       ratingAverage: entry.ratingAverage,
       ratingCount: entry.ratingCount,
-      image: entry.recipe.imageUrl || getRecipeImageFallback(entry.recipe),
+      image: entry.recipe.imageUrl,
       author: entry.recipe.sourceLabel,
       viewCount: entry.viewCount,
     }));

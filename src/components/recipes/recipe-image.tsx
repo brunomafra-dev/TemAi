@@ -10,6 +10,7 @@ const FALLBACK_TIMEOUT_MS = 8000;
 const nextImageHosts = new Set([
   "images.unsplash.com",
   "images.pexels.com",
+  "www.receiteria.com.br",
   "static.itdg.com.br",
   "www.tudogostoso.com.br",
   "s2-receitas.glbimg.com",
@@ -35,9 +36,6 @@ function normalizeRecipeImageSource(value?: string | null): string | null {
   try {
     const url = new URL(source);
     if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-    if (url.hostname === "www.receiteria.com.br") {
-      return null;
-    }
     return url.toString();
   } catch {
     return null;
@@ -165,7 +163,7 @@ function RecipeImageState({
           loading={priority ? undefined : loading || "lazy"}
           decoding={decoding}
           unoptimized={unoptimized}
-          className={`transition duration-700 ${imageClassName}`}
+          className={`transition duration-700 ${isLoaded ? "opacity-100" : "opacity-0"} ${imageClassName}`}
           onLoad={() => setIsLoaded(true)}
           onError={() => {
             if (activeSource === fallbackSrc || activeSource === RECIPE_PLACEHOLDER_SRC) {
